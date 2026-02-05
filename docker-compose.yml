@@ -1,0 +1,80 @@
+version: '3.8'
+
+services:
+  redpanda:
+    image: redpandadata/redpanda:latest
+    container_name: swifka-redpanda
+    command:
+      - redpanda start
+      - --overprovisioned
+      - --smp 1
+      - --memory 512M
+      - --reserve-memory 0M
+      - --node-id 0
+      - --check=false
+      - --kafka-addr PLAINTEXT://0.0.0.0:29092,OUTSIDE://0.0.0.0:9092
+      - --advertise-kafka-addr PLAINTEXT://redpanda:29092,OUTSIDE://localhost:9092
+      - --pandaproxy-addr 0.0.0.0:8082
+      - --advertise-pandaproxy-addr localhost:8082
+    ports:
+      - "9092:9092"
+      - "8082:8082"
+      - "9644:9644"
+    healthcheck:
+      test: ["CMD", "rpk", "cluster", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Initialize test data
+  init-kafka:
+    image: redpandadata/redpanda:latest
+    container_name: swifka-init
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    entrypoint: /bin/bash
+    command: |
+      -c '
+      echo "Creating topics..."
+      
+      # Create test topics
+      rpk topic create orders --brokers redpanda:29092 --partitions 3 --replicas 1
+      rpk topic create users --brokers redpanda:29092 --partitions 2 --replicas 1  
+      rpk topic create logs --brokers redpanda:29092 --partitions 1 --replicas 1
+      
+      echo "Topics created:"
+      rpk topic list --brokers redpanda:29092
+      
+      echo ""
+      echo "Producing test messages..."
+      
+      # Produce test messages to orders topic
+      echo "{\"order_id\": 1001, \"user\": \"alice\", \"amount\": 99.99}" | rpk topic produce orders --brokers redpanda:29092
+      echo "{\"order_id\": 1002, \"user\": \"bob\", \"amount\": 149.50}" | rpk topic produce orders --brokers redpanda:29092
+      echo "{\"order_id\": 1003, \"user\": \"charlie\", \"amount\": 25.00}" | rpk topic produce orders --brokers redpanda:29092
+      echo "{\"order_id\": 1004, \"user\": \"alice\", \"amount\": 200.00}" | rpk topic produce orders --brokers redpanda:29092
+      echo "{\"order_id\": 1005, \"user\": \"david\", \"amount\": 75.25}" | rpk topic produce orders --brokers redpanda:29092
+      
+      # Produce test messages to users topic
+      echo "{\"id\": 1, \"name\": \"Alice\", \"email\": \"alice@example.com\"}" | rpk topic produce users --brokers redpanda:29092
+      echo "{\"id\": 2, \"name\": \"Bob\", \"email\": \"bob@example.com\"}" | rpk topic produce users --brokers redpanda:29092
+      echo "{\"id\": 3, \"name\": \"Charlie\", \"email\": \"charlie@example.com\"}" | rpk topic produce users --brokers redpanda:29092
+      
+      # Produce test messages to logs topic
+      echo "{\"level\": \"INFO\", \"message\": \"Application started\"}" | rpk topic produce logs --brokers redpanda:29092
+      echo "{\"level\": \"WARN\", \"message\": \"High memory usage\"}" | rpk topic produce logs --brokers redpanda:29092
+      echo "{\"level\": \"ERROR\", \"message\": \"Connection timeout\"}" | rpk topic produce logs --brokers redpanda:29092
+      
+      echo ""
+      echo "Creating a consumer group with some lag..."
+      # Create a consumer group, consume partial messages to simulate lag
+      rpk group seek test-consumer-group --to start --brokers redpanda:29092 --topics orders || true
+      
+      echo ""
+      echo "=== Setup Complete ==="
+      echo "Kafka broker: localhost:9092"
+      echo "Topics: orders (3 partitions), users (2 partitions), logs (1 partition)"
+      echo ""
+      rpk topic list --brokers redpanda:29092
+      '
