@@ -1,0 +1,96 @@
+import Foundation
+
+@Observable
+final class ConfigStore {
+    var clusters: [ClusterConfig] = []
+    var selectedClusterId: UUID?
+
+    var selectedCluster: ClusterConfig? {
+        clusters.first { $0.id == selectedClusterId }
+    }
+
+    private let fileURL: URL
+
+    init() {
+        let appSupport = FileManager.default.urls(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask,
+        ).first!
+        let dir = appSupport.appendingPathComponent(Constants.configDirectory)
+        fileURL = dir.appendingPathComponent(Constants.configFileName)
+
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        load()
+    }
+
+    // MARK: - CRUD
+
+    func addCluster(_ cluster: ClusterConfig) {
+        clusters.append(cluster)
+        if selectedClusterId == nil {
+            selectedClusterId = cluster.id
+        }
+        save()
+    }
+
+    func updateCluster(_ cluster: ClusterConfig) {
+        if let index = clusters.firstIndex(where: { $0.id == cluster.id }) {
+            var updated = cluster
+            updated.updatedAt = Date()
+            clusters[index] = updated
+            save()
+        }
+    }
+
+    func deleteCluster(_ id: UUID) {
+        clusters.removeAll { $0.id == id }
+        if selectedClusterId == id {
+            selectedClusterId = clusters.first?.id
+        }
+        save()
+    }
+
+    // MARK: - Persistence
+
+    func save() {
+        do {
+            let encoder = JSONEncoder()
+            encoder.dateEncodingStrategy = .iso8601
+            encoder.outputFormatting = .prettyPrinted
+            let data = try encoder.encode(clusters)
+            try data.write(to: fileURL, options: .atomic)
+        } catch {
+            print("ConfigStore: Failed to save: \(error)")
+        }
+    }
+
+    func load() {
+        guard FileManager.default.fileExists(atPath: fileURL.path) else { return }
+        do {
+            let data = try Data(contentsOf: fileURL)
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            clusters = try decoder.decode([ClusterConfig].self, from: data)
+            selectedClusterId = clusters.first?.id
+        } catch {
+            print("ConfigStore: Failed to load: \(error)")
+        }
+    }
+
+    // MARK: - Import/Export
+
+    func exportConfig() -> Data? {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.outputFormatting = .prettyPrinted
+        return try? encoder.encode(clusters)
+    }
+
+    func importConfig(from data: Data) throws {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let imported = try decoder.decode([ClusterConfig].self, from: data)
+        clusters.append(contentsOf: imported)
+        save()
+    }
+}

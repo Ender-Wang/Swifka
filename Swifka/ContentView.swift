@@ -1,24 +1,167 @@
-//
-//  ContentView.swift
-//  Swifka
-//
-//  Created by Ender Wang on 2/5/26.
-//
-
 import SwiftUI
 
 struct ContentView: View {
+    @Environment(AppState.self) private var appState
+
     var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
+        @Bindable var state = appState
+        let l10n = appState.l10n
+
+        NavigationSplitView {
+            SidebarView()
+                .navigationSplitViewColumnWidth(min: Constants.sidebarMinWidth, ideal: 220)
+        } detail: {
+            switch appState.selectedSidebarItem {
+            case .dashboard:
+                DashboardView()
+            case .topics:
+                TopicListView()
+            case .messages:
+                MessageBrowserView()
+            case .consumerGroups:
+                ConsumerGroupsView()
+            case .brokers:
+                BrokersView()
+            case .settings:
+                SettingsView()
+            case .none:
+                DashboardView()
+            }
         }
-        .padding()
+        .toolbar {
+            ToolbarItemGroup(placement: .primaryAction) {
+                // Refresh controls
+                if appState.connectionStatus.isConnected {
+                    Menu {
+                        Button(l10n["common.refresh"]) {
+                            Task { await appState.refreshAll() }
+                        }
+                        .keyboardShortcut("r")
+
+                        Divider()
+
+                        ForEach(RefreshMode.presets) { mode in
+                            Button {
+                                appState.refreshManager.updateMode(mode)
+                                appState.defaultRefreshMode = mode
+                            } label: {
+                                HStack {
+                                    Text(refreshModeLabel(mode, l10n: l10n))
+                                    if mode == appState.defaultRefreshMode {
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
+                        }
+                    } label: {
+                        Label(l10n["common.refresh"], systemImage: "arrow.clockwise")
+                    }
+                }
+
+                // Connection controls
+                if appState.connectionStatus.isConnected {
+                    Button {
+                        Task { await appState.disconnect() }
+                    } label: {
+                        Label(l10n["connection.disconnect"], systemImage: "bolt.slash")
+                    }
+                } else if appState.configStore.selectedCluster != nil {
+                    Button {
+                        Task { await appState.connect() }
+                    } label: {
+                        Label(l10n["connection.connect"], systemImage: "bolt")
+                    }
+                }
+            }
+        }
+        .overlay(alignment: .bottom) {
+            StatusBarView()
+        }
+        .task {
+            // Auto-connect on launch if a cluster is selected
+            if appState.configStore.selectedCluster != nil {
+                await appState.connect()
+            }
+        }
+    }
+
+    private func refreshModeLabel(_ mode: RefreshMode, l10n: L10n) -> String {
+        switch mode {
+        case .manual: l10n["settings.refresh.manual"]
+        case let .interval(seconds): l10n.t("settings.refresh.interval.seconds", "\(seconds)")
+        }
+    }
+}
+
+// MARK: - Sidebar
+
+struct SidebarView: View {
+    @Environment(AppState.self) private var appState
+
+    var body: some View {
+        @Bindable var state = appState
+        let l10n = appState.l10n
+
+        List(selection: $state.selectedSidebarItem) {
+            // Cluster picker at top
+            Section {
+                ClusterPickerView()
+            }
+
+            Section(l10n["sidebar.section.overview"]) {
+                Label(l10n["sidebar.dashboard"], systemImage: "gauge.with.dots.needle.33percent")
+                    .tag(SidebarItem.dashboard)
+            }
+
+            Section(l10n["sidebar.section.browse"]) {
+                Label(l10n["sidebar.topics"], systemImage: "list.bullet.rectangle")
+                    .tag(SidebarItem.topics)
+                Label(l10n["sidebar.messages"], systemImage: "envelope")
+                    .tag(SidebarItem.messages)
+            }
+
+            Section(l10n["sidebar.section.monitor"]) {
+                Label(l10n["sidebar.groups"], systemImage: "person.3")
+                    .tag(SidebarItem.consumerGroups)
+                Label(l10n["sidebar.brokers"], systemImage: "server.rack")
+                    .tag(SidebarItem.brokers)
+            }
+
+            Section(l10n["sidebar.section.system"]) {
+                Label(l10n["sidebar.settings"], systemImage: "gear")
+                    .tag(SidebarItem.settings)
+            }
+        }
+        .listStyle(.sidebar)
+    }
+}
+
+// MARK: - Status Bar
+
+struct StatusBarView: View {
+    @Environment(AppState.self) private var appState
+
+    var body: some View {
+        HStack(spacing: 8) {
+            ConnectionStatusBadge(status: appState.connectionStatus)
+            Text(appState.statusText)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Spacer()
+
+            if appState.isLoading {
+                ProgressView()
+                    .controlSize(.small)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(.bar)
     }
 }
 
 #Preview {
     ContentView()
+        .environment(AppState())
 }
