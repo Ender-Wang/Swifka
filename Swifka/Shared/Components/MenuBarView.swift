@@ -25,14 +25,20 @@ struct MenuBarView: View {
         Divider()
 
         Button(l10n["sidebar.dashboard"]) { navigateTo(.dashboard) }
+            .keyboardShortcut("d", modifiers: [.command, .shift])
         Divider()
         Button(l10n["sidebar.topics"]) { navigateTo(.topics) }
+            .keyboardShortcut("t", modifiers: [.command, .shift])
         Button(l10n["sidebar.messages"]) { navigateTo(.messages) }
+            .keyboardShortcut("m", modifiers: [.command, .shift])
         Divider()
         Button(l10n["sidebar.groups"]) { navigateTo(.consumerGroups) }
+            .keyboardShortcut("c", modifiers: [.command, .shift])
         Button(l10n["sidebar.brokers"]) { navigateTo(.brokers) }
+            .keyboardShortcut("b", modifiers: [.command, .shift])
         Divider()
         Button(l10n["sidebar.settings"]) { navigateTo(.settings) }
+            .keyboardShortcut(",")
 
         Divider()
 
