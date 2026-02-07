@@ -5,7 +5,7 @@
 <h1 align="center">Swifka</h1>
 
 <p align="center">
-  A read-focused, lightweight, native macOS Kafka client for monitoring clusters, browsing topics, and tracking consumer lag.
+  A read-focused, lightweight, native macOS Kafka client for monitoring clusters, browsing topics, and tracking consumer lag. PR tested.
 </p>
 
 **Why Swifka exists:** Every existing Kafka client is either Java-based (Offset Explorer, Conduktor) or web-based (AKHQ, Kafdrop, Redpanda Console) — none of them feel at home on macOS. When one of our projects started migrating from Redis to Kafka, we needed a fast, frictionless way to monitor clusters, browse messages, and track consumer lag without spinning up a web app or dealing with clunky Java UIs. So we built a native one.
