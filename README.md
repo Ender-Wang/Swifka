@@ -14,6 +14,14 @@
   <img src=".github/assets/Swifka_demo.gif" alt="Swifka Demo" width="800" />
 </p>
 
+## Install
+
+```bash
+brew install --cask ender-wang/tap/swifka
+```
+
+Or download the latest `.dmg` from [Releases](https://github.com/Ender-Wang/Swifka/releases).
+
 **What it does:**
 - Connect to any Kafka-compatible cluster (Kafka, Redpanda, etc.)
 - Browse topics, partitions, and messages (UTF-8 / Hex / Base64)
