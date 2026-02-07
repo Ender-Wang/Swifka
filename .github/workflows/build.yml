@@ -28,7 +28,7 @@ jobs:
         run: |
           VERSION=$(grep 'MARKETING_VERSION' Swifka.xcodeproj/project.pbxproj | head -1 | sed 's/.*= \(.*\);/\1/' | tr -d ' ')
           BUILD=$(grep 'CURRENT_PROJECT_VERSION' Swifka.xcodeproj/project.pbxproj | head -1 | sed 's/.*= \(.*\);/\1/' | tr -d ' ')
-          COMMIT_MSG=$(git log -1 --pretty=%B | tail -n +2 | sed '/^$/d')
+          COMMIT_MSG=$(git log -1 --pretty=%B | tail -n +2 | tail -n +2)
 
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "build=$BUILD" >> $GITHUB_OUTPUT
