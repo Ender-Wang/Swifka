@@ -1,0 +1,38 @@
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgFinal2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1a1a"/>
+      <stop offset="100%" style="stop-color:#0d0d0d"/>
+    </linearGradient>
+<!--Swift Gradient-->
+    <linearGradient id="swiftBelt2" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#FFAC33"/>
+      <stop offset="50%" style="stop-color:#FF9500"/>
+      <stop offset="100%" style="stop-color:#F05138"/>
+    </linearGradient>
+  </defs>
+<!--Swift Gradient Track-->
+  <rect x="14" y="76" width="72" height="9" rx="3" fill="#"/>
+<!--Track Orientation ›››-->
+  <text x="22" y="83" font-size="7" fill="#ffff" font-family="Arial" font-weight="bold">›</text>
+  <text x="34" y="83" font-size="7" fill="#ffff" font-family="Arial" font-weight="bold">›</text>
+  <text x="46" y="83" font-size="7" fill="#ffff" font-family="Arial" font-weight="bold">›</text>
+  <text x="58" y="83" font-size="7" fill="#ffff" font-family="Arial" font-weight="bold">›</text>
+  <text x="70" y="83" font-size="7" fill="#ffff" font-family="Arial" font-weight="bold">›</text>
+<!--Small case k, centered
+    ■ · · ·
+    ■ · ■ ·
+    ■ ■ · ·
+    ■ · ■ ·-->
+<!--Row 1-->
+  <rect x="30" y="18" width="11" height="11" rx="2"/>
+<!--Row 2-->
+  <rect x="30" y="31" width="11" height="11" rx="2"/>
+  <rect x="58" y="31" width="11" height="11" rx="2"/>
+<!--Row 3-->
+  <rect x="30" y="44" width="11" height="11" rx="2"/>
+  <rect x="44" y="44" width="11" height="11" rx="2"/>
+<!--Row 4-->
+  <rect x="30" y="57" width="11" height="11" rx="2"/>
+  <rect x="58" y="57" width="11" height="11" rx="2"/>
+</svg>
