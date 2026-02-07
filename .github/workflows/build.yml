@@ -1,0 +1,99 @@
+name: Build and Release
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'Swifka.xcodeproj/project.pbxproj'
+  workflow_dispatch:
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    outputs:
+      should_release: ${{ steps.check.outputs.should_release }}
+      version: ${{ steps.check.outputs.version }}
+      tag: ${{ steps.check.outputs.tag }}
+      build: ${{ steps.check.outputs.build }}
+      prerelease: ${{ steps.check.outputs.prerelease }}
+      commit_message: ${{ steps.check.outputs.commit_message }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check version
+        id: check
+        run: |
+          VERSION=$(grep 'MARKETING_VERSION' Swifka.xcodeproj/project.pbxproj | head -1 | sed 's/.*= \(.*\);/\1/' | tr -d ' ')
+          BUILD=$(grep 'CURRENT_PROJECT_VERSION' Swifka.xcodeproj/project.pbxproj | head -1 | sed 's/.*= \(.*\);/\1/' | tr -d ' ')
+          COMMIT_MSG=$(git log -1 --pretty=%B | tail -n +2 | sed '/^$/d')
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "build=$BUILD" >> $GITHUB_OUTPUT
+          echo "commit_message<<EOF" >> $GITHUB_OUTPUT
+          echo "$COMMIT_MSG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+          git fetch --tags
+
+          # If the version tag exists, this is a build-number-only bump → pre-release
+          if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+            TAG="v${VERSION}.${BUILD}"
+            PRERELEASE=true
+          else
+            TAG="v${VERSION}"
+            PRERELEASE=false
+          fi
+
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "prerelease=$PRERELEASE" >> $GITHUB_OUTPUT
+
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists, skipping"
+            echo "should_release=false" >> $GITHUB_OUTPUT
+          else
+            echo "Creating release $TAG (build $BUILD)"
+            echo "should_release=true" >> $GITHUB_OUTPUT
+          fi
+
+  build:
+    needs: check-version
+    if: needs.check-version.outputs.should_release == 'true'
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '26.2'
+
+      - name: Install SwiftFormat
+        run: brew install swiftformat
+
+      - name: Build
+        run: |
+          xcodebuild -project Swifka.xcodeproj -scheme Swifka -configuration Release \
+            -derivedDataPath build CODE_SIGN_IDENTITY="-" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO build
+          strip build/Build/Products/Release/Swifka.app/Contents/MacOS/Swifka || true
+
+      - name: Create DMG
+        id: dmg
+        run: |
+          mkdir -p dmg_contents
+          cp -R build/Build/Products/Release/Swifka.app dmg_contents/
+          ln -s /Applications dmg_contents/Applications
+          hdiutil create -volname "Swifka" -srcfolder dmg_contents -ov -format UDZO "Swifka-${{ needs.check-version.outputs.tag }}.dmg"
+          echo "dmg_name=Swifka-${{ needs.check-version.outputs.tag }}.dmg" >> $GITHUB_OUTPUT
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ needs.check-version.outputs.tag }}
+          name: ${{ needs.check-version.outputs.tag }} (build ${{ needs.check-version.outputs.build }})
+          body: ${{ needs.check-version.outputs.commit_message }}
+          prerelease: ${{ needs.check-version.outputs.prerelease == 'true' }}
+          files: ${{ steps.dmg.outputs.dmg_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
