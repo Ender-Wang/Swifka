@@ -70,7 +70,7 @@ jobs:
           xcode-version: '26.2'
 
       - name: Install SwiftFormat
-        run: brew install swiftformat
+        run: command -v swiftformat || brew install swiftformat
 
       - name: Build
         run: |
