@@ -144,7 +144,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "if [ -f /opt/homebrew/bin/swiftformat ]; then\n    /opt/homebrew/bin/swiftformat \"$SRCROOT/Swifka\"\nelse\n    echo \"warning: SwiftFormat not installed\"\nfi\n";
+			shellScript = "if [ -f /opt/homebrew/bin/swiftformat ]; then\n    /opt/homebrew/bin/swiftformat \"$SRCROOT/Swifka\"\nelif command -v swiftformat > /dev/null 2>&1; then\n    swiftformat \"$SRCROOT/Swifka\"\nelse\n    echo \"warning: SwiftFormat not installed\"\nfi\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
