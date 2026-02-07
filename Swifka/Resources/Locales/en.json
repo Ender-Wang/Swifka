@@ -135,5 +135,8 @@
     "error.metadata.failed": "Failed to fetch metadata",
     "error.messages.failed": "Failed to fetch messages",
     "error.config.save.failed": "Failed to save configuration",
-    "error.config.load.failed": "Failed to load configuration"
+    "error.config.load.failed": "Failed to load configuration",
+
+    "menubar.quit": "Quit Swifka",
+    "menubar.show": "Show Swifka"
 }

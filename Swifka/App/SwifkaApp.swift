@@ -18,5 +18,12 @@ struct SwifkaApp: App {
             height: Constants.defaultWindowHeight,
         )
         .windowToolbarStyle(.unified)
+
+        MenuBarExtra {
+            MenuBarView(appState: appState)
+        } label: {
+            Image("MenuBarIcon")
+        }
+        .menuBarExtraStyle(.menu)
     }
 }

@@ -135,5 +135,8 @@
     "error.metadata.failed": "获取元数据失败",
     "error.messages.failed": "获取消息失败",
     "error.config.save.failed": "保存配置失败",
-    "error.config.load.failed": "加载配置失败"
+    "error.config.load.failed": "加载配置失败",
+
+    "menubar.quit": "退出 Swifka",
+    "menubar.show": "显示 Swifka"
 }
