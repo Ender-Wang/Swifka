@@ -1,6 +1,31 @@
-# Swifka
+<p align="center">
+  <img src=".github/assets/Swifka.svg" alt="Swifka" width="128" />
+</p>
 
-A read-focused, lightweight, native macOS Kafka client for monitoring clusters, browsing topics, and tracking consumer lag.
+<h1 align="center">Swifka</h1>
+
+<p align="center">
+  A read-focused, lightweight, native macOS Kafka client for monitoring clusters, browsing topics, and tracking consumer lag.
+</p>
+
+**Why Swifka exists:** Every existing Kafka client is either Java-based (Offset Explorer, Conduktor) or web-based (AKHQ, Kafdrop, Redpanda Console) — none of them feel at home on macOS. When one of our projects started migrating from Redis to Kafka, we needed a fast, frictionless way to monitor clusters, browse messages, and track consumer lag without spinning up a web app or dealing with clunky Java UIs. So we built a native one.
+
+<p align="center">
+  <img src=".github/assets/Swifka_demo.gif" alt="Swifka Demo" width="800" />
+</p>
+
+**What it does:**
+- Connect to any Kafka-compatible cluster (Kafka, Redpanda, etc.)
+- Browse topics, partitions, and messages (UTF-8 / Hex / Base64)
+- Monitor consumer groups and lag in real time
+- View broker stats and cluster metadata
+- All read-only by default — safe to point at production
+
+**Built with:**
+- SwiftUI + Swift 6.2
+- [swift-kafka-client](https://github.com/swift-server/swift-kafka-client) + direct librdkafka C interop
+- macOS Keychain for credential storage
+- JSON-based i18n (English + Simplified Chinese)
 
 ---
 
@@ -129,12 +154,6 @@ Swifka uses a custom JSON-based i18n system. Currently supported:
 4. Submit a PR
 
 No code changes needed — the app picks up new locale files automatically.
-
----
-
-## Logo
-
-Swifka doesn't have a logo yet. If you're a designer (or just have a cool idea), feel free to open an issue or PR with your suggestion. Bonus points if it somehow combines Swift and Kafka.
 
 ---
 
