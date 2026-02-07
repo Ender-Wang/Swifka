@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - develop
     paths:
       - 'Swifka.xcodeproj/project.pbxproj'
   workflow_dispatch:
@@ -38,11 +39,18 @@ jobs:
 
           git fetch --tags
 
-          # If the version tag exists, this is a build-number-only bump → pre-release
-          if git rev-parse "v$VERSION" >/dev/null 2>&1; then
-            TAG="v${VERSION}.${BUILD}"
+          BRANCH="${GITHUB_REF#refs/heads/}"
+
+          if [ "$BRANCH" = "develop" ]; then
+            # Pre-release: auto-increment beta number
+            BETA_NUM=1
+            while git rev-parse "v${VERSION}-beta.${BETA_NUM}" >/dev/null 2>&1; do
+              BETA_NUM=$((BETA_NUM + 1))
+            done
+            TAG="v${VERSION}-beta.${BETA_NUM}"
             PRERELEASE=true
           else
+            # Stable release from main
             TAG="v${VERSION}"
             PRERELEASE=false
           fi
