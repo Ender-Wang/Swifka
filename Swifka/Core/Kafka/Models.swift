@@ -248,9 +248,13 @@ nonisolated enum RefreshMode: Codable, Hashable, Identifiable, Sendable {
 
     static let presets: [RefreshMode] = [
         .manual,
+        .interval(1),
+        .interval(3),
         .interval(5),
         .interval(10),
+        .interval(15),
         .interval(30),
+        .interval(45),
         .interval(60),
     ]
 }

@@ -54,19 +54,21 @@ struct ContentView: View {
 
                         Divider()
 
-                        ForEach(RefreshMode.presets) { mode in
-                            Button {
-                                appState.refreshManager.updateMode(mode)
-                                appState.defaultRefreshMode = mode
-                            } label: {
-                                HStack {
-                                    Text(refreshModeLabel(mode, l10n: l10n))
-                                    if mode == appState.defaultRefreshMode {
-                                        Image(systemName: "checkmark")
-                                    }
-                                }
+                        Picker(selection: Binding(
+                            get: { appState.defaultRefreshMode },
+                            set: { newMode in
+                                appState.refreshManager.updateMode(newMode)
+                                appState.defaultRefreshMode = newMode
+                            },
+                        )) {
+                            ForEach(RefreshMode.presets) { mode in
+                                Text(refreshModeLabel(mode, l10n: l10n))
+                                    .tag(mode)
                             }
+                        } label: {
+                            EmptyView()
                         }
+                        .pickerStyle(.inline)
                     } label: {
                         switch appState.defaultRefreshMode {
                         case .manual:
