@@ -68,6 +68,7 @@
     "messages.key": "Key",
     "messages.value": "Value",
     "messages.timestamp": "Timestamp",
+    "messages.headers": "Headers",
     "messages.format": "Format",
     "messages.format.utf8": "UTF-8",
     "messages.format.hex": "Hex",

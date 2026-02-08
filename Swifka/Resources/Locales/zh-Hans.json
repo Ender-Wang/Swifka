@@ -68,6 +68,7 @@
     "messages.key": "Key",
     "messages.value": "Value",
     "messages.timestamp": "时间戳",
+    "messages.headers": "消息头",
     "messages.format": "格式",
     "messages.format.utf8": "UTF-8",
     "messages.format.hex": "Hex",

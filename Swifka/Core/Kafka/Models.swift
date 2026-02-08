@@ -114,7 +114,10 @@ nonisolated struct PartitionInfo: Identifiable, Hashable, Sendable {
 // MARK: - Kafka Message
 
 nonisolated struct KafkaMessageRecord: Identifiable, Sendable {
-    let id: UUID
+    var id: String {
+        "\(partition)-\(offset)"
+    }
+
     let topic: String
     let partition: Int32
     let offset: Int64
@@ -124,7 +127,6 @@ nonisolated struct KafkaMessageRecord: Identifiable, Sendable {
     let headers: [(String, Data)]
 
     init(
-        id: UUID = UUID(),
         topic: String,
         partition: Int32,
         offset: Int64,
@@ -133,7 +135,6 @@ nonisolated struct KafkaMessageRecord: Identifiable, Sendable {
         timestamp: Date? = nil,
         headers: [(String, Data)] = [],
     ) {
-        self.id = id
         self.topic = topic
         self.partition = partition
         self.offset = offset

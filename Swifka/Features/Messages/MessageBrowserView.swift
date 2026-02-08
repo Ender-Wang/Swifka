@@ -13,7 +13,8 @@ struct MessageBrowserView: View {
     @State private var isFetching = false
     @State private var fetchError: String?
     @AppStorage("messages.format") private var messageFormat: MessageFormat = .utf8
-    @State private var selectedMessageId: UUID?
+    @State private var selectedMessageId: String?
+    @State private var detailMessage: KafkaMessageRecord?
     @State private var refreshRotation: Double = 0
 
     var body: some View {
@@ -114,7 +115,17 @@ struct MessageBrowserView: View {
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                Table(messages, selection: $selectedMessageId) {
+                Table(messages, selection: Binding(
+                    get: { selectedMessageId },
+                    set: { newValue in
+                        selectedMessageId = newValue
+                        if let id = newValue, let msg = messages.first(where: { $0.id == id }) {
+                            detailMessage = msg
+                        } else if newValue == nil {
+                            detailMessage = nil
+                        }
+                    },
+                )) {
                     TableColumn(l10n["messages.offset"]) { message in
                         Text("\(message.offset)")
                             .monospacedDigit()
@@ -158,7 +169,7 @@ struct MessageBrowserView: View {
             }
         }
         .overlay(alignment: .trailing) {
-            if let message = selectedMessage {
+            if let message = detailMessage {
                 MessageDetailView(message: message, format: messageFormat)
                     .frame(width: 320)
                     .compositingGroup()
@@ -171,14 +182,15 @@ struct MessageBrowserView: View {
                     .transition(.move(edge: .trailing))
             }
         }
-        .animation(.smooth(duration: 0.25), value: selectedMessageId)
+        .animation(.smooth(duration: 0.25), value: detailMessage?.id)
         .onChange(of: selectedTopicName) {
             UserDefaults.standard.set(selectedTopicName, forKey: "messages.selectedTopic")
+            selectedMessageId = nil
+            detailMessage = nil
             if selectedTopicName != nil {
                 fetchMessages()
             } else {
                 messages = []
-                selectedMessageId = nil
                 fetchError = nil
             }
         }
@@ -221,11 +233,6 @@ struct MessageBrowserView: View {
         return appState.topics.first { $0.name == name }
     }
 
-    private var selectedMessage: KafkaMessageRecord? {
-        guard let id = selectedMessageId else { return nil }
-        return messages.first { $0.id == id }
-    }
-
     private func fetchMessages() {
         guard let topicName = selectedTopicName else { return }
         isFetching = true
@@ -233,11 +240,24 @@ struct MessageBrowserView: View {
 
         Task {
             do {
-                messages = try await appState.fetchMessages(
+                let newMessages = try await appState.fetchMessages(
                     topic: topicName,
                     partition: selectedPartition,
                     maxMessages: maxMessages,
                 )
+
+                // Reconcile selection: stable IDs mean the same message keeps the same ID
+                if let id = selectedMessageId {
+                    if let msg = newMessages.first(where: { $0.id == id }) {
+                        // Message still in results — keep highlight and update detail
+                        detailMessage = msg
+                    } else {
+                        // Message gone — remove highlight but keep detail panel open
+                        selectedMessageId = nil
+                    }
+                }
+
+                messages = newMessages
             } catch {
                 fetchError = error.localizedDescription
             }
@@ -293,9 +313,33 @@ struct MessageDetailView: View {
                         .overlay(alignment: .topTrailing) {
                             CopyButton(text: message.valuePrettyString(format: format), copied: $valueCopied)
                         }
+
+                    if !message.headers.isEmpty {
+                        Text(l10n["messages.headers"])
+                            .font(.subheadline.bold())
+                        VStack(alignment: .leading, spacing: 4) {
+                            ForEach(Array(message.headers.enumerated()), id: \.offset) { _, header in
+                                HStack(alignment: .top, spacing: 8) {
+                                    Text(header.0)
+                                        .foregroundStyle(.blue)
+                                    Text(String(data: header.1, encoding: .utf8) ?? header.1.map { String(format: "%02x", $0) }.joined(separator: " "))
+                                        .foregroundStyle(.secondary)
+                                }
+                                .font(.system(.body, design: .monospaced))
+                            }
+                        }
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(8)
+                        .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+                    }
                 }
             }
             .padding()
+        }
+        .onChange(of: message.id) {
+            keyCopied = false
+            valueCopied = false
         }
     }
 
