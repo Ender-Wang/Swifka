@@ -190,6 +190,12 @@ struct MessageBrowserView: View {
                 refreshRotation += 360
             }
         }
+        .onChange(of: appState.connectionStatus.isConnected) {
+            if appState.connectionStatus.isConnected, selectedTopicName != nil {
+                fetchMessages()
+                appState.refreshManager.restart()
+            }
+        }
         .navigationTitle(l10n["messages.title"])
     }
 
