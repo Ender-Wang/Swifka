@@ -23,7 +23,7 @@ struct MessageBrowserView: View {
                         Text(topic.name).tag(topic.name as String?)
                     }
                 }
-                .frame(maxWidth: 200)
+                .fixedSize()
 
                 Picker(l10n["messages.partition"], selection: $selectedPartition) {
                     Text(l10n["messages.partition.all"]).tag(nil as Int32?)
@@ -33,7 +33,7 @@ struct MessageBrowserView: View {
                         }
                     }
                 }
-                .frame(maxWidth: 100)
+                .fixedSize()
 
                 Stepper(
                     "\(l10n["messages.fetch.count"]): \(maxMessages)",
@@ -41,6 +41,7 @@ struct MessageBrowserView: View {
                     in: 10 ... 500,
                     step: 10,
                 )
+                .fixedSize()
 
                 Spacer()
 
@@ -49,7 +50,7 @@ struct MessageBrowserView: View {
                         Text(format.rawValue).tag(format)
                     }
                 }
-                .frame(maxWidth: 100)
+                .fixedSize()
 
                 Button {
                     fetchMessages()
