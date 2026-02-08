@@ -2,30 +2,44 @@ import SwiftUI
 
 struct ContentView: View {
     @Environment(AppState.self) private var appState
+    @State private var columnVisibility: NavigationSplitViewVisibility = .automatic
+
+    private var sidebarHidden: Bool {
+        columnVisibility == .detailOnly
+    }
 
     var body: some View {
         @Bindable var state = appState
         let l10n = appState.l10n
 
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
             SidebarView()
                 .navigationSplitViewColumnWidth(min: Constants.sidebarMinWidth, ideal: 220)
         } detail: {
-            switch appState.selectedSidebarItem {
-            case .dashboard:
-                DashboardView()
-            case .topics:
-                TopicListView()
-            case .messages:
-                MessageBrowserView()
-            case .consumerGroups:
-                ConsumerGroupsView()
-            case .brokers:
-                BrokersView()
-            case .settings:
-                SettingsView()
-            case .none:
-                DashboardView()
+            HStack(spacing: 0) {
+                if sidebarHidden {
+                    CompactSidebarView(selection: $state.selectedSidebarItem)
+                }
+
+                Group {
+                    switch appState.selectedSidebarItem {
+                    case .dashboard:
+                        DashboardView()
+                    case .topics:
+                        TopicListView()
+                    case .messages:
+                        MessageBrowserView()
+                    case .consumerGroups:
+                        ConsumerGroupsView()
+                    case .brokers:
+                        BrokersView()
+                    case .settings:
+                        SettingsView()
+                    case .none:
+                        DashboardView()
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .toolbar {
@@ -93,6 +107,69 @@ struct ContentView: View {
     }
 }
 
+// MARK: - Compact Sidebar
+
+private struct CompactSidebarView: View {
+    @Binding var selection: SidebarItem?
+
+    private struct IconGroup {
+        let items: [(SidebarItem, String)]
+    }
+
+    private let groups: [IconGroup] = [
+        IconGroup(items: [
+            (.dashboard, "gauge.with.dots.needle.33percent"),
+        ]),
+        IconGroup(items: [
+            (.topics, "list.bullet.rectangle"),
+            (.messages, "envelope"),
+        ]),
+        IconGroup(items: [
+            (.consumerGroups, "person.3"),
+            (.brokers, "server.rack"),
+        ]),
+        IconGroup(items: [
+            (.settings, "gear"),
+        ]),
+    ]
+
+    var body: some View {
+        VStack(spacing: 4) {
+            ForEach(Array(groups.enumerated()), id: \.offset) { index, group in
+                if index > 0 {
+                    Divider()
+                        .padding(.horizontal, 8)
+                }
+
+                ForEach(group.items, id: \.0) { item, icon in
+                    Button {
+                        selection = item
+                    } label: {
+                        Image(systemName: icon)
+                            .font(.system(size: 14))
+                            .frame(width: 32, height: 28)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(selection == item ? .accent : .secondary)
+                    .background(
+                        selection == item
+                            ? AnyShapeStyle(.selection)
+                            : AnyShapeStyle(.clear),
+                        in: RoundedRectangle(cornerRadius: 6),
+                    )
+                }
+            }
+
+            Spacer()
+        }
+        .padding(.vertical, 8)
+        .padding(.horizontal, 4)
+        .frame(width: 44)
+        .overlay(alignment: .trailing) { Divider() }
+    }
+}
+
 // MARK: - Sidebar
 
 struct SidebarView: View {
@@ -148,16 +225,13 @@ struct StatusBarView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-            Spacer()
-
             if appState.isLoading {
                 ProgressView()
                     .controlSize(.small)
             }
         }
-        .padding(.horizontal, 12)
+        .frame(maxWidth: .infinity)
         .padding(.vertical, 6)
-        .background(.bar)
     }
 }
 
