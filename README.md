@@ -71,11 +71,11 @@ Or download the latest `.dmg` from [Releases](https://github.com/Ender-Wang/Swif
 
 🎨 **UI & Animations**
 - [ ] Message flow animations and real-time data change effects
-- [ ] Dark mode optimization
+- [x] Dark mode optimization
 - [ ] Cluster topology and broker status visualization
 
 🔧 **Enhancements**
-- [ ] Menu bar resident mode + keyboard shortcuts
+- [x] Menu bar resident mode + keyboard shortcuts
 
 ### Milestone 4: Write Operations & Experiments
 
@@ -90,7 +90,8 @@ Or download the latest `.dmg` from [Releases](https://github.com/Ender-Wang/Swif
 ### Milestone 5: Advanced Features
 
 ✨ **Features**
-- [ ] Protobuf decoding (import .proto files) + JSON pretty-printing
+- [ ] Protobuf decoding (import .proto files)
+- [x] JSON pretty-printing with syntax highlighting
 - [ ] Message search/filter (time range, keywords)
 
 📊 **Monitoring**
