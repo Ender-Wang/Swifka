@@ -141,6 +141,6 @@ final class AppState {
     }
 
     var totalPartitions: Int {
-        topics.reduce(0) { $0 + $1.partitionCount }
+        topics.filter { !$0.isInternal }.reduce(0) { $0 + $1.partitionCount }
     }
 }
