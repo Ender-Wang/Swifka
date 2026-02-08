@@ -4,7 +4,7 @@ struct TopicListView: View {
     @Environment(AppState.self) private var appState
     @State private var searchText = ""
     @State private var selectedTopicId: String?
-    @State private var hideInternal = true
+    @AppStorage("topics.hideInternal") private var hideInternal = true
 
     var body: some View {
         let l10n = appState.l10n

@@ -11,13 +11,34 @@ final class AppState {
     var brokers: [BrokerInfo] = []
     var topics: [TopicInfo] = []
     var consumerGroups: [ConsumerGroupInfo] = []
-    var selectedSidebarItem: SidebarItem? = .dashboard
+    var selectedSidebarItem: SidebarItem? = .dashboard {
+        didSet {
+            UserDefaults.standard.set(selectedSidebarItem?.rawValue, forKey: "nav.sidebarItem")
+        }
+    }
+
     var lastError: String?
     var isLoading = false
 
-    var operationLevel: OperationLevel = .readonly
-    var defaultRefreshMode: RefreshMode = .manual
-    var appearanceMode: AppearanceMode = .system
+    var operationLevel: OperationLevel = .readonly {
+        didSet {
+            UserDefaults.standard.set(operationLevel.rawValue, forKey: "settings.operationLevel")
+        }
+    }
+
+    var defaultRefreshMode: RefreshMode = .manual {
+        didSet {
+            if let data = try? JSONEncoder().encode(defaultRefreshMode) {
+                UserDefaults.standard.set(data, forKey: "settings.refreshMode")
+            }
+        }
+    }
+
+    var appearanceMode: AppearanceMode = .system {
+        didSet {
+            UserDefaults.standard.set(appearanceMode.rawValue, forKey: "settings.appearanceMode")
+        }
+    }
 
     init(
         configStore: ConfigStore = ConfigStore(),
@@ -29,6 +50,29 @@ final class AppState {
         self.kafkaService = kafkaService
         self.l10n = l10n
         self.refreshManager = refreshManager
+
+        // Restore persisted settings
+        if let raw = UserDefaults.standard.string(forKey: "settings.operationLevel"),
+           let level = OperationLevel(rawValue: raw)
+        {
+            operationLevel = level
+        }
+        if let data = UserDefaults.standard.data(forKey: "settings.refreshMode"),
+           let mode = try? JSONDecoder().decode(RefreshMode.self, from: data)
+        {
+            defaultRefreshMode = mode
+            refreshManager.updateMode(mode)
+        }
+        if let raw = UserDefaults.standard.string(forKey: "settings.appearanceMode"),
+           let mode = AppearanceMode(rawValue: raw)
+        {
+            appearanceMode = mode
+        }
+        if let raw = UserDefaults.standard.string(forKey: "nav.sidebarItem"),
+           let item = SidebarItem(rawValue: raw)
+        {
+            selectedSidebarItem = item
+        }
 
         self.refreshManager.onRefresh = { [weak self] in
             await self?.refreshAll()

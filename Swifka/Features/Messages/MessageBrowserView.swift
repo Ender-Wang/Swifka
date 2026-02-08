@@ -2,13 +2,17 @@ import SwiftUI
 
 struct MessageBrowserView: View {
     @Environment(AppState.self) private var appState
-    @State private var selectedTopicName: String?
-    @State private var selectedPartition: Int32?
-    @State private var maxMessages = Constants.defaultMaxMessages
+    @State private var selectedTopicName: String? = UserDefaults.standard.string(forKey: "messages.selectedTopic")
+    @State private var selectedPartition: Int32? = {
+        let val = UserDefaults.standard.object(forKey: "messages.selectedPartition")
+        return val != nil ? Int32(UserDefaults.standard.integer(forKey: "messages.selectedPartition")) : nil
+    }()
+
+    @AppStorage("messages.fetchLimit") private var maxMessages = Constants.defaultMaxMessages
     @State private var messages: [KafkaMessageRecord] = []
     @State private var isFetching = false
     @State private var fetchError: String?
-    @State private var messageFormat: MessageFormat = .utf8
+    @AppStorage("messages.format") private var messageFormat: MessageFormat = .utf8
     @State private var selectedMessageId: UUID?
     @State private var refreshRotation: Double = 0
 
@@ -162,12 +166,20 @@ struct MessageBrowserView: View {
         }
         .animation(.smooth(duration: 0.25), value: selectedMessageId)
         .onChange(of: selectedTopicName) {
+            UserDefaults.standard.set(selectedTopicName, forKey: "messages.selectedTopic")
             if selectedTopicName != nil {
                 fetchMessages()
             } else {
                 messages = []
                 selectedMessageId = nil
                 fetchError = nil
+            }
+        }
+        .onChange(of: selectedPartition) {
+            if let p = selectedPartition {
+                UserDefaults.standard.set(Int(p), forKey: "messages.selectedPartition")
+            } else {
+                UserDefaults.standard.removeObject(forKey: "messages.selectedPartition")
             }
         }
         .onChange(of: appState.refreshManager.tick) {

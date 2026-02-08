@@ -285,7 +285,7 @@ nonisolated enum AppearanceMode: String, CaseIterable, Identifiable, Sendable {
 
 // MARK: - Navigation
 
-nonisolated enum SidebarItem: Hashable, Sendable {
+nonisolated enum SidebarItem: String, Hashable, Sendable {
     case dashboard
     case topics
     case messages
