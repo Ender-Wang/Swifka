@@ -9,24 +9,41 @@ struct TopicListView: View {
     var body: some View {
         let l10n = appState.l10n
 
-        Table(filteredTopics, selection: $selectedTopicId) {
-            TableColumn(l10n["topics.name"]) { topic in
-                Text(topic.name)
-                    .fontWeight(topic.isInternal ? .regular : .medium)
-                    .foregroundStyle(topic.isInternal ? .secondary : .primary)
-            }
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(.secondary)
+                TextField(l10n["topics.search"], text: $searchText)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 200)
 
-            TableColumn(l10n["topics.partitions"]) { topic in
-                Text("\(topic.partitionCount)")
-            }
-            .width(min: 60, ideal: 90)
+                Spacer()
 
-            TableColumn(l10n["topics.replicas"]) { topic in
-                Text("\(topic.replicaCount)")
+                Toggle(isOn: $hideInternal) {
+                    Text(l10n["topics.hide.internal"])
+                }
+                .toggleStyle(.checkbox)
             }
-            .width(min: 60, ideal: 90)
+            .padding(12)
+
+            Table(filteredTopics, selection: $selectedTopicId) {
+                TableColumn(l10n["topics.name"]) { topic in
+                    Text(topic.name)
+                        .fontWeight(topic.isInternal ? .regular : .medium)
+                        .foregroundStyle(topic.isInternal ? .secondary : .primary)
+                }
+
+                TableColumn(l10n["topics.partitions"]) { topic in
+                    Text("\(topic.partitionCount)")
+                }
+                .width(min: 60, ideal: 90)
+
+                TableColumn(l10n["topics.replicas"]) { topic in
+                    Text("\(topic.replicaCount)")
+                }
+                .width(min: 60, ideal: 90)
+            }
         }
-        .searchable(text: $searchText, prompt: Text(l10n["topics.search"]))
         .overlay(alignment: .trailing) {
             if let topic = selectedTopic {
                 TopicDetailView(topic: topic)
@@ -40,14 +57,6 @@ struct TopicListView: View {
         }
         .animation(.smooth(duration: 0.25), value: selectedTopicId)
         .navigationTitle(l10n["topics.title"])
-        .toolbar {
-            ToolbarItem {
-                Toggle(isOn: $hideInternal) {
-                    Text(l10n["topics.hide.internal"])
-                }
-                .toggleStyle(.checkbox)
-            }
-        }
     }
 
     private var filteredTopics: [TopicInfo] {
