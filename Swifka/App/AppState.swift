@@ -17,6 +17,7 @@ final class AppState {
         }
     }
 
+    var expandedTopics: Set<String> = []
     var lastError: String?
     var isLoading = false
 
@@ -105,6 +106,7 @@ final class AppState {
         brokers = []
         topics = []
         consumerGroups = []
+        expandedTopics = []
     }
 
     func testConnection(config: ClusterConfig, password: String?) async -> Result<Bool, Error> {
@@ -127,6 +129,8 @@ final class AppState {
             let metadata = try await kafkaService.fetchMetadata()
             brokers = metadata.brokers
             topics = await kafkaService.fetchAllWatermarks(topics: metadata.topics)
+            let currentNames = Set(topics.map(\.name))
+            expandedTopics.formIntersection(currentNames)
         } catch {
             lastError = error.localizedDescription
         }
