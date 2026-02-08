@@ -36,26 +36,85 @@ struct DashboardView: View {
                             color: .orange,
                         )
                     }
+                    .padding(.bottom, 20)
 
                     // Broker table
-                    GroupBox(l10n["brokers.title"]) {
-                        Table(appState.brokers) {
-                            TableColumn(l10n["brokers.id"]) { broker in
-                                Text("\(broker.id)")
-                            }
-                            .width(min: 60, ideal: 80)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(l10n["brokers.title"])
+                            .font(.system(size: 22, weight: .regular, design: .rounded))
 
-                            TableColumn(l10n["brokers.host"]) { broker in
-                                Text(broker.host)
+                        Grid(alignment: .leading, verticalSpacing: 0) {
+                            GridRow {
+                                Text(l10n["brokers.id"])
+                                    .foregroundStyle(.secondary)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                Text(l10n["brokers.host"])
+                                    .foregroundStyle(.secondary)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                Text(l10n["brokers.port"])
+                                    .foregroundStyle(.secondary)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
                             }
+                            .padding(.vertical, 6)
 
-                            TableColumn(l10n["brokers.port"]) { broker in
-                                Text("\(broker.port)")
+                            ForEach(appState.brokers) { broker in
+                                GridRow {
+                                    Text("\(broker.id)")
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                    Text(broker.host)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                    Text("\(broker.port)")
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                }
+                                .padding(.vertical, 4)
                             }
-                            .width(min: 60, ideal: 80)
                         }
-                        .frame(minHeight: 120)
                     }
+                    .padding()
+                    .background(.background, in: RoundedRectangle(cornerRadius: 12))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .strokeBorder(.quaternary),
+                    )
+
+                    // Topics table
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(l10n["topics.title"])
+                            .font(.system(size: 22, weight: .regular, design: .rounded))
+
+                        Grid(alignment: .leading, verticalSpacing: 0) {
+                            GridRow {
+                                Text(l10n["topics.name"])
+                                    .foregroundStyle(.secondary)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                Text(l10n["topics.partitions"])
+                                    .foregroundStyle(.secondary)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                Text(l10n["topics.replicas"])
+                                    .foregroundStyle(.secondary)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .padding(.vertical, 6)
+
+                            ForEach(appState.topics.filter { !$0.isInternal }) { topic in
+                                GridRow {
+                                    Text(topic.name)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                    Text("\(topic.partitionCount)")
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                    Text("\(topic.replicaCount)")
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                }
+                                .padding(.vertical, 4)
+                            }
+                        }
+                    }
+                    .padding()
+                    .background(.background, in: RoundedRectangle(cornerRadius: 12))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .strokeBorder(.quaternary),
+                    )
                 }
                 .padding()
             }
@@ -71,16 +130,14 @@ struct StatCard: View {
     let color: Color
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Image(systemName: icon)
-                    .foregroundStyle(color)
-                Spacer()
-            }
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 28))
+                .foregroundStyle(color)
             Text(value)
-                .font(.system(size: 32, weight: .bold, design: .rounded))
+                .font(.system(size: 28, weight: .bold, design: .rounded))
             Text(title)
-                .font(.caption)
+                .font(.system(size: 14))
                 .foregroundStyle(.secondary)
         }
         .padding()
