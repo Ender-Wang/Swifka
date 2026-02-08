@@ -10,6 +10,7 @@ struct MessageBrowserView: View {
     @State private var fetchError: String?
     @State private var messageFormat: MessageFormat = .utf8
     @State private var selectedMessageId: UUID?
+    @State private var refreshRotation: Double = 0
 
     var body: some View {
         let l10n = appState.l10n
@@ -45,24 +46,41 @@ struct MessageBrowserView: View {
 
                 Spacer()
 
+                if appState.defaultRefreshMode == .manual {
+                    Button {
+                        fetchMessages()
+                    } label: {
+                        if isFetching {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else {
+                            Text(l10n["messages.fetch"])
+                        }
+                    }
+                    .disabled(selectedTopicName == nil || isFetching)
+                } else {
+                    Button {
+                        fetchMessages()
+                        appState.refreshManager.restart()
+                        withAnimation(.easeInOut(duration: 0.6)) {
+                            refreshRotation += 360
+                        }
+                    } label: {
+                        Image(systemName: "arrow.trianglehead.2.clockwise")
+                            .rotationEffect(.degrees(refreshRotation))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(selectedTopicName == nil || isFetching)
+                }
+
+                Spacer()
+
                 Picker(l10n["messages.format"], selection: $messageFormat) {
                     ForEach(MessageFormat.allCases) { format in
                         Text(format.rawValue).tag(format)
                     }
                 }
                 .fixedSize()
-
-                Button {
-                    fetchMessages()
-                } label: {
-                    if isFetching {
-                        ProgressView()
-                            .controlSize(.small)
-                    } else {
-                        Text(l10n["messages.fetch"])
-                    }
-                }
-                .disabled(selectedTopicName == nil || isFetching)
             }
             .padding(12)
 
@@ -135,6 +153,23 @@ struct MessageBrowserView: View {
             }
         }
         .animation(.smooth(duration: 0.25), value: selectedMessageId)
+        .onChange(of: selectedTopicName) {
+            if selectedTopicName != nil {
+                fetchMessages()
+            } else {
+                messages = []
+                selectedMessageId = nil
+                fetchError = nil
+            }
+        }
+        .onChange(of: appState.refreshManager.tick) {
+            if selectedTopicName != nil {
+                fetchMessages()
+            }
+            withAnimation(.easeInOut(duration: 0.6)) {
+                refreshRotation += 360
+            }
+        }
         .navigationTitle(l10n["messages.title"])
     }
 
