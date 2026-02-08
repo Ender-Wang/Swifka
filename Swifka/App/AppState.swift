@@ -122,10 +122,16 @@ final class AppState {
         }
         switch connectionStatus {
         case .connected:
+            let userTopics = topics.filter { !$0.isInternal }
+            let b = brokers.count
+            let t = userTopics.count
+            let p = userTopics.reduce(0) { $0 + $1.partitionCount }
             return l10n.t(
                 "status.connected",
                 cluster.bootstrapServers,
-                "\(topics.count(where: { !$0.isInternal }))",
+                "\(b)", l10n[b == 1 ? "status.broker" : "status.brokers"],
+                "\(t)", l10n[t == 1 ? "status.topic" : "status.topics"],
+                "\(p)", l10n[p == 1 ? "status.partition" : "status.partitions"],
             )
         case .connecting:
             return l10n["status.connecting"]

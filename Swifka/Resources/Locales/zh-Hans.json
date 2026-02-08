@@ -127,7 +127,13 @@
     "common.ok": "确定",
     "common.comingSoon": "即将推出",
 
-    "status.connected": "已连接到 {0} | {1} 个 Topic",
+    "status.connected": "已连接到 {0} | {1} {2} · {3} {4} · {5} {6}",
+    "status.broker": "个 Broker",
+    "status.brokers": "个 Broker",
+    "status.topic": "个 Topic",
+    "status.topics": "个 Topic",
+    "status.partition": "个分区",
+    "status.partitions": "个分区",
     "status.disconnected": "未连接",
     "status.connecting": "连接中…",
 

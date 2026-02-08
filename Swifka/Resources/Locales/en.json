@@ -127,7 +127,13 @@
     "common.ok": "OK",
     "common.comingSoon": "Coming Soon",
 
-    "status.connected": "Connected to {0} | {1} topics",
+    "status.connected": "Connected to {0} | {1} {2} · {3} {4} · {5} {6}",
+    "status.broker": "broker",
+    "status.brokers": "brokers",
+    "status.topic": "topic",
+    "status.topics": "topics",
+    "status.partition": "partition",
+    "status.partitions": "partitions",
     "status.disconnected": "Not connected",
     "status.connecting": "Connecting…",
 
