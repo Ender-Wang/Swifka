@@ -68,7 +68,17 @@ struct ContentView: View {
                             }
                         }
                     } label: {
-                        Label(l10n["common.refresh"], systemImage: "arrow.clockwise")
+                        switch appState.defaultRefreshMode {
+                        case .manual:
+                            Label(l10n["common.refresh"], systemImage: "hand.raised")
+                        case let .interval(seconds):
+                            HStack(spacing: 4) {
+                                Image(systemName: "arrow.trianglehead.2.clockwise")
+                                Text("\(seconds)s")
+                                    .font(.caption2)
+                                    .monospacedDigit()
+                            }
+                        }
                     }
                 }
 
@@ -77,14 +87,19 @@ struct ContentView: View {
                     Button {
                         Task { await appState.disconnect() }
                     } label: {
-                        Label(l10n["connection.disconnect"], systemImage: "bolt.slash")
+                        Label(l10n["connection.disconnect"], systemImage: "power")
+                            .foregroundStyle(.green)
                     }
                 } else if appState.configStore.selectedCluster != nil {
                     Button {
                         Task { await appState.connect() }
                     } label: {
-                        Label(l10n["connection.connect"], systemImage: "bolt")
+                        Label(l10n["connection.connect"], systemImage: "power")
+                            .foregroundStyle(.red)
                     }
+                } else {
+                    Label(l10n["connection.connect"], systemImage: "power")
+                        .foregroundStyle(.gray)
                 }
             }
         }
