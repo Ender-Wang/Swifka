@@ -118,36 +118,43 @@ struct MessageBrowserView: View {
                     TableColumn(l10n["messages.offset"]) { message in
                         Text("\(message.offset)")
                             .monospacedDigit()
+                            .padding(.vertical, appState.rowDensity.tablePadding)
                     }
                     .width(min: 60, ideal: 80)
 
                     TableColumn(l10n["messages.partition"]) { message in
                         Text("\(message.partition)")
+                            .padding(.vertical, appState.rowDensity.tablePadding)
                     }
                     .width(min: 50, ideal: 70)
 
                     TableColumn(l10n["messages.key"]) { message in
                         Text(message.keyString(format: messageFormat))
                             .lineLimit(1)
+                            .padding(.vertical, appState.rowDensity.tablePadding)
                     }
                     .width(min: 80, ideal: 120)
 
                     TableColumn(l10n["messages.value"]) { message in
                         Text(message.valueString(format: messageFormat))
                             .lineLimit(1)
+                            .padding(.vertical, appState.rowDensity.tablePadding)
                     }
 
                     TableColumn(l10n["messages.timestamp"]) { message in
                         if let timestamp = message.timestamp {
-                            Text(timestamp, style: .date)
+                            (Text(timestamp, style: .date)
                                 + Text(" ")
-                                + Text(timestamp, style: .time)
+                                + Text(timestamp, style: .time))
+                                .padding(.vertical, appState.rowDensity.tablePadding)
                         } else {
                             Text("-")
+                                .padding(.vertical, appState.rowDensity.tablePadding)
                         }
                     }
                     .width(min: 140, ideal: 180)
                 }
+                .font(.system(size: appState.rowDensity.fontSize))
             }
         }
         .overlay(alignment: .trailing) {

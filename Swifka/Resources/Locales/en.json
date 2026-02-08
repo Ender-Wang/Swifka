@@ -118,6 +118,12 @@
     "settings.language.en": "English",
     "settings.language.zh": "简体中文",
 
+    "settings.display": "Display",
+    "settings.display.density": "Row Size",
+    "settings.density.compact": "Compact",
+    "settings.density.regular": "Regular",
+    "settings.density.large": "Large",
+
     "settings.appearance": "Appearance",
     "settings.appearance.system": "System",
     "settings.appearance.light": "Light",

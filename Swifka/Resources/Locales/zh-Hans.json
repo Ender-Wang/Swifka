@@ -118,6 +118,12 @@
     "settings.language.en": "English",
     "settings.language.zh": "简体中文",
 
+    "settings.display": "显示",
+    "settings.display.density": "行大小",
+    "settings.density.compact": "紧凑",
+    "settings.density.regular": "常规",
+    "settings.density.large": "大",
+
     "settings.appearance": "外观",
     "settings.appearance.system": "跟随系统",
     "settings.appearance.light": "浅色",

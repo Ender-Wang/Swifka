@@ -40,6 +40,7 @@ struct ContentView: View {
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .environment(\.defaultMinListRowHeight, appState.rowDensity.rowHeight)
             }
         }
         .toolbar {

@@ -41,6 +41,12 @@ final class AppState {
         }
     }
 
+    var rowDensity: RowDensity = .regular {
+        didSet {
+            UserDefaults.standard.set(rowDensity.rawValue, forKey: "settings.rowDensity")
+        }
+    }
+
     init(
         configStore: ConfigStore = ConfigStore(),
         kafkaService: KafkaService = KafkaService(),
@@ -68,6 +74,11 @@ final class AppState {
            let mode = AppearanceMode(rawValue: raw)
         {
             appearanceMode = mode
+        }
+        if let raw = UserDefaults.standard.string(forKey: "settings.rowDensity"),
+           let density = RowDensity(rawValue: raw)
+        {
+            rowDensity = density
         }
         if let raw = UserDefaults.standard.string(forKey: "nav.sidebarItem"),
            let item = SidebarItem(rawValue: raw)

@@ -57,6 +57,15 @@ struct SettingsView: View {
                 }
             }
 
+            // Display
+            Section(l10n["settings.display"]) {
+                Picker(l10n["settings.display.density"], selection: $state.rowDensity) {
+                    Text(l10n["settings.density.compact"]).tag(RowDensity.compact)
+                    Text(l10n["settings.density.regular"]).tag(RowDensity.regular)
+                    Text(l10n["settings.density.large"]).tag(RowDensity.large)
+                }
+            }
+
             // Appearance
             Section(l10n["settings.appearance"]) {
                 Picker(l10n["settings.appearance"], selection: $state.appearanceMode) {

@@ -41,18 +41,20 @@ struct TopicListView: View {
                     } label: {
                         HStack {
                             Text(topic.name)
+                                .font(.system(size: appState.rowDensity.fontSize))
                                 .fontWeight(topic.isInternal ? .regular : .medium)
                                 .foregroundStyle(topic.isInternal ? .secondary : .primary)
                             Spacer()
                             Text("\(topic.partitionCount) \(l10n["topics.partitions"])")
                                 .foregroundStyle(.secondary)
-                                .font(.caption)
+                                .font(.system(size: appState.rowDensity.captionSize))
                             Text("·")
                                 .foregroundStyle(.quaternary)
                             Text("\(topic.replicaCount) \(l10n["topics.replicas"])")
                                 .foregroundStyle(.secondary)
-                                .font(.caption)
+                                .font(.system(size: appState.rowDensity.captionSize))
                         }
+                        .padding(.vertical, appState.rowDensity.tablePadding)
                         .contentShape(Rectangle())
                         .onTapGesture(count: 2) {
                             withAnimation(.smooth(duration: 0.25)) {
@@ -87,7 +89,7 @@ private struct TopicPartitionsView: View {
     var body: some View {
         let l10n = appState.l10n
 
-        Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 6) {
+        Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: appState.rowDensity.gridSpacing) {
             GridRow {
                 Text(l10n["topic.detail.partition.id"]).foregroundStyle(.secondary)
                 Text(l10n["topic.detail.leader"]).foregroundStyle(.secondary)
@@ -97,7 +99,7 @@ private struct TopicPartitionsView: View {
                 Text(l10n["topic.detail.high.watermark"]).foregroundStyle(.secondary)
                 Text(l10n["topic.detail.messages"]).foregroundStyle(.secondary)
             }
-            .font(.caption)
+            .font(.system(size: appState.rowDensity.captionSize))
 
             Divider()
 
@@ -111,10 +113,10 @@ private struct TopicPartitionsView: View {
                     Text(partition.highWatermark.map(String.init) ?? "-").monospacedDigit()
                     Text(partition.messageCount.map(String.init) ?? "-").monospacedDigit().fontWeight(.medium)
                 }
-                .font(.callout)
+                .font(.system(size: appState.rowDensity.fontSize))
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, appState.rowDensity.tablePadding)
         .padding(.leading, 4)
     }
 }

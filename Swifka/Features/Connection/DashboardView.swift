@@ -55,7 +55,8 @@ struct DashboardView: View {
                                     .foregroundStyle(.secondary)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                             }
-                            .padding(.vertical, 6)
+                            .font(.system(size: appState.rowDensity.captionSize))
+                            .padding(.vertical, appState.rowDensity.gridSpacing)
 
                             ForEach(appState.brokers) { broker in
                                 GridRow {
@@ -66,7 +67,8 @@ struct DashboardView: View {
                                     Text("\(broker.port)")
                                         .frame(maxWidth: .infinity, alignment: .leading)
                                 }
-                                .padding(.vertical, 4)
+                                .font(.system(size: appState.rowDensity.fontSize))
+                                .padding(.vertical, appState.rowDensity.tablePadding)
                             }
                         }
                     }
@@ -94,7 +96,8 @@ struct DashboardView: View {
                                     .foregroundStyle(.secondary)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                             }
-                            .padding(.vertical, 6)
+                            .font(.system(size: appState.rowDensity.captionSize))
+                            .padding(.vertical, appState.rowDensity.gridSpacing)
 
                             ForEach(appState.topics.filter { !$0.isInternal }) { topic in
                                 GridRow {
@@ -105,7 +108,8 @@ struct DashboardView: View {
                                     Text("\(topic.replicaCount)")
                                         .frame(maxWidth: .infinity, alignment: .leading)
                                 }
-                                .padding(.vertical, 4)
+                                .font(.system(size: appState.rowDensity.fontSize))
+                                .padding(.vertical, appState.rowDensity.tablePadding)
                             }
                         }
                     }

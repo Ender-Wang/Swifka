@@ -16,24 +16,29 @@ struct ConsumerGroupsView: View {
                 TableColumn(l10n["groups.name"]) { group in
                     Text(group.name)
                         .fontWeight(.medium)
+                        .padding(.vertical, appState.rowDensity.tablePadding)
                 }
 
                 TableColumn(l10n["groups.state"]) { group in
                     Text(group.state)
                         .foregroundStyle(stateColor(group.state))
+                        .padding(.vertical, appState.rowDensity.tablePadding)
                 }
                 .width(min: 60, ideal: 100)
 
                 TableColumn(l10n["groups.members"]) { group in
                     Text("\(group.members.count)")
+                        .padding(.vertical, appState.rowDensity.tablePadding)
                 }
                 .width(min: 50, ideal: 80)
 
                 TableColumn(l10n["groups.protocol.type"]) { group in
                     Text(group.protocolType)
+                        .padding(.vertical, appState.rowDensity.tablePadding)
                 }
                 .width(min: 60, ideal: 100)
             }
+            .font(.system(size: appState.rowDensity.fontSize))
             .frame(minWidth: 350)
             .overlay {
                 if appState.consumerGroups.isEmpty {
@@ -96,18 +101,22 @@ struct GroupDetailView: View {
                     TableColumn(l10n["groups.member.id"]) { member in
                         Text(member.memberId)
                             .lineLimit(1)
+                            .padding(.vertical, appState.rowDensity.tablePadding)
                     }
 
                     TableColumn(l10n["groups.member.client.id"]) { member in
                         Text(member.clientId)
+                            .padding(.vertical, appState.rowDensity.tablePadding)
                     }
                     .width(min: 80, ideal: 120)
 
                     TableColumn(l10n["groups.member.host"]) { member in
                         Text(member.clientHost)
+                            .padding(.vertical, appState.rowDensity.tablePadding)
                     }
                     .width(min: 80, ideal: 120)
                 }
+                .font(.system(size: appState.rowDensity.fontSize))
             }
         }
     }

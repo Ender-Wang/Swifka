@@ -259,6 +259,58 @@ nonisolated enum RefreshMode: Codable, Hashable, Identifiable, Sendable {
     ]
 }
 
+// MARK: - Row Density
+
+nonisolated enum RowDensity: String, CaseIterable, Identifiable, Sendable {
+    case compact
+    case regular
+    case large
+
+    var id: String {
+        rawValue
+    }
+
+    var tablePadding: CGFloat {
+        switch self {
+        case .compact: 2
+        case .regular: 4
+        case .large: 8
+        }
+    }
+
+    var fontSize: CGFloat {
+        switch self {
+        case .compact: 12
+        case .regular: 13
+        case .large: 15
+        }
+    }
+
+    var captionSize: CGFloat {
+        switch self {
+        case .compact: 10
+        case .regular: 11
+        case .large: 13
+        }
+    }
+
+    var gridSpacing: CGFloat {
+        switch self {
+        case .compact: 4
+        case .regular: 6
+        case .large: 10
+        }
+    }
+
+    var rowHeight: CGFloat {
+        switch self {
+        case .compact: 22
+        case .regular: 28
+        case .large: 38
+        }
+    }
+}
+
 // MARK: - Appearance
 
 nonisolated enum AppearanceMode: String, CaseIterable, Identifiable, Sendable {
