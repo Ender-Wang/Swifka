@@ -23,6 +23,7 @@ brew install --cask ender-wang/tap/swifka
 Or download the latest `.dmg` from [Releases](https://github.com/Ender-Wang/Swifka/releases).
 
 **What it does:**
+
 - Connect to any Kafka-compatible cluster (Kafka, Redpanda, etc.)
 - Browse topics, partitions, and messages (UTF-8 / Hex / Base64)
 - Monitor consumer groups and lag in real time
@@ -30,6 +31,7 @@ Or download the latest `.dmg` from [Releases](https://github.com/Ender-Wang/Swif
 - All read-only by default — safe to point at production
 
 **Built with:**
+
 - SwiftUI + Swift 6.2
 - [swift-kafka-client](https://github.com/swift-server/swift-kafka-client) + direct librdkafka C interop
 - macOS Keychain for credential storage
@@ -42,6 +44,7 @@ Or download the latest `.dmg` from [Releases](https://github.com/Ender-Wang/Swif
 ### Milestone 1: MVP Core
 
 ✨ **Features**
+
 - [x] Cluster connection management (add/edit/delete, multi-cluster switching, test connection)
 - [x] Topic list with partition detail (replicas, leader, ISR, watermarks)
 - [x] Message browsing (key, value, timestamp, offset) with UTF-8 / Hex / Base64 display
@@ -49,55 +52,66 @@ Or download the latest `.dmg` from [Releases](https://github.com/Ender-Wang/Swif
 - [x] Broker list and basic stats (topic count, partition count)
 
 ⚙️ **Settings & Infrastructure**
+
 - [x] Config persistence (JSON) + Keychain for credentials
 - [x] Manual + timed refresh (5s / 10s / 30s / 60s)
 - [x] Read-only by default, extension points for future write features
 
 🌍 **i18n**
+
 - [x] i18n framework — English + Simplified Chinese (JSON-based, easy to contribute)
 
 ### Milestone 2: Dashboards & Visualization
 
 📊 **Features**
+
 - [ ] Cluster health overview with production/consumption throughput
 - [ ] Per-topic lag ranking and total lag display
 - [ ] Swift Charts — lag trends, throughput trends, partition distribution
 
 🔧 **Enhancements**
+
 - [ ] Local database storage (SQLite / SwiftData) with configurable retention
 - [ ] Pagination and virtual lists for large datasets
 
 ### Milestone 3: Animations & Polish
 
 🎨 **UI & Animations**
+
 - [ ] Message flow animations and real-time data change effects
 - [x] Dark mode optimization
 - [ ] Cluster topology and broker status visualization
 
 🔧 **Enhancements**
+
 - [x] Menu bar resident mode + keyboard shortcuts
 
 ### Milestone 4: Write Operations & Experiments
 
 ✨ **Features**
+
 - [ ] Send test messages, create/delete topics, reset offsets (all opt-in)
 - [ ] Docker API integration for local dev environments
 - [ ] Failure simulation and recovery monitoring
 
 ⚙️ **Settings & Infrastructure**
+
 - [ ] Permission tiers (Read / Write / Admin / Dangerous) with double confirmation
 
 ### Milestone 5: Advanced Features
 
 ✨ **Features**
+
 - [ ] Protobuf decoding (import .proto files)
 - [x] JSON pretty-printing with syntax highlighting
 - [ ] Message search/filter (time range, keywords)
 
 📊 **Monitoring**
+
 - [ ] Broker liveness monitoring, consumer activity status
 
 📦 **Release**
+
 - [ ] Logo, screenshots, full README, CONTRIBUTING.md, GitHub Releases
 
 ---

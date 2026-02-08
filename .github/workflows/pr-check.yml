@@ -24,7 +24,7 @@ jobs:
 
       - uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: '26.2'
+          xcode-version: "26.2"
 
       - name: Install SwiftFormat
         run: command -v swiftformat || brew install swiftformat
