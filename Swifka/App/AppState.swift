@@ -17,6 +17,7 @@ final class AppState {
 
     var operationLevel: OperationLevel = .readonly
     var defaultRefreshMode: RefreshMode = .manual
+    var appearanceMode: AppearanceMode = .system
 
     init(
         configStore: ConfigStore = ConfigStore(),

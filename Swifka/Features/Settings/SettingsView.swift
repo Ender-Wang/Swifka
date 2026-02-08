@@ -57,6 +57,15 @@ struct SettingsView: View {
                 }
             }
 
+            // Appearance
+            Section(l10n["settings.appearance"]) {
+                Picker(l10n["settings.appearance"], selection: $state.appearanceMode) {
+                    Text(l10n["settings.appearance.system"]).tag(AppearanceMode.system)
+                    Text(l10n["settings.appearance.light"]).tag(AppearanceMode.light)
+                    Text(l10n["settings.appearance.dark"]).tag(AppearanceMode.dark)
+                }
+            }
+
             // Language
             Section(l10n["settings.language"]) {
                 Picker(l10n["settings.language"], selection: Binding(

@@ -118,6 +118,11 @@
     "settings.language.en": "English",
     "settings.language.zh": "简体中文",
 
+    "settings.appearance": "Appearance",
+    "settings.appearance.system": "System",
+    "settings.appearance.light": "Light",
+    "settings.appearance.dark": "Dark",
+
     "common.save": "Save",
     "common.cancel": "Cancel",
     "common.delete": "Delete",

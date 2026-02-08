@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 // MARK: - Cluster Configuration
 
@@ -233,6 +234,34 @@ nonisolated enum RefreshMode: Codable, Hashable, Identifiable, Sendable {
         .interval(30),
         .interval(60),
     ]
+}
+
+// MARK: - Appearance
+
+nonisolated enum AppearanceMode: String, CaseIterable, Identifiable, Sendable {
+    case system
+    case light
+    case dark
+
+    var id: String {
+        rawValue
+    }
+
+    var colorScheme: ColorScheme? {
+        switch self {
+        case .system: nil
+        case .light: .light
+        case .dark: .dark
+        }
+    }
+
+    var nsAppearance: NSAppearance? {
+        switch self {
+        case .system: nil
+        case .light: NSAppearance(named: .aqua)
+        case .dark: NSAppearance(named: .darkAqua)
+        }
+    }
 }
 
 // MARK: - Navigation

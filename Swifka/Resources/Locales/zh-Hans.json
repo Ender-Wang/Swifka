@@ -118,6 +118,11 @@
     "settings.language.en": "English",
     "settings.language.zh": "简体中文",
 
+    "settings.appearance": "外观",
+    "settings.appearance.system": "跟随系统",
+    "settings.appearance.light": "浅色",
+    "settings.appearance.dark": "深色",
+
     "common.save": "保存",
     "common.cancel": "取消",
     "common.delete": "删除",

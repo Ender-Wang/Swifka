@@ -12,6 +12,9 @@ struct SwifkaApp: App {
                     minWidth: Constants.minWindowWidth,
                     minHeight: Constants.minWindowHeight,
                 )
+                .onChange(of: appState.appearanceMode, initial: true) {
+                    NSApp.appearance = appState.appearanceMode.nsAppearance
+                }
         }
         .defaultSize(
             width: Constants.defaultWindowWidth,
