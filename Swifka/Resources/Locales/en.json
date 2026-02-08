@@ -62,7 +62,7 @@
     "messages.partition": "Partition",
     "messages.partition.all": "All",
     "messages.fetch": "Fetch",
-    "messages.fetch.count": "Max Messages",
+    "messages.fetch.count": "Fetch Limit",
     "messages.fetching": "Fetching messages…",
     "messages.offset": "Offset",
     "messages.key": "Key",
@@ -123,6 +123,8 @@
     "settings.appearance.light": "Light",
     "settings.appearance.dark": "Dark",
 
+    "common.copy": "Copy",
+    "common.copied": "Copied",
     "common.save": "Save",
     "common.cancel": "Cancel",
     "common.delete": "Delete",

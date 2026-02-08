@@ -36,12 +36,16 @@ struct MessageBrowserView: View {
                 }
                 .fixedSize()
 
-                Stepper(
-                    "\(l10n["messages.fetch.count"]): \(maxMessages)",
-                    value: $maxMessages,
-                    in: 10 ... 500,
-                    step: 10,
-                )
+                HStack(spacing: 4) {
+                    Text("\(l10n["messages.fetch.count"]):")
+                    TextField("", value: $maxMessages, format: .number)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(minWidth: 40)
+                        .fixedSize()
+                        .multilineTextAlignment(.center)
+                    Stepper("", value: $maxMessages, in: 10 ... 500, step: 10)
+                        .labelsHidden()
+                }
                 .fixedSize()
 
                 Spacer()
@@ -148,7 +152,11 @@ struct MessageBrowserView: View {
                     .frame(width: 320)
                     .compositingGroup()
                     .background(Color(nsColor: .windowBackgroundColor))
-                    .overlay(alignment: .leading) { Divider() }
+                    .overlay(alignment: .leading) {
+                        Rectangle()
+                            .fill(.separator)
+                            .frame(width: 1)
+                    }
                     .transition(.move(edge: .trailing))
             }
         }
@@ -211,6 +219,8 @@ struct MessageDetailView: View {
     @Environment(AppState.self) private var appState
     let message: KafkaMessageRecord
     let format: MessageFormat
+    @State private var keyCopied = false
+    @State private var valueCopied = false
 
     var body: some View {
         let l10n = appState.l10n
@@ -229,31 +239,125 @@ struct MessageDetailView: View {
                         DetailRow(label: l10n["messages.timestamp"], value: ts.formatted())
                     }
 
-                    Divider()
-
                     Text(l10n["messages.key"])
                         .font(.subheadline.bold())
-                    Text(message.keyString(format: format))
+                    colorizedText(message.keyPrettyString(format: format))
                         .font(.system(.body, design: .monospaced))
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(8)
+                        .padding(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 50))
                         .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
-
-                    Divider()
+                        .overlay(alignment: .topTrailing) {
+                            CopyButton(text: message.keyPrettyString(format: format), copied: $keyCopied)
+                        }
 
                     Text(l10n["messages.value"])
                         .font(.subheadline.bold())
-                    Text(message.valueString(format: format))
+                    colorizedText(message.valuePrettyString(format: format))
                         .font(.system(.body, design: .monospaced))
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(8)
+                        .padding(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 50))
                         .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+                        .overlay(alignment: .topTrailing) {
+                            CopyButton(text: message.valuePrettyString(format: format), copied: $valueCopied)
+                        }
                 }
             }
             .padding()
         }
+    }
+
+    private func colorizedText(_ string: String) -> Text {
+        let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.hasPrefix("{") || trimmed.hasPrefix("[") else {
+            return Text(string)
+        }
+        return colorizeJSON(string)
+    }
+
+    private func colorizeJSON(_ json: String) -> Text {
+        var result = Text("")
+        var index = json.startIndex
+
+        while index < json.endIndex {
+            let char = json[index]
+
+            if char == "\"" {
+                let start = index
+                index = json.index(after: index)
+                while index < json.endIndex {
+                    if json[index] == "\\" {
+                        index = json.index(after: index)
+                        if index < json.endIndex {
+                            index = json.index(after: index)
+                        }
+                        continue
+                    }
+                    if json[index] == "\"" {
+                        index = json.index(after: index)
+                        break
+                    }
+                    index = json.index(after: index)
+                }
+                let token = String(json[start ..< index])
+                let rest = json[index...].drop { $0 == " " }
+                if rest.first == ":" {
+                    result = result + Text(token).foregroundStyle(.blue)
+                } else {
+                    result = result + Text(token).foregroundStyle(.orange)
+                }
+            } else if char == "-" || char.isNumber {
+                let start = index
+                while index < json.endIndex, "0123456789.eE+-".contains(json[index]) {
+                    index = json.index(after: index)
+                }
+                result = result + Text(String(json[start ..< index])).foregroundStyle(.purple)
+            } else if json[index...].hasPrefix("true") {
+                result = result + Text("true").foregroundStyle(.cyan)
+                index = json.index(index, offsetBy: 4)
+            } else if json[index...].hasPrefix("false") {
+                result = result + Text("false").foregroundStyle(.cyan)
+                index = json.index(index, offsetBy: 5)
+            } else if json[index...].hasPrefix("null") {
+                result = result + Text("null").foregroundStyle(.red)
+                index = json.index(index, offsetBy: 4)
+            } else {
+                result = result + Text(String(char))
+                index = json.index(after: index)
+            }
+        }
+
+        return result
+    }
+}
+
+private struct CopyButton: View {
+    @Environment(AppState.self) private var appState
+    let text: String
+    @Binding var copied: Bool
+    @State private var isHovered = false
+
+    var body: some View {
+        let l10n = appState.l10n
+        Button {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(text, forType: .string)
+            copied = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                copied = false
+            }
+        } label: {
+            Text(copied ? l10n["common.copied"] : l10n["common.copy"])
+                .font(.caption)
+                .foregroundStyle(copied ? .green : isHovered ? .primary : .secondary)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(isHovered ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.clear), in: RoundedRectangle(cornerRadius: 4))
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
+        .padding(6)
     }
 }
 

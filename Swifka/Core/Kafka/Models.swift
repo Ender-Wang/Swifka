@@ -151,6 +151,14 @@ nonisolated struct KafkaMessageRecord: Identifiable, Sendable {
         formatData(value, format: format)
     }
 
+    func keyPrettyString(format: MessageFormat) -> String {
+        prettyFormatData(key, format: format)
+    }
+
+    func valuePrettyString(format: MessageFormat) -> String {
+        prettyFormatData(value, format: format)
+    }
+
     private func formatData(_ data: Data?, format: MessageFormat) -> String {
         guard let data else { return "(null)" }
         if data.isEmpty { return "(empty)" }
@@ -162,6 +170,17 @@ nonisolated struct KafkaMessageRecord: Identifiable, Sendable {
         case .base64:
             return data.base64EncodedString()
         }
+    }
+
+    private func prettyFormatData(_ data: Data?, format: MessageFormat) -> String {
+        guard format == .utf8, let data, !data.isEmpty,
+              let json = try? JSONSerialization.jsonObject(with: data),
+              let pretty = try? JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted, .sortedKeys]),
+              let prettyString = String(data: pretty, encoding: .utf8)
+        else {
+            return formatData(data, format: format)
+        }
+        return prettyString
     }
 }
 
