@@ -191,7 +191,13 @@ struct MessageBrowserView: View {
             }
         }
         .onChange(of: appState.connectionStatus.isConnected) {
-            if appState.connectionStatus.isConnected, selectedTopicName != nil {
+            if appState.connectionStatus.isConnected, selectedTopicName != nil, appState.refreshManager.isAutoRefresh {
+                fetchMessages()
+                appState.refreshManager.restart()
+            }
+        }
+        .onAppear {
+            if appState.connectionStatus.isConnected, selectedTopicName != nil, messages.isEmpty, appState.refreshManager.isAutoRefresh {
                 fetchMessages()
                 appState.refreshManager.restart()
             }
