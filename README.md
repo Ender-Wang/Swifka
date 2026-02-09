@@ -74,6 +74,15 @@ Or download the latest `.dmg` from [Releases](https://github.com/Ender-Wang/Swif
 - [ ] Local database storage (SQLite / SwiftData) with configurable retention
 - [ ] Pagination and virtual lists for large datasets
 
+⚠️ **Health & Alerts**
+
+- [ ] ISR health monitoring and alerts
+  - [ ] Alert: Under-replicated partitions (ISR < replication factor)
+  - [ ] Alert: Critical ISR level (ISR = 1, single point of failure)
+  - [ ] Alert: ISR below min.insync.replicas (partition at risk)
+  - [ ] ISR history graph (track ISR changes over time)
+- [ ] Desktop notifications (macOS native alerts)
+
 ### Milestone 3: Animations & Polish
 
 🎨 **UI & Animations**
@@ -85,6 +94,12 @@ Or download the latest `.dmg` from [Releases](https://github.com/Ender-Wang/Swif
 🔧 **Enhancements**
 
 - [x] Menu bar resident mode + keyboard shortcuts
+- [ ] Connection manager improvements
+  - [ ] Quick connection switcher (keyboard shortcut / menu bar)
+  - [ ] Recent connections history
+  - [ ] Favorite/pin frequently used clusters
+  - [ ] Duplicate/clone connection configs
+  - [ ] Connection groups/folders for organization
 
 ### Milestone 4: Write Operations & Experiments
 
@@ -102,9 +117,16 @@ Or download the latest `.dmg` from [Releases](https://github.com/Ender-Wang/Swif
 
 ✨ **Features**
 
-- [ ] Protobuf decoding (import .proto files)
+- [ ] Message deserialization
+  - [ ] Protobuf decoding (import .proto files)
+  - [ ] Avro deserialization (with schema registry integration)
+  - [ ] Custom deserializers (plugin system)
 - [x] JSON pretty-printing with syntax highlighting
-- [ ] Message search/filter (time range, keywords)
+- [ ] Message search/filter
+  - [ ] Time range filter
+  - [ ] Keyword search
+  - [ ] Regex search within JSON
+  - [ ] JSON path search (e.g., `$.user.email`)
 
 📊 **Monitoring**
 
