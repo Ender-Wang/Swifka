@@ -272,14 +272,26 @@ struct MessageDetailView: View {
     let format: MessageFormat
     @State private var keyCopied = false
     @State private var valueCopied = false
+    @State private var wrapText = true
 
     var body: some View {
         let l10n = appState.l10n
 
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
-                Text(l10n["messages.detail"])
-                    .font(.headline)
+                HStack {
+                    Text(l10n["messages.detail"])
+                        .font(.headline)
+                    Spacer()
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.15)) { wrapText.toggle() }
+                    } label: {
+                        Label(wrapText ? "Wrap" : "Scroll", systemImage: wrapText ? "text.wordwrap" : "arrow.left.and.right.text.vertical")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
 
                 Group {
                     DetailRow(label: "Topic", value: message.topic)
@@ -292,27 +304,11 @@ struct MessageDetailView: View {
 
                     Text(l10n["messages.key"])
                         .font(.subheadline.bold())
-                    colorizedText(message.keyPrettyString(format: format))
-                        .font(.system(.body, design: .monospaced))
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 50))
-                        .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
-                        .overlay(alignment: .topTrailing) {
-                            CopyButton(text: message.keyPrettyString(format: format), copied: $keyCopied)
-                        }
+                    codeBlock(message.keyPrettyString(format: format), copied: $keyCopied)
 
                     Text(l10n["messages.value"])
                         .font(.subheadline.bold())
-                    colorizedText(message.valuePrettyString(format: format))
-                        .font(.system(.body, design: .monospaced))
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 50))
-                        .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
-                        .overlay(alignment: .topTrailing) {
-                            CopyButton(text: message.valuePrettyString(format: format), copied: $valueCopied)
-                        }
+                    codeBlock(message.valuePrettyString(format: format), copied: $valueCopied)
 
                     if !message.headers.isEmpty {
                         Text(l10n["messages.headers"])
@@ -340,6 +336,35 @@ struct MessageDetailView: View {
         .onChange(of: message.id) {
             keyCopied = false
             valueCopied = false
+        }
+    }
+
+    @ViewBuilder
+    private func codeBlock(_ text: String, copied: Binding<Bool>) -> some View {
+        if wrapText {
+            colorizedText(text)
+                .font(.system(.body, design: .monospaced))
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 50))
+                .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+                .overlay(alignment: .topTrailing) {
+                    CopyButton(text: text, copied: copied)
+                }
+        } else {
+            ScrollView(.horizontal, showsIndicators: true) {
+                colorizedText(text)
+                    .font(.system(.body, design: .monospaced))
+                    .textSelection(.enabled)
+                    .lineLimit(nil)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .padding(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 50))
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+            .overlay(alignment: .topTrailing) {
+                CopyButton(text: text, copied: copied)
+            }
         }
     }
 
