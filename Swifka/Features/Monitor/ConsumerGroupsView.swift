@@ -77,11 +77,12 @@ struct GroupDetailView: View {
     var body: some View {
         let l10n = appState.l10n
 
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 0) {
             Text(group.name)
                 .font(.title2.bold())
                 .padding(.horizontal)
                 .padding(.top, 8)
+                .padding(.bottom, 12)
 
             HStack(spacing: 16) {
                 DetailRow(label: l10n["groups.state"], value: group.state)
@@ -89,6 +90,7 @@ struct GroupDetailView: View {
                 DetailRow(label: l10n["groups.protocol.type"], value: group.protocolType)
             }
             .padding(.horizontal)
+            .padding(.bottom, 12)
 
             if group.members.isEmpty {
                 ContentUnavailableView(
@@ -96,6 +98,7 @@ struct GroupDetailView: View {
                     systemImage: "person.slash",
                     description: Text("This consumer group has no active members."),
                 )
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
             } else {
                 Table(group.members) {
                     TableColumn(l10n["groups.member.id"]) { member in
