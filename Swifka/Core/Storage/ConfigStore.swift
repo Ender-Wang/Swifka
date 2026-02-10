@@ -3,7 +3,15 @@ import Foundation
 @Observable
 final class ConfigStore {
     var clusters: [ClusterConfig] = []
-    var selectedClusterId: UUID?
+    var selectedClusterId: UUID? {
+        didSet {
+            if let id = selectedClusterId {
+                UserDefaults.standard.set(id.uuidString, forKey: "configStore.selectedClusterId")
+            } else {
+                UserDefaults.standard.removeObject(forKey: "configStore.selectedClusterId")
+            }
+        }
+    }
 
     var selectedCluster: ClusterConfig? {
         clusters.first { $0.id == selectedClusterId }
@@ -71,7 +79,14 @@ final class ConfigStore {
             let decoder = JSONDecoder()
             decoder.dateDecodingStrategy = .iso8601
             clusters = try decoder.decode([ClusterConfig].self, from: data)
-            selectedClusterId = clusters.first?.id
+            if let savedId = UserDefaults.standard.string(forKey: "configStore.selectedClusterId"),
+               let uuid = UUID(uuidString: savedId),
+               clusters.contains(where: { $0.id == uuid })
+            {
+                selectedClusterId = uuid
+            } else {
+                selectedClusterId = clusters.first?.id
+            }
         } catch {
             print("ConfigStore: Failed to load: \(error)")
         }
