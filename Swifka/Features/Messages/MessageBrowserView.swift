@@ -170,19 +170,30 @@ struct MessageBrowserView: View {
         }
         .overlay(alignment: .trailing) {
             if let message = detailMessage {
-                MessageDetailView(message: message, format: messageFormat)
-                    .frame(width: 320)
-                    .compositingGroup()
-                    .background(Color(nsColor: .windowBackgroundColor))
-                    .overlay(alignment: .leading) {
-                        Rectangle()
-                            .fill(.separator)
-                            .frame(width: 1)
-                    }
-                    .transition(.move(edge: .trailing))
+                MessageDetailView(message: message, format: messageFormat) {
+                    selectedMessageId = nil
+                    detailMessage = nil
+                }
+                .frame(width: 320)
+                .compositingGroup()
+                .background(Color(nsColor: .windowBackgroundColor))
+                .overlay(alignment: .leading) {
+                    Rectangle()
+                        .fill(.separator)
+                        .frame(width: 1)
+                }
+                .transition(.move(edge: .trailing))
             }
         }
         .animation(.smooth(duration: 0.25), value: detailMessage?.id)
+        .onKeyPress(.escape) {
+            if detailMessage != nil {
+                selectedMessageId = nil
+                detailMessage = nil
+                return .handled
+            }
+            return .ignored
+        }
         .onChange(of: selectedTopicName) {
             UserDefaults.standard.set(selectedTopicName, forKey: "messages.selectedTopic")
             selectedMessageId = nil
@@ -270,6 +281,7 @@ struct MessageDetailView: View {
     @Environment(AppState.self) private var appState
     let message: KafkaMessageRecord
     let format: MessageFormat
+    var onDismiss: () -> Void = {}
     @State private var keyCopied = false
     @State private var valueCopied = false
     @State private var wrapText = true
@@ -280,6 +292,7 @@ struct MessageDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
+                    PanelCloseButton(action: onDismiss)
                     Text(l10n["messages.detail"])
                         .font(.headline)
                     Spacer()
@@ -458,6 +471,27 @@ private struct CopyButton: View {
         .buttonStyle(.plain)
         .onHover { isHovered = $0 }
         .padding(6)
+    }
+}
+
+struct PanelCloseButton: View {
+    let action: () -> Void
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: action) {
+            ZStack {
+                Circle()
+                    .fill(isHovered ? Color.red : Color.secondary.opacity(0.2))
+                    .frame(width: 14, height: 14)
+                Image(systemName: "xmark")
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundStyle(isHovered ? .white : .secondary)
+            }
+            .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
     }
 }
 

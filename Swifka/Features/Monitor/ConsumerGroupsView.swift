@@ -48,19 +48,28 @@ struct ConsumerGroupsView: View {
         }
         .overlay(alignment: .trailing) {
             if let group = selectedGroup {
-                GroupDetailView(group: group)
-                    .frame(width: 320)
-                    .compositingGroup()
-                    .background(Color(nsColor: .windowBackgroundColor))
-                    .overlay(alignment: .leading) {
-                        Rectangle()
-                            .fill(.separator)
-                            .frame(width: 1)
-                    }
-                    .transition(.move(edge: .trailing))
+                GroupDetailView(group: group) {
+                    selectedGroup = nil
+                }
+                .frame(width: 320)
+                .compositingGroup()
+                .background(Color(nsColor: .windowBackgroundColor))
+                .overlay(alignment: .leading) {
+                    Rectangle()
+                        .fill(.separator)
+                        .frame(width: 1)
+                }
+                .transition(.move(edge: .trailing))
             }
         }
         .animation(.smooth(duration: 0.25), value: selectedGroup?.id)
+        .onKeyPress(.escape) {
+            if selectedGroup != nil {
+                selectedGroup = nil
+                return .handled
+            }
+            return .ignored
+        }
         .navigationTitle(l10n["groups.title"])
     }
 
@@ -78,25 +87,30 @@ struct ConsumerGroupsView: View {
 struct GroupDetailView: View {
     @Environment(AppState.self) private var appState
     let group: ConsumerGroupInfo
+    var onDismiss: () -> Void = {}
     @State private var nameCopied = false
 
     var body: some View {
         let l10n = appState.l10n
 
         VStack(alignment: .leading, spacing: 0) {
-            Text(nameCopied ? "Copied" : group.name)
-                .font(.title2.bold())
-                .foregroundStyle(nameCopied ? .green : .primary)
-                .contentTransition(.opacity)
-                .padding(.horizontal)
-                .padding(.top, 8)
-                .padding(.bottom, 12)
-                .onTapGesture {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(group.name, forType: .string)
-                    withAnimation(.easeIn(duration: 0.1)) { nameCopied = true }
-                    withAnimation(.easeOut(duration: 0.3).delay(0.8)) { nameCopied = false }
-                }
+            HStack {
+                PanelCloseButton(action: onDismiss)
+                Text(nameCopied ? "Copied" : group.name)
+                    .font(.title2.bold())
+                    .foregroundStyle(nameCopied ? .green : .primary)
+                    .contentTransition(.opacity)
+                    .onTapGesture {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(group.name, forType: .string)
+                        withAnimation(.easeIn(duration: 0.1)) { nameCopied = true }
+                        withAnimation(.easeOut(duration: 0.3).delay(0.8)) { nameCopied = false }
+                    }
+                Spacer()
+            }
+            .padding(.horizontal)
+            .padding(.top, 8)
+            .padding(.bottom, 12)
 
             VStack(alignment: .leading, spacing: 8) {
                 DetailRow(label: l10n["groups.state"], value: group.state)
