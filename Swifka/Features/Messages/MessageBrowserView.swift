@@ -299,7 +299,7 @@ struct MessageDetailView: View {
                     Button {
                         withAnimation(.easeInOut(duration: 0.15)) { wrapText.toggle() }
                     } label: {
-                        Label(wrapText ? "Wrap" : "Scroll", systemImage: wrapText ? "text.wordwrap" : "arrow.left.and.right.text.vertical")
+                        Label(wrapText ? "Wrap" : "Scroll", systemImage: wrapText ? "text.justify.left" : "scroll")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
