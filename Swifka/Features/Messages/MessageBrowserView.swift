@@ -440,13 +440,37 @@ struct DetailRow: View {
     let label: String
     let value: String
 
+    @State private var showCopied = false
+    @State private var isHighlighted = false
+
     var body: some View {
         HStack {
             Text(label)
                 .foregroundStyle(.secondary)
-                .frame(width: 80, alignment: .trailing)
-            Text(value)
-                .textSelection(.enabled)
+                .lineLimit(1)
+                .frame(width: 100, alignment: .trailing)
+            Text(showCopied ? "Copied" : value)
+                .foregroundStyle(showCopied ? .green : .primary)
+                .padding(.horizontal, 4)
+                .padding(.vertical, 1)
+                .background(
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(isHighlighted ? Color.accentColor.opacity(0.15) : .clear),
+                )
+                .contentTransition(.opacity)
+                .onTapGesture {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(value, forType: .string)
+
+                    withAnimation(.easeIn(duration: 0.1)) {
+                        isHighlighted = true
+                        showCopied = true
+                    }
+                    withAnimation(.easeOut(duration: 0.3).delay(0.8)) {
+                        showCopied = false
+                        isHighlighted = false
+                    }
+                }
         }
     }
 }
