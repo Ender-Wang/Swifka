@@ -177,11 +177,12 @@ struct MessageBrowserView: View {
                 .frame(width: 320)
                 .compositingGroup()
                 .background(Color(nsColor: .windowBackgroundColor))
-                .overlay(alignment: .leading) {
-                    Rectangle()
-                        .fill(.separator)
-                        .frame(width: 1)
+                .clipShape(.rect(topLeadingRadius: 10, bottomLeadingRadius: 10))
+                .overlay {
+                    UnevenRoundedRectangle(topLeadingRadius: 10, bottomLeadingRadius: 10)
+                        .strokeBorder(.separator, lineWidth: 1)
                 }
+                .shadow(color: .black.opacity(0.15), radius: 8, x: -2)
                 .transition(.move(edge: .trailing))
             }
         }
