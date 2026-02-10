@@ -132,20 +132,20 @@ struct MessageBrowserView: View {
                             .monospacedDigit()
                             .padding(.vertical, appState.rowDensity.tablePadding)
                     }
-                    .width(min: 60, ideal: 80)
+                    .width(min: 50, ideal: 70, max: 90)
 
                     TableColumn(l10n["messages.partition"], value: \.partition) { message in
                         Text("\(message.partition)")
                             .padding(.vertical, appState.rowDensity.tablePadding)
                     }
-                    .width(min: 50, ideal: 70)
+                    .width(min: 40, ideal: 55, max: 70)
 
                     TableColumn(l10n["messages.key"]) { message in
                         Text(message.keyString(format: messageFormat))
                             .lineLimit(1)
                             .padding(.vertical, appState.rowDensity.tablePadding)
                     }
-                    .width(min: 80, ideal: 120)
+                    .width(min: 60, ideal: 100, max: 150)
 
                     TableColumn(l10n["messages.value"]) { message in
                         Text(message.valueString(format: messageFormat))
@@ -164,7 +164,7 @@ struct MessageBrowserView: View {
                                 .padding(.vertical, appState.rowDensity.tablePadding)
                         }
                     }
-                    .width(min: 140, ideal: 180)
+                    .width(min: 140, ideal: 170, max: 200)
                 }
                 .font(.system(size: appState.rowDensity.fontSize))
             }
