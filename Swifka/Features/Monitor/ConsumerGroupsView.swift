@@ -5,32 +5,33 @@ struct ConsumerGroupsView: View {
     @State private var selectedGroup: ConsumerGroupInfo?
 
     var body: some View {
+        @Bindable var appState = appState
         let l10n = appState.l10n
 
-        Table(appState.consumerGroups, selection: Binding(
+        Table(sortedGroups, selection: Binding(
             get: { selectedGroup?.id },
-            set: { id in selectedGroup = appState.consumerGroups.first { $0.id == id } },
-        )) {
-            TableColumn(l10n["groups.name"]) { group in
+            set: { id in selectedGroup = sortedGroups.first { $0.id == id } },
+        ), sortOrder: $appState.consumerGroupsSortOrder) {
+            TableColumn(l10n["groups.name"], value: \.name) { group in
                 Text(group.name)
                     .fontWeight(.medium)
                     .padding(.vertical, appState.rowDensity.tablePadding)
             }
 
-            TableColumn(l10n["groups.state"]) { group in
+            TableColumn(l10n["groups.state"], value: \.state) { group in
                 Text(group.state)
                     .foregroundStyle(stateColor(group.state))
                     .padding(.vertical, appState.rowDensity.tablePadding)
             }
             .width(min: 60, ideal: 100)
 
-            TableColumn(l10n["groups.members"]) { group in
+            TableColumn(l10n["groups.members"], value: \.members.count) { group in
                 Text("\(group.members.count)")
                     .padding(.vertical, appState.rowDensity.tablePadding)
             }
             .width(min: 50, ideal: 80)
 
-            TableColumn(l10n["groups.protocol.type"]) { group in
+            TableColumn(l10n["groups.protocol.type"], value: \.protocolType) { group in
                 Text(group.protocolType)
                     .padding(.vertical, appState.rowDensity.tablePadding)
             }
@@ -72,6 +73,10 @@ struct ConsumerGroupsView: View {
             return .ignored
         }
         .navigationTitle(l10n["groups.title"])
+    }
+
+    private var sortedGroups: [ConsumerGroupInfo] {
+        appState.consumerGroups.sorted(using: appState.consumerGroupsSortOrder)
     }
 
     private func stateColor(_ state: String) -> Color {

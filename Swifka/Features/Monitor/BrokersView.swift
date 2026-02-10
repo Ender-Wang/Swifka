@@ -4,22 +4,23 @@ struct BrokersView: View {
     @Environment(AppState.self) private var appState
 
     var body: some View {
+        @Bindable var appState = appState
         let l10n = appState.l10n
 
-        Table(appState.brokers) {
-            TableColumn(l10n["brokers.id"]) { broker in
+        Table(sortedBrokers, sortOrder: $appState.brokersSortOrder) {
+            TableColumn(l10n["brokers.id"], value: \.id) { broker in
                 Text("\(broker.id)")
                     .fontWeight(.medium)
                     .padding(.vertical, appState.rowDensity.tablePadding)
             }
             .width(min: 60, ideal: 100)
 
-            TableColumn(l10n["brokers.host"]) { broker in
+            TableColumn(l10n["brokers.host"], value: \.host) { broker in
                 Text(broker.host)
                     .padding(.vertical, appState.rowDensity.tablePadding)
             }
 
-            TableColumn(l10n["brokers.port"]) { broker in
+            TableColumn(l10n["brokers.port"], value: \.port) { broker in
                 Text("\(broker.port)")
                     .padding(.vertical, appState.rowDensity.tablePadding)
             }
@@ -36,5 +37,9 @@ struct BrokersView: View {
                 )
             }
         }
+    }
+
+    private var sortedBrokers: [BrokerInfo] {
+        appState.brokers.sorted(using: appState.brokersSortOrder)
     }
 }

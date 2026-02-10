@@ -18,6 +18,13 @@ final class AppState {
     }
 
     var expandedTopics: Set<String> = []
+
+    // MARK: - Sort Orders (session-scoped, reset on app restart)
+
+    var brokersSortOrder = [KeyPathComparator(\BrokerInfo.id)]
+    var consumerGroupsSortOrder = [KeyPathComparator(\ConsumerGroupInfo.name)]
+    var messagesSortOrder = [KeyPathComparator(\KafkaMessageRecord.offset)]
+    var partitionsSortOrder = [KeyPathComparator(\PartitionInfo.partitionId)]
     var lastError: String?
     var isLoading = false
 

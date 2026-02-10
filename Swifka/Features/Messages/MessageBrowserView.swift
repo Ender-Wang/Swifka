@@ -18,6 +18,7 @@ struct MessageBrowserView: View {
     @State private var refreshRotation: Double = 0
 
     var body: some View {
+        @Bindable var appState = appState
         let l10n = appState.l10n
 
         VStack(spacing: 0) {
@@ -115,25 +116,25 @@ struct MessageBrowserView: View {
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                Table(messages, selection: Binding(
+                Table(sortedMessages, selection: Binding(
                     get: { selectedMessageId },
                     set: { newValue in
                         selectedMessageId = newValue
-                        if let id = newValue, let msg = messages.first(where: { $0.id == id }) {
+                        if let id = newValue, let msg = sortedMessages.first(where: { $0.id == id }) {
                             detailMessage = msg
                         } else if newValue == nil {
                             detailMessage = nil
                         }
                     },
-                )) {
-                    TableColumn(l10n["messages.offset"]) { message in
+                ), sortOrder: $appState.messagesSortOrder) {
+                    TableColumn(l10n["messages.offset"], value: \.offset) { message in
                         Text("\(message.offset)")
                             .monospacedDigit()
                             .padding(.vertical, appState.rowDensity.tablePadding)
                     }
                     .width(min: 60, ideal: 80)
 
-                    TableColumn(l10n["messages.partition"]) { message in
+                    TableColumn(l10n["messages.partition"], value: \.partition) { message in
                         Text("\(message.partition)")
                             .padding(.vertical, appState.rowDensity.tablePadding)
                     }
@@ -152,7 +153,7 @@ struct MessageBrowserView: View {
                             .padding(.vertical, appState.rowDensity.tablePadding)
                     }
 
-                    TableColumn(l10n["messages.timestamp"]) { message in
+                    TableColumn(l10n["messages.timestamp"], value: \.timestamp) { message in
                         if let timestamp = message.timestamp {
                             (Text(timestamp, style: .date)
                                 + Text(" ")
@@ -234,6 +235,10 @@ struct MessageBrowserView: View {
             }
         }
         .navigationTitle(l10n["messages.title"])
+    }
+
+    private var sortedMessages: [KafkaMessageRecord] {
+        messages.sorted(using: appState.messagesSortOrder)
     }
 
     private var userTopics: [TopicInfo] {
