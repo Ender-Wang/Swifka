@@ -253,29 +253,41 @@ private struct SidebarFooterView: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
 
-                if appState.isLoading {
-                    Spacer()
-                    ProgressView()
-                        .controlSize(.mini)
-                }
+                ProgressView()
+                    .controlSize(.mini)
+                    .opacity(appState.isLoading ? 1 : 0)
             }
 
-            // Metric chips (only when connected)
-            if appState.connectionStatus.isConnected {
-                MetricChipRow(icon: "server.rack", count: appState.brokers.count,
-                              label: l10n[appState.brokers.count == 1 ? "status.broker" : "status.brokers"],
-                              color: .blue)
-                MetricChipRow(icon: "list.bullet.rectangle", count: appState.topics.count(where: { !$0.isInternal }),
-                              label: l10n[appState.topics.count(where: { !$0.isInternal }) == 1 ? "status.topic" : "status.topics"],
-                              color: .green)
-                MetricChipRow(icon: "square.split.2x2", count: appState.totalPartitions,
-                              label: l10n[appState.totalPartitions == 1 ? "status.partition" : "status.partitions"],
-                              color: .orange)
-            }
+            // Metric chips — always visible, counts animate on change
+            MetricChipRow(icon: "server.rack", count: brokerCount,
+                          label: l10n[brokerCount == 1 ? "status.broker" : "status.brokers"],
+                          color: .blue, connected: connected)
+            MetricChipRow(icon: "list.bullet.rectangle", count: topicCount,
+                          label: l10n[topicCount == 1 ? "status.topic" : "status.topics"],
+                          color: .green, connected: connected)
+            MetricChipRow(icon: "square.split.2x2", count: partitionCount,
+                          label: l10n[partitionCount == 1 ? "status.partition" : "status.partitions"],
+                          color: .orange, connected: connected)
         }
         .padding(.horizontal, 12)
         .padding(.bottom, 8)
         .padding(.top, 2)
+    }
+
+    private var connected: Bool {
+        appState.connectionStatus.isConnected
+    }
+
+    private var brokerCount: Int {
+        appState.brokers.count
+    }
+
+    private var topicCount: Int {
+        appState.topics.count(where: { !$0.isInternal })
+    }
+
+    private var partitionCount: Int {
+        appState.totalPartitions
     }
 
     private func connectionLabel(l10n: L10n) -> String {
@@ -297,6 +309,7 @@ private struct MetricChipRow: View {
     let count: Int
     let label: String
     let color: Color
+    var connected: Bool = true
 
     var body: some View {
         HStack(spacing: 4) {
@@ -304,12 +317,16 @@ private struct MetricChipRow: View {
                 .font(.system(size: 10))
                 .foregroundStyle(color)
                 .frame(width: 14, alignment: .center)
-            Text("\(count)")
+            Text(connected ? "\(count)" : "--")
                 .font(.caption.monospacedDigit().bold())
+                .contentTransition(.numericText())
             Text(label)
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
+        .opacity(connected ? 1 : 0.35)
+        .animation(.default, value: count)
+        .animation(.default, value: connected)
     }
 }
 
@@ -318,25 +335,22 @@ private struct MetricChipRow: View {
 private struct CompactSidebarFooterView: View {
     @Environment(AppState.self) private var appState
 
+    private var connected: Bool {
+        appState.connectionStatus.isConnected
+    }
+
     var body: some View {
         VStack(spacing: 6) {
             Divider()
                 .padding(.horizontal, 8)
 
-            if appState.connectionStatus.isConnected {
-                CompactMetricIcon(icon: "server.rack", count: appState.brokers.count, color: .blue)
-                CompactMetricIcon(icon: "list.bullet.rectangle", count: appState.topics.count(where: { !$0.isInternal }), color: .green)
-                CompactMetricIcon(icon: "square.split.2x2", count: appState.totalPartitions, color: .orange)
-            }
-
             // Connection dot
             ConnectionStatusBadge(status: appState.connectionStatus)
-                .padding(.top, 2)
+                .padding(.bottom, 2)
 
-            if appState.isLoading {
-                ProgressView()
-                    .controlSize(.mini)
-            }
+            CompactMetricIcon(icon: "server.rack", count: appState.brokers.count, color: .blue, connected: connected)
+            CompactMetricIcon(icon: "list.bullet.rectangle", count: appState.topics.count(where: { !$0.isInternal }), color: .green, connected: connected)
+            CompactMetricIcon(icon: "square.split.2x2", count: appState.totalPartitions, color: .orange, connected: connected)
         }
         .padding(.bottom, 6)
     }
@@ -346,17 +360,22 @@ private struct CompactMetricIcon: View {
     let icon: String
     let count: Int
     let color: Color
+    var connected: Bool = true
 
     var body: some View {
         VStack(spacing: 1) {
             Image(systemName: icon)
                 .font(.system(size: 10))
                 .foregroundStyle(color)
-            Text("\(count)")
+            Text(connected ? "\(count)" : "-")
                 .font(.system(size: 9).monospacedDigit().bold())
+                .contentTransition(.numericText())
         }
         .frame(width: 32, height: 24)
         .help("\(count)")
+        .opacity(connected ? 1 : 0.35)
+        .animation(.default, value: count)
+        .animation(.default, value: connected)
     }
 }
 
