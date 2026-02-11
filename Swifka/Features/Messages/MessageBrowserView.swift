@@ -24,67 +24,79 @@ struct MessageBrowserView: View {
         VStack(spacing: 0) {
             // Controls
             HStack(spacing: 12) {
-                Picker(l10n["messages.topic"], selection: validatedTopicBinding) {
-                    Text("--").tag(nil as String?)
-                    ForEach(userTopics, id: \.name) { topic in
-                        Text(topic.name).tag(topic.name as String?)
-                    }
-                }
-                .fixedSize()
-
-                Picker(l10n["messages.partition"], selection: validatedPartitionBinding) {
-                    Text(l10n["messages.partition.all"]).tag(nil as Int32?)
-                    if let topic = selectedTopic {
-                        ForEach(topic.partitions) { partition in
-                            Text("\(partition.partitionId)").tag(partition.partitionId as Int32?)
+                // Left group — scrollable when space is tight
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        Picker(l10n["messages.topic"], selection: validatedTopicBinding) {
+                            Text("--").tag(nil as String?)
+                            ForEach(userTopics, id: \.name) { topic in
+                                Text(topic.name).tag(topic.name as String?)
+                            }
                         }
-                    }
-                }
-                .fixedSize()
-
-                HStack(spacing: 4) {
-                    Text("\(l10n["messages.fetch.count"]):")
-                    TextField("", value: $maxMessages, format: .number)
-                        .textFieldStyle(.roundedBorder)
-                        .frame(minWidth: 40)
                         .fixedSize()
-                        .multilineTextAlignment(.center)
-                    Stepper("", value: $maxMessages, in: 10 ... 500, step: 10)
-                        .labelsHidden()
-                }
-                .fixedSize()
 
-                Spacer()
+                        Picker(l10n["messages.partition"], selection: validatedPartitionBinding) {
+                            Text(l10n["messages.partition.all"]).tag(nil as Int32?)
+                            if let topic = selectedTopic {
+                                ForEach(topic.partitions) { partition in
+                                    Text("\(partition.partitionId)").tag(partition.partitionId as Int32?)
+                                }
+                            }
+                        }
+                        .fixedSize()
 
-                if appState.defaultRefreshMode == .manual {
-                    Button {
-                        fetchMessages()
-                    } label: {
-                        if isFetching {
-                            ProgressView()
-                                .controlSize(.small)
+                        HStack(spacing: 4) {
+                            Text("\(l10n["messages.fetch.count"]):")
+                            TextField("", value: $maxMessages, format: .number)
+                                .textFieldStyle(.roundedBorder)
+                                .frame(minWidth: 40)
+                                .fixedSize()
+                                .multilineTextAlignment(.center)
+                            Stepper("", value: $maxMessages, in: 10 ... 500, step: 10)
+                                .labelsHidden()
+                        }
+                        .fixedSize()
+
+                        if appState.defaultRefreshMode == .manual {
+                            Button {
+                                fetchMessages()
+                            } label: {
+                                if isFetching {
+                                    ProgressView()
+                                        .controlSize(.small)
+                                } else {
+                                    Text(l10n["messages.fetch"])
+                                }
+                            }
+                            .disabled(selectedTopicName == nil || isFetching)
                         } else {
-                            Text(l10n["messages.fetch"])
+                            Button {
+                                fetchMessages()
+                                appState.refreshManager.restart()
+                                withAnimation(.easeInOut(duration: 0.6)) {
+                                    refreshRotation += 360
+                                }
+                            } label: {
+                                Image(systemName: "arrow.trianglehead.2.clockwise")
+                                    .rotationEffect(.degrees(refreshRotation))
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(selectedTopicName == nil || isFetching)
                         }
                     }
-                    .disabled(selectedTopicName == nil || isFetching)
-                } else {
-                    Button {
-                        fetchMessages()
-                        appState.refreshManager.restart()
-                        withAnimation(.easeInOut(duration: 0.6)) {
-                            refreshRotation += 360
-                        }
-                    } label: {
-                        Image(systemName: "arrow.trianglehead.2.clockwise")
-                            .rotationEffect(.degrees(refreshRotation))
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(selectedTopicName == nil || isFetching)
+                }
+                // Trailing fade overlay to hint at overflow
+                .overlay(alignment: .trailing) {
+                    LinearGradient(
+                        colors: [.clear, Color(nsColor: .windowBackgroundColor)],
+                        startPoint: .leading,
+                        endPoint: .trailing,
+                    )
+                    .frame(width: 40)
+                    .allowsHitTesting(false)
                 }
 
-                Spacer()
-
+                // Right group — sits naturally, no extra background
                 Picker(l10n["messages.format"], selection: $messageFormat) {
                     ForEach(MessageFormat.allCases) { format in
                         Text(format.rawValue).tag(format)
