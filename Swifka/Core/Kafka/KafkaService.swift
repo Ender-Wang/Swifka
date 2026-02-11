@@ -2,9 +2,34 @@ import Crdkafka
 import Foundation
 import Kafka
 
+/// Wrapper to send OpaquePointer across isolation boundaries.
+/// librdkafka handles are thread-safe for concurrent operations, so this is sound.
+private nonisolated struct SendableHandle: @unchecked Sendable {
+    let pointer: OpaquePointer
+}
+
 actor KafkaService {
     private var handle: OpaquePointer?
     private let stringSize = 512
+    /// Serial queue ensures rd_kafka_destroy() never runs while other C calls are in-flight
+    private static let blockingQueue = DispatchQueue(label: "com.swifka.kafka-blocking")
+
+    /// Run a blocking C call on a background queue so the actor executor is freed.
+    /// This allows other actor methods (e.g. disconnect) to execute while the C call blocks.
+    private nonisolated static func offload<T: Sendable>(
+        _ work: @escaping @Sendable () throws -> T,
+    ) async throws -> T {
+        try await withCheckedThrowingContinuation { continuation in
+            blockingQueue.async {
+                do {
+                    let result = try work()
+                    continuation.resume(returning: result)
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
 
     var isConnected: Bool {
         handle != nil
@@ -45,10 +70,13 @@ actor KafkaService {
     }
 
     func disconnect() {
-        if let handle {
-            rd_kafka_destroy(handle)
-        }
+        guard let oldHandle = handle else { return }
         handle = nil
+        // Destroy on serial queue so it waits for any in-flight C calls to finish first
+        let h = SendableHandle(pointer: oldHandle)
+        Self.blockingQueue.async {
+            rd_kafka_destroy(h.pointer)
+        }
     }
 
     func testConnection(config: ClusterConfig, password: String? = nil) throws -> Bool {
@@ -93,105 +121,114 @@ actor KafkaService {
 
     // MARK: - Metadata
 
-    func fetchMetadata() throws -> (brokers: [BrokerInfo], topics: [TopicInfo]) {
+    func fetchMetadata() async throws -> (brokers: [BrokerInfo], topics: [TopicInfo]) {
         guard let handle else {
             throw SwifkaError.notConnected
         }
+        let h = SendableHandle(pointer: handle)
+        let timeout = Constants.kafkaTimeout
 
-        var metadataPtr: UnsafePointer<rd_kafka_metadata_t>?
-        let result = rd_kafka_metadata(handle, 1, nil, &metadataPtr, Constants.kafkaTimeout)
+        return try await Self.offload {
+            var metadataPtr: UnsafePointer<rd_kafka_metadata_t>?
+            let result = rd_kafka_metadata(h.pointer, 1, nil, &metadataPtr, timeout)
 
-        guard result == RD_KAFKA_RESP_ERR_NO_ERROR else {
-            let errStr = String(cString: rd_kafka_err2str(result))
-            throw SwifkaError.metadataFailed(errStr)
-        }
+            guard result == RD_KAFKA_RESP_ERR_NO_ERROR else {
+                let errStr = String(cString: rd_kafka_err2str(result))
+                throw SwifkaError.metadataFailed(errStr)
+            }
 
-        guard let metadata = metadataPtr?.pointee else {
-            throw SwifkaError.metadataFailed("Null metadata pointer")
-        }
-        defer { rd_kafka_metadata_destroy(metadataPtr) }
+            guard let metadata = metadataPtr?.pointee else {
+                throw SwifkaError.metadataFailed("Null metadata pointer")
+            }
+            defer { rd_kafka_metadata_destroy(metadataPtr) }
 
-        // Parse brokers
-        var brokers: [BrokerInfo] = []
-        for i in 0 ..< Int(metadata.broker_cnt) {
-            let broker = metadata.brokers[i]
-            brokers.append(BrokerInfo(
-                id: broker.id,
-                host: String(cString: broker.host),
-                port: Int32(broker.port),
-            ))
-        }
-
-        // Parse topics
-        var topics: [TopicInfo] = []
-        for i in 0 ..< Int(metadata.topic_cnt) {
-            let topic = metadata.topics[i]
-            let topicName = String(cString: topic.topic)
-
-            var partitions: [PartitionInfo] = []
-            for j in 0 ..< Int(topic.partition_cnt) {
-                let partition = topic.partitions[j]
-
-                var replicas: [Int32] = []
-                for r in 0 ..< Int(partition.replica_cnt) {
-                    replicas.append(partition.replicas[r])
-                }
-
-                var isrs: [Int32] = []
-                for s in 0 ..< Int(partition.isr_cnt) {
-                    isrs.append(partition.isrs[s])
-                }
-
-                partitions.append(PartitionInfo(
-                    partitionId: partition.id,
-                    leader: partition.leader,
-                    replicas: replicas,
-                    isr: isrs,
+            // Parse brokers
+            var brokers: [BrokerInfo] = []
+            for i in 0 ..< Int(metadata.broker_cnt) {
+                let broker = metadata.brokers[i]
+                brokers.append(BrokerInfo(
+                    id: broker.id,
+                    host: String(cString: broker.host),
+                    port: Int32(broker.port),
                 ))
             }
 
-            topics.append(TopicInfo(
-                name: topicName,
-                partitions: partitions,
-            ))
-        }
+            // Parse topics
+            var topics: [TopicInfo] = []
+            for i in 0 ..< Int(metadata.topic_cnt) {
+                let topic = metadata.topics[i]
+                let topicName = String(cString: topic.topic)
 
-        return (brokers, topics)
+                var partitions: [PartitionInfo] = []
+                for j in 0 ..< Int(topic.partition_cnt) {
+                    let partition = topic.partitions[j]
+
+                    var replicas: [Int32] = []
+                    for r in 0 ..< Int(partition.replica_cnt) {
+                        replicas.append(partition.replicas[r])
+                    }
+
+                    var isrs: [Int32] = []
+                    for s in 0 ..< Int(partition.isr_cnt) {
+                        isrs.append(partition.isrs[s])
+                    }
+
+                    partitions.append(PartitionInfo(
+                        partitionId: partition.id,
+                        leader: partition.leader,
+                        replicas: replicas,
+                        isr: isrs,
+                    ))
+                }
+
+                topics.append(TopicInfo(
+                    name: topicName,
+                    partitions: partitions,
+                ))
+            }
+
+            return (brokers, topics)
+        }
     }
 
     // MARK: - Watermarks
 
-    func fetchWatermarks(topic: String, partition: Int32) throws -> (low: Int64, high: Int64) {
+    func fetchWatermarks(topic: String, partition: Int32) async throws -> (low: Int64, high: Int64) {
         guard let handle else {
             throw SwifkaError.notConnected
         }
+        let h = SendableHandle(pointer: handle)
+        let timeout = Constants.kafkaTimeout
 
-        var low: Int64 = 0
-        var high: Int64 = 0
+        return try await Self.offload {
+            var low: Int64 = 0
+            var high: Int64 = 0
 
-        let result = rd_kafka_query_watermark_offsets(
-            handle,
-            topic,
-            partition,
-            &low,
-            &high,
-            Constants.kafkaTimeout,
-        )
+            let result = rd_kafka_query_watermark_offsets(
+                h.pointer,
+                topic,
+                partition,
+                &low,
+                &high,
+                timeout,
+            )
 
-        guard result == RD_KAFKA_RESP_ERR_NO_ERROR else {
-            let errStr = String(cString: rd_kafka_err2str(result))
-            throw SwifkaError.watermarkFailed(errStr)
+            guard result == RD_KAFKA_RESP_ERR_NO_ERROR else {
+                let errStr = String(cString: rd_kafka_err2str(result))
+                throw SwifkaError.watermarkFailed(errStr)
+            }
+
+            return (low, high)
         }
-
-        return (low, high)
     }
 
-    func fetchAllWatermarks(topics: [TopicInfo]) -> [TopicInfo] {
-        topics.map { topic in
+    func fetchAllWatermarks(topics: [TopicInfo]) async -> [TopicInfo] {
+        var result: [TopicInfo] = []
+        for topic in topics {
             var updatedPartitions = topic.partitions
             for i in updatedPartitions.indices {
                 let partition = updatedPartitions[i]
-                if let watermarks = try? fetchWatermarks(
+                if let watermarks = try? await fetchWatermarks(
                     topic: topic.name,
                     partition: partition.partitionId,
                 ) {
@@ -205,54 +242,59 @@ actor KafkaService {
                     )
                 }
             }
-            return TopicInfo(name: topic.name, partitions: updatedPartitions)
+            result.append(TopicInfo(name: topic.name, partitions: updatedPartitions))
         }
+        return result
     }
 
     // MARK: - Consumer Groups
 
-    func fetchConsumerGroups() throws -> [ConsumerGroupInfo] {
+    func fetchConsumerGroups() async throws -> [ConsumerGroupInfo] {
         guard let handle else {
             throw SwifkaError.notConnected
         }
+        let h = SendableHandle(pointer: handle)
+        let timeout = Constants.kafkaTimeout
 
-        var groupListPtr: UnsafePointer<rd_kafka_group_list>?
-        let result = rd_kafka_list_groups(handle, nil, &groupListPtr, Constants.kafkaTimeout)
+        return try await Self.offload {
+            var groupListPtr: UnsafePointer<rd_kafka_group_list>?
+            let result = rd_kafka_list_groups(h.pointer, nil, &groupListPtr, timeout)
 
-        guard result == RD_KAFKA_RESP_ERR_NO_ERROR else {
-            let errStr = String(cString: rd_kafka_err2str(result))
-            throw SwifkaError.consumerGroupsFailed(errStr)
-        }
+            guard result == RD_KAFKA_RESP_ERR_NO_ERROR else {
+                let errStr = String(cString: rd_kafka_err2str(result))
+                throw SwifkaError.consumerGroupsFailed(errStr)
+            }
 
-        guard let groupList = groupListPtr?.pointee else {
-            throw SwifkaError.consumerGroupsFailed("Null group list pointer")
-        }
-        defer { rd_kafka_group_list_destroy(groupListPtr) }
+            guard let groupList = groupListPtr?.pointee else {
+                throw SwifkaError.consumerGroupsFailed("Null group list pointer")
+            }
+            defer { rd_kafka_group_list_destroy(groupListPtr) }
 
-        var groups: [ConsumerGroupInfo] = []
-        for i in 0 ..< Int(groupList.group_cnt) {
-            let group = groupList.groups[i]
+            var groups: [ConsumerGroupInfo] = []
+            for i in 0 ..< Int(groupList.group_cnt) {
+                let group = groupList.groups[i]
 
-            var members: [GroupMemberInfo] = []
-            for j in 0 ..< Int(group.member_cnt) {
-                let member = group.members[j]
-                members.append(GroupMemberInfo(
-                    memberId: String(cString: member.member_id),
-                    clientId: String(cString: member.client_id),
-                    clientHost: String(cString: member.client_host),
+                var members: [GroupMemberInfo] = []
+                for j in 0 ..< Int(group.member_cnt) {
+                    let member = group.members[j]
+                    members.append(GroupMemberInfo(
+                        memberId: String(cString: member.member_id),
+                        clientId: String(cString: member.client_id),
+                        clientHost: String(cString: member.client_host),
+                    ))
+                }
+
+                groups.append(ConsumerGroupInfo(
+                    name: String(cString: group.group),
+                    state: String(cString: group.state),
+                    protocolType: String(cString: group.protocol_type),
+                    protocol: String(cString: group.protocol),
+                    members: members,
                 ))
             }
 
-            groups.append(ConsumerGroupInfo(
-                name: String(cString: group.group),
-                state: String(cString: group.state),
-                protocolType: String(cString: group.protocol_type),
-                protocol: String(cString: group.protocol),
-                members: members,
-            ))
+            return groups
         }
-
-        return groups
     }
 
     // MARK: - Message Browsing

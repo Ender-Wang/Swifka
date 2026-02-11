@@ -24,7 +24,7 @@ struct MessageBrowserView: View {
         VStack(spacing: 0) {
             // Controls
             HStack(spacing: 12) {
-                Picker(l10n["messages.topic"], selection: $selectedTopicName) {
+                Picker(l10n["messages.topic"], selection: validatedTopicBinding) {
                     Text("--").tag(nil as String?)
                     ForEach(userTopics, id: \.name) { topic in
                         Text(topic.name).tag(topic.name as String?)
@@ -32,7 +32,7 @@ struct MessageBrowserView: View {
                 }
                 .fixedSize()
 
-                Picker(l10n["messages.partition"], selection: $selectedPartition) {
+                Picker(l10n["messages.partition"], selection: validatedPartitionBinding) {
                     Text(l10n["messages.partition.all"]).tag(nil as Int32?)
                     if let topic = selectedTopic {
                         ForEach(topic.partitions) { partition in
@@ -198,6 +198,7 @@ struct MessageBrowserView: View {
         }
         .onChange(of: selectedTopicName) {
             UserDefaults.standard.set(selectedTopicName, forKey: "messages.selectedTopic")
+            selectedPartition = nil
             selectedMessageId = nil
             detailMessage = nil
             if selectedTopicName != nil {
@@ -228,6 +229,12 @@ struct MessageBrowserView: View {
                 appState.refreshManager.restart()
             }
         }
+        .onChange(of: userTopics.map(\.name)) {
+            // Reset selection if the previously selected topic no longer exists
+            if let name = selectedTopicName, !userTopics.contains(where: { $0.name == name }) {
+                selectedTopicName = nil
+            }
+        }
         .onAppear {
             if appState.connectionStatus.isConnected, selectedTopicName != nil, messages.isEmpty, appState.refreshManager.isAutoRefresh {
                 fetchMessages()
@@ -239,6 +246,32 @@ struct MessageBrowserView: View {
 
     private var sortedMessages: [KafkaMessageRecord] {
         messages.sorted(using: appState.messagesSortOrder)
+    }
+
+    /// Binding that returns nil when the stored topic isn't in the current list,
+    /// preventing SwiftUI Picker "invalid selection" warnings during loading/cluster switch.
+    private var validatedTopicBinding: Binding<String?> {
+        Binding(
+            get: {
+                guard let name = selectedTopicName,
+                      userTopics.contains(where: { $0.name == name })
+                else { return nil }
+                return name
+            },
+            set: { selectedTopicName = $0 },
+        )
+    }
+
+    private var validatedPartitionBinding: Binding<Int32?> {
+        Binding(
+            get: {
+                guard let id = selectedPartition,
+                      selectedTopic?.partitions.contains(where: { $0.partitionId == id }) == true
+                else { return nil }
+                return id
+            },
+            set: { selectedPartition = $0 },
+        )
     }
 
     private var userTopics: [TopicInfo] {

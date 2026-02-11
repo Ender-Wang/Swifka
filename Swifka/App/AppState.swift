@@ -119,12 +119,14 @@ final class AppState {
     }
 
     func disconnect() async {
-        await kafkaService.disconnect()
+        refreshManager.stop()
         connectionStatus = .disconnected
+        isLoading = false
         brokers = []
         topics = []
         consumerGroups = []
         expandedTopics = []
+        await kafkaService.disconnect()
     }
 
     func testConnection(config: ClusterConfig, password: String?) async -> Result<Bool, Error> {
@@ -145,17 +147,21 @@ final class AppState {
 
         do {
             let metadata = try await kafkaService.fetchMetadata()
+            guard connectionStatus.isConnected else { return }
             brokers = metadata.brokers
             topics = await kafkaService.fetchAllWatermarks(topics: metadata.topics)
+            guard connectionStatus.isConnected else { return }
             let currentNames = Set(topics.map(\.name))
             expandedTopics.formIntersection(currentNames)
         } catch {
+            guard connectionStatus.isConnected else { return }
             lastError = error.localizedDescription
         }
 
         do {
             consumerGroups = try await kafkaService.fetchConsumerGroups()
         } catch {
+            guard connectionStatus.isConnected else { return }
             // Consumer groups might not be available; don't block on this
             print("Failed to fetch consumer groups: \(error)")
         }
