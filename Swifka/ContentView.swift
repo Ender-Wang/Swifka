@@ -106,9 +106,6 @@ struct ContentView: View {
                 }
             }
         }
-        .overlay(alignment: .bottom) {
-            StatusBarView()
-        }
         .task {
             // Auto-connect on launch if a cluster is selected
             if appState.configStore.selectedCluster != nil {
@@ -180,6 +177,8 @@ private struct CompactSidebarView: View {
             }
 
             Spacer()
+
+            CompactSidebarFooterView()
         }
         .padding(.vertical, 8)
         .padding(.horizontal, 4)
@@ -197,58 +196,167 @@ struct SidebarView: View {
         @Bindable var state = appState
         let l10n = appState.l10n
 
-        List(selection: $state.selectedSidebarItem) {
-            // Cluster picker at top
-            Section {
-                ClusterPickerView()
-            }
+        VStack(spacing: 0) {
+            List(selection: $state.selectedSidebarItem) {
+                // Cluster picker at top
+                Section {
+                    ClusterPickerView()
+                }
 
-            Section(l10n["sidebar.section.overview"]) {
-                Label(l10n["sidebar.dashboard"], systemImage: "gauge.with.dots.needle.33percent")
-                    .tag(SidebarItem.dashboard)
-            }
+                Section(l10n["sidebar.section.overview"]) {
+                    Label(l10n["sidebar.dashboard"], systemImage: "gauge.with.dots.needle.33percent")
+                        .tag(SidebarItem.dashboard)
+                }
 
-            Section(l10n["sidebar.section.browse"]) {
-                Label(l10n["sidebar.topics"], systemImage: "list.bullet.rectangle")
-                    .tag(SidebarItem.topics)
-                Label(l10n["sidebar.messages"], systemImage: "envelope")
-                    .tag(SidebarItem.messages)
-            }
+                Section(l10n["sidebar.section.browse"]) {
+                    Label(l10n["sidebar.topics"], systemImage: "list.bullet.rectangle")
+                        .tag(SidebarItem.topics)
+                    Label(l10n["sidebar.messages"], systemImage: "envelope")
+                        .tag(SidebarItem.messages)
+                }
 
-            Section(l10n["sidebar.section.monitor"]) {
-                Label(l10n["sidebar.groups"], systemImage: "person.3")
-                    .tag(SidebarItem.consumerGroups)
-                Label(l10n["sidebar.brokers"], systemImage: "server.rack")
-                    .tag(SidebarItem.brokers)
-            }
+                Section(l10n["sidebar.section.monitor"]) {
+                    Label(l10n["sidebar.groups"], systemImage: "person.3")
+                        .tag(SidebarItem.consumerGroups)
+                    Label(l10n["sidebar.brokers"], systemImage: "server.rack")
+                        .tag(SidebarItem.brokers)
+                }
 
-            Section(l10n["sidebar.section.system"]) {
-                Label(l10n["sidebar.settings"], systemImage: "gear")
-                    .tag(SidebarItem.settings)
+                Section(l10n["sidebar.section.system"]) {
+                    Label(l10n["sidebar.settings"], systemImage: "gear")
+                        .tag(SidebarItem.settings)
+                }
             }
+            .listStyle(.sidebar)
+
+            SidebarFooterView()
         }
-        .listStyle(.sidebar)
     }
 }
 
-// MARK: - Status Bar
+// MARK: - Sidebar Footer
 
-struct StatusBarView: View {
+private struct SidebarFooterView: View {
     @Environment(AppState.self) private var appState
 
     var body: some View {
-        HStack(spacing: 8) {
-            ConnectionStatusBadge(status: appState.connectionStatus)
-            Text(appState.statusText)
+        let l10n = appState.l10n
+
+        VStack(alignment: .leading, spacing: 6) {
+            Divider()
+
+            // Connection status row
+            HStack(spacing: 6) {
+                ConnectionStatusBadge(status: appState.connectionStatus)
+                Text(connectionLabel(l10n: l10n))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+
+                if appState.isLoading {
+                    Spacer()
+                    ProgressView()
+                        .controlSize(.mini)
+                }
+            }
+
+            // Metric chips (only when connected)
+            if appState.connectionStatus.isConnected {
+                MetricChipRow(icon: "server.rack", count: appState.brokers.count,
+                              label: l10n[appState.brokers.count == 1 ? "status.broker" : "status.brokers"],
+                              color: .blue)
+                MetricChipRow(icon: "list.bullet.rectangle", count: appState.topics.count(where: { !$0.isInternal }),
+                              label: l10n[appState.topics.count(where: { !$0.isInternal }) == 1 ? "status.topic" : "status.topics"],
+                              color: .green)
+                MetricChipRow(icon: "square.split.2x2", count: appState.totalPartitions,
+                              label: l10n[appState.totalPartitions == 1 ? "status.partition" : "status.partitions"],
+                              color: .orange)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.bottom, 8)
+        .padding(.top, 2)
+    }
+
+    private func connectionLabel(l10n: L10n) -> String {
+        switch appState.connectionStatus {
+        case .connected:
+            appState.configStore.selectedCluster?.name ?? l10n["connection.status.connected"]
+        case .connecting:
+            l10n["status.connecting"]
+        case .disconnected:
+            l10n["status.disconnected"]
+        case .error:
+            l10n["connection.status.error"]
+        }
+    }
+}
+
+private struct MetricChipRow: View {
+    let icon: String
+    let count: Int
+    let label: String
+    let color: Color
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(.system(size: 10))
+                .foregroundStyle(color)
+                .frame(width: 14, alignment: .center)
+            Text("\(count)")
+                .font(.caption.monospacedDigit().bold())
+            Text(label)
                 .font(.caption)
                 .foregroundStyle(.secondary)
-
-            ProgressView()
-                .controlSize(.small)
-                .opacity(appState.isLoading ? 1 : 0)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 6)
+    }
+}
+
+// MARK: - Compact Sidebar Footer
+
+private struct CompactSidebarFooterView: View {
+    @Environment(AppState.self) private var appState
+
+    var body: some View {
+        VStack(spacing: 6) {
+            Divider()
+                .padding(.horizontal, 8)
+
+            if appState.connectionStatus.isConnected {
+                CompactMetricIcon(icon: "server.rack", count: appState.brokers.count, color: .blue)
+                CompactMetricIcon(icon: "list.bullet.rectangle", count: appState.topics.count(where: { !$0.isInternal }), color: .green)
+                CompactMetricIcon(icon: "square.split.2x2", count: appState.totalPartitions, color: .orange)
+            }
+
+            // Connection dot
+            ConnectionStatusBadge(status: appState.connectionStatus)
+                .padding(.top, 2)
+
+            if appState.isLoading {
+                ProgressView()
+                    .controlSize(.mini)
+            }
+        }
+        .padding(.bottom, 6)
+    }
+}
+
+private struct CompactMetricIcon: View {
+    let icon: String
+    let count: Int
+    let color: Color
+
+    var body: some View {
+        VStack(spacing: 1) {
+            Image(systemName: icon)
+                .font(.system(size: 10))
+                .foregroundStyle(color)
+            Text("\(count)")
+                .font(.system(size: 9).monospacedDigit().bold())
+        }
+        .frame(width: 32, height: 24)
+        .help("\(count)")
     }
 }
 
