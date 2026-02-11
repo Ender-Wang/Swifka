@@ -36,7 +36,7 @@ struct DashboardView: View {
                             color: .orange,
                         )
                     }
-                    .padding(.bottom, 20)
+                    .padding(.bottom, 10)
 
                     // Broker table
                     VStack(alignment: .leading, spacing: 8) {

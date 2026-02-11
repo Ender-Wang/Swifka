@@ -196,39 +196,39 @@ struct SidebarView: View {
         @Bindable var state = appState
         let l10n = appState.l10n
 
-        VStack(spacing: 0) {
-            List(selection: $state.selectedSidebarItem) {
-                // Cluster picker at top
-                Section {
-                    ClusterPickerView()
-                }
-
-                Section(l10n["sidebar.section.overview"]) {
-                    Label(l10n["sidebar.dashboard"], systemImage: "gauge.with.dots.needle.33percent")
-                        .tag(SidebarItem.dashboard)
-                }
-
-                Section(l10n["sidebar.section.browse"]) {
-                    Label(l10n["sidebar.topics"], systemImage: "list.bullet.rectangle")
-                        .tag(SidebarItem.topics)
-                    Label(l10n["sidebar.messages"], systemImage: "envelope")
-                        .tag(SidebarItem.messages)
-                }
-
-                Section(l10n["sidebar.section.monitor"]) {
-                    Label(l10n["sidebar.groups"], systemImage: "person.3")
-                        .tag(SidebarItem.consumerGroups)
-                    Label(l10n["sidebar.brokers"], systemImage: "server.rack")
-                        .tag(SidebarItem.brokers)
-                }
-
-                Section(l10n["sidebar.section.system"]) {
-                    Label(l10n["sidebar.settings"], systemImage: "gear")
-                        .tag(SidebarItem.settings)
-                }
+        List(selection: $state.selectedSidebarItem) {
+            // Cluster picker at top
+            Section {
+                ClusterPickerView()
             }
-            .listStyle(.sidebar)
 
+            Section(l10n["sidebar.section.overview"]) {
+                Label(l10n["sidebar.dashboard"], systemImage: "gauge.with.dots.needle.33percent")
+                    .tag(SidebarItem.dashboard)
+            }
+
+            Section(l10n["sidebar.section.browse"]) {
+                Label(l10n["sidebar.topics"], systemImage: "list.bullet.rectangle")
+                    .tag(SidebarItem.topics)
+                Label(l10n["sidebar.messages"], systemImage: "envelope")
+                    .tag(SidebarItem.messages)
+            }
+
+            Section(l10n["sidebar.section.monitor"]) {
+                Label(l10n["sidebar.groups"], systemImage: "person.3")
+                    .tag(SidebarItem.consumerGroups)
+                Label(l10n["sidebar.brokers"], systemImage: "server.rack")
+                    .tag(SidebarItem.brokers)
+            }
+
+            Section(l10n["sidebar.section.system"]) {
+                Label(l10n["sidebar.settings"], systemImage: "gear")
+                    .tag(SidebarItem.settings)
+            }
+        }
+        .listStyle(.sidebar)
+        .frame(minHeight: 0)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
             SidebarFooterView()
         }
     }
@@ -242,7 +242,7 @@ private struct SidebarFooterView: View {
     var body: some View {
         let l10n = appState.l10n
 
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 4) {
             Divider()
 
             // Connection status row
@@ -270,7 +270,7 @@ private struct SidebarFooterView: View {
                           color: .orange, connected: connected)
         }
         .padding(.horizontal, 12)
-        .padding(.bottom, 8)
+        .padding(.bottom, 4)
         .padding(.top, 2)
     }
 
