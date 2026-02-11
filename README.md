@@ -14,6 +14,14 @@
   <img src=".github/assets/Swifka_demo.gif" alt="Swifka Demo" width="800" />
 </p>
 
+## Features
+
+- Connect to any Kafka-compatible cluster (Kafka, Redpanda, etc.)
+- Browse topics, partitions, and messages (UTF-8 / Hex / Base64)
+- Monitor consumer groups and lag in real time
+- View broker stats and cluster metadata
+- All read-only by default — safe to point at production
+
 ## Install
 
 ```bash
@@ -22,15 +30,7 @@ brew install --cask ender-wang/tap/swifka
 
 Or download the latest `.dmg` from [Releases](https://github.com/Ender-Wang/Swifka/releases).
 
-**What it does:**
-
-- Connect to any Kafka-compatible cluster (Kafka, Redpanda, etc.)
-- Browse topics, partitions, and messages (UTF-8 / Hex / Base64)
-- Monitor consumer groups and lag in real time
-- View broker stats and cluster metadata
-- All read-only by default — safe to point at production
-
-**Built with:**
+## Built With
 
 - SwiftUI + Swift 6.2
 - [swift-kafka-client](https://github.com/swift-server/swift-kafka-client) + direct librdkafka C interop
@@ -199,6 +199,18 @@ Swifka uses a custom JSON-based i18n system. Currently supported:
 4. Submit a PR
 
 No code changes needed — the app picks up new locale files automatically.
+
+---
+
+## Star History
+
+<a href="https://star-history.com/#Ender-Wang/Swifka&Date">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=Ender-Wang/Swifka&type=Date&theme=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=Ender-Wang/Swifka&type=Date" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=Ender-Wang/Swifka&type=Date" />
+ </picture>
+</a>
 
 ---
 
