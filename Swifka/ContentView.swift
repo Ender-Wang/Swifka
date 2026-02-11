@@ -243,10 +243,9 @@ struct StatusBarView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-            if appState.isLoading {
-                ProgressView()
-                    .controlSize(.small)
-            }
+            ProgressView()
+                .controlSize(.small)
+                .opacity(appState.isLoading ? 1 : 0)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 6)
