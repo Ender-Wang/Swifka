@@ -89,6 +89,7 @@ struct ContentView: View {
                             }
                         }
                     }
+                    .help(l10n["settings.refresh.mode"])
                 }
 
                 // Add cluster (only on Clusters page)
@@ -98,6 +99,7 @@ struct ContentView: View {
                     } label: {
                         Label(l10n["cluster.add"], systemImage: "plus")
                     }
+                    .help(l10n["cluster.add"])
                 }
 
                 // Connection controls
@@ -108,6 +110,7 @@ struct ContentView: View {
                         Label(l10n["connection.disconnect"], systemImage: "power")
                             .foregroundStyle(.green)
                     }
+                    .help(l10n["connection.disconnect"])
                 } else if appState.configStore.selectedCluster != nil {
                     Button {
                         Task { await appState.connect() }
@@ -115,9 +118,11 @@ struct ContentView: View {
                         Label(l10n["connection.connect"], systemImage: "power")
                             .foregroundStyle(.red)
                     }
+                    .help(l10n["connection.connect"])
                 } else {
                     Label(l10n["connection.connect"], systemImage: "power")
                         .foregroundStyle(.gray)
+                        .help(l10n["connection.connect"])
                 }
             }
         }
@@ -150,6 +155,8 @@ struct ContentView: View {
 
 private struct CompactSidebarView: View {
     @Binding var selection: SidebarItem?
+    @Environment(AppState.self) private var appState
+    @State private var hoveredItem: SidebarItem?
 
     private struct IconGroup {
         let items: [(SidebarItem, String)]
@@ -174,6 +181,8 @@ private struct CompactSidebarView: View {
     ]
 
     var body: some View {
+        let l10n = appState.l10n
+
         VStack(spacing: 4) {
             ForEach(Array(groups.enumerated()), id: \.offset) { index, group in
                 if index > 0 {
@@ -195,9 +204,15 @@ private struct CompactSidebarView: View {
                     .background(
                         selection == item
                             ? AnyShapeStyle(.selection)
+                            : hoveredItem == item
+                            ? AnyShapeStyle(.quaternary)
                             : AnyShapeStyle(.clear),
                         in: RoundedRectangle(cornerRadius: 6),
                     )
+                    .onHover { isHovered in
+                        hoveredItem = isHovered ? item : nil
+                    }
+                    .help(sidebarLabel(for: item, l10n: l10n))
                 }
             }
 
@@ -208,7 +223,20 @@ private struct CompactSidebarView: View {
         .padding(.top, 8)
         .padding(.horizontal, 4)
         .frame(width: 44)
+        .contentShape(Rectangle())
         .overlay(alignment: .trailing) { Divider() }
+    }
+
+    private func sidebarLabel(for item: SidebarItem, l10n: L10n) -> String {
+        switch item {
+        case .dashboard: l10n["sidebar.dashboard"]
+        case .topics: l10n["sidebar.topics"]
+        case .messages: l10n["sidebar.messages"]
+        case .consumerGroups: l10n["sidebar.groups"]
+        case .brokers: l10n["sidebar.brokers"]
+        case .clusters: l10n["sidebar.clusters"]
+        case .settings: l10n["sidebar.settings"]
+        }
     }
 }
 

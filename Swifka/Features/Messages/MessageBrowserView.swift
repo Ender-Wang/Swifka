@@ -16,6 +16,7 @@ struct MessageBrowserView: View {
     @State private var selectedMessageId: String?
     @State private var detailMessage: KafkaMessageRecord?
     @State private var refreshRotation: Double = 0
+    @State private var refreshHovered = false
     @State private var controlsOverflow = false
     @State private var controlsContentWidth: CGFloat = 0
 
@@ -81,9 +82,16 @@ struct MessageBrowserView: View {
                             } label: {
                                 Image(systemName: "arrow.trianglehead.2.clockwise")
                                     .rotationEffect(.degrees(refreshRotation))
+                                    .padding(4)
+                                    .background(
+                                        refreshHovered ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.clear),
+                                        in: RoundedRectangle(cornerRadius: 4),
+                                    )
                             }
                             .buttonStyle(.plain)
                             .disabled(selectedTopicName == nil || isFetching)
+                            .onHover { refreshHovered = $0 }
+                            .help(l10n["common.refresh"])
                         }
                     }
                     .onGeometryChange(for: CGFloat.self) { proxy in
@@ -539,6 +547,7 @@ private struct CopyButton: View {
 }
 
 struct PanelCloseButton: View {
+    @Environment(AppState.self) private var appState
     let action: () -> Void
     @State private var isHovered = false
 
@@ -556,6 +565,7 @@ struct PanelCloseButton: View {
         }
         .buttonStyle(.plain)
         .onHover { isHovered = $0 }
+        .help(appState.l10n["common.close"])
     }
 }
 

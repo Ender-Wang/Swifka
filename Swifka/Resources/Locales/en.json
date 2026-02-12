@@ -140,6 +140,7 @@
   "common.cancel": "Cancel",
   "common.delete": "Delete",
   "common.refresh": "Refresh",
+  "common.close": "Close",
   "common.loading": "Loading…",
   "common.error": "Error",
   "common.ok": "OK",
