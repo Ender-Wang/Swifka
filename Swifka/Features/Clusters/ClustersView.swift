@@ -8,6 +8,7 @@ struct ClustersView: View {
     @State private var testingClusterId: UUID?
     @State private var connectedPingMs: Int?
     @State private var clusterPingResults: [UUID: Int] = [:]
+    @State private var pingFailedIds: Set<UUID> = []
     @State private var banner: BannerInfo?
 
     var body: some View {
@@ -22,6 +23,7 @@ struct ClustersView: View {
                     isConnected: isConnected,
                     isTesting: testingClusterId == cluster.id,
                     pingMs: isConnected ? connectedPingMs : clusterPingResults[cluster.id],
+                    pingFailed: pingFailedIds.contains(cluster.id),
                     onConnect: { connectTo(cluster) },
                     onEdit: { editCluster(cluster) },
                     onDelete: { confirmDelete(cluster) },
@@ -30,6 +32,7 @@ struct ClustersView: View {
             }
         }
         .listStyle(.inset)
+        .navigationTitle(l10n["sidebar.clusters"])
         .overlay {
             if appState.configStore.clusters.isEmpty {
                 ContentUnavailableView(
@@ -100,7 +103,15 @@ struct ClustersView: View {
                     }
                 }
                 for await (id, pingMs) in group {
-                    withAnimation { clusterPingResults[id] = pingMs }
+                    withAnimation {
+                        if let pingMs {
+                            clusterPingResults[id] = pingMs
+                            pingFailedIds.remove(id)
+                        } else {
+                            clusterPingResults[id] = nil
+                            pingFailedIds.insert(id)
+                        }
+                    }
                 }
             }
         }
@@ -139,14 +150,20 @@ struct ClustersView: View {
 
             switch result {
             case .success:
-                withAnimation { clusterPingResults[cluster.id] = pingMs }
+                withAnimation {
+                    clusterPingResults[cluster.id] = pingMs
+                    pingFailedIds.remove(cluster.id)
+                }
                 showBanner(.init(
                     success: true,
                     clusterName: cluster.name,
                     pingMs: pingMs,
                 ))
             case let .failure(error):
-                withAnimation { clusterPingResults[cluster.id] = nil }
+                withAnimation {
+                    clusterPingResults[cluster.id] = nil
+                    pingFailedIds.insert(cluster.id)
+                }
                 showBanner(.init(
                     success: false,
                     clusterName: cluster.name,
@@ -212,6 +229,7 @@ private struct ClusterRow: View {
     let isConnected: Bool
     let isTesting: Bool
     var pingMs: Int?
+    var pingFailed: Bool = false
     let onConnect: () -> Void
     let onEdit: () -> Void
     let onDelete: () -> Void
@@ -228,22 +246,12 @@ private struct ClusterRow: View {
             // Left group — cluster info
             HStack(spacing: 10) {
                 Circle()
-                    .fill(isConnected ? .green : .gray.opacity(0.3))
+                    .fill(dotColor)
                     .frame(width: 8, height: 8)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 6) {
-                        Text(cluster.name)
-                            .fontWeight(isConnected ? .semibold : .regular)
-                        if isConnected {
-                            Text(l10n["clusters.status.connected"])
-                                .font(.caption2)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(.green.opacity(0.15), in: Capsule())
-                                .foregroundStyle(.green)
-                        }
-                    }
+                    Text(cluster.name)
+                        .fontWeight(isConnected ? .semibold : .regular)
                     HStack(spacing: 6) {
                         Image(systemName: authIcon)
                             .font(.caption.weight(.semibold))
@@ -323,6 +331,12 @@ private struct ClusterRow: View {
         }
         .padding(.vertical, 4)
         .onTapGesture(count: 2) { onEdit() }
+    }
+
+    private var dotColor: Color {
+        if isConnected { return .green }
+        if pingFailed { return .red }
+        return .gray.opacity(0.3)
     }
 
     private var authLabel: String {
