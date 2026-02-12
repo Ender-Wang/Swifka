@@ -6,7 +6,6 @@ struct ClustersView: View {
     @State private var clusterToDelete: ClusterConfig?
     @State private var showDeleteConfirmation = false
     @State private var testingClusterId: UUID?
-    @State private var connectedPingMs: Int?
     @State private var clusterPingResults: [UUID: Int] = [:]
     @State private var pingFailedIds: Set<UUID> = []
     @State private var banner: BannerInfo?
@@ -22,7 +21,7 @@ struct ClustersView: View {
                     cluster: cluster,
                     isConnected: isConnected,
                     isTesting: testingClusterId == cluster.id,
-                    pingMs: isConnected ? connectedPingMs : clusterPingResults[cluster.id],
+                    pingMs: isConnected ? appState.pingMs : clusterPingResults[cluster.id],
                     pingFailed: pingFailedIds.contains(cluster.id),
                     onConnect: { connectTo(cluster) },
                     onEdit: { editCluster(cluster) },
@@ -72,14 +71,6 @@ struct ClustersView: View {
             Button(l10n["common.cancel"], role: .cancel) {}
         } message: { cluster in
             Text(l10n.t("clusters.delete.confirm", cluster.name))
-        }
-        .task {
-            // Ping loop for connected cluster
-            while !Task.isCancelled {
-                let ms = await appState.ping()
-                withAnimation { connectedPingMs = ms }
-                try? await Task.sleep(for: .seconds(1))
-            }
         }
         .task {
             // Auto-test all disconnected clusters on page open

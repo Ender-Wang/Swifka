@@ -27,6 +27,7 @@ final class AppState {
     var partitionsSortOrder = [KeyPathComparator(\PartitionInfo.partitionId)]
     var lastError: String?
     var isLoading = false
+    var pingMs: Int?
 
     var operationLevel: OperationLevel = .readonly {
         didSet {
@@ -122,6 +123,7 @@ final class AppState {
         refreshManager.stop()
         connectionStatus = .disconnected
         isLoading = false
+        pingMs = nil
         brokers = []
         topics = []
         consumerGroups = []

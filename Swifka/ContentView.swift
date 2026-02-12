@@ -141,6 +141,14 @@ struct ContentView: View {
                 await appState.connect()
             }
         }
+        .task(id: appState.connectionStatus.isConnected) {
+            guard appState.connectionStatus.isConnected else { return }
+            while !Task.isCancelled {
+                let ms = await appState.ping()
+                withAnimation { appState.pingMs = ms }
+                try? await Task.sleep(for: .seconds(1))
+            }
+        }
     }
 
     private func refreshModeLabel(_ mode: RefreshMode, l10n: L10n) -> String {
@@ -308,6 +316,16 @@ private struct SidebarFooterView: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
 
+                if connected, let ping = appState.pingMs {
+                    Text("·")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text("\(ping)ms")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .contentTransition(.numericText())
+                }
+
                 ProgressView()
                     .controlSize(.mini)
                     .opacity(appState.isLoading ? 1 : 0)
@@ -348,7 +366,7 @@ private struct SidebarFooterView: View {
     private func connectionLabel(l10n: L10n) -> String {
         switch appState.connectionStatus {
         case .connected:
-            appState.configStore.selectedCluster?.name ?? l10n["connection.status.connected"]
+            l10n["connection.status.connected"]
         case .connecting:
             l10n["status.connecting"]
         case .disconnected:
@@ -409,7 +427,14 @@ private struct CompactSidebarFooterView: View {
                     }
                 }
                 .animation(.easeInOut(duration: 0.25), value: appState.isLoading)
-                .padding(.bottom, 2)
+
+            if connected, let ping = appState.pingMs {
+                Text("\(ping)ms")
+                    .font(.system(size: 9).monospacedDigit().bold())
+                    .foregroundStyle(.green)
+                    .contentTransition(.numericText())
+                    .animation(.default, value: ping)
+            }
 
             CompactMetricIcon(icon: "server.rack", count: appState.brokers.count, color: .blue, connected: connected)
             CompactMetricIcon(icon: "list.bullet.rectangle", count: appState.topics.count(where: { !$0.isInternal }), color: .green, connected: connected)
