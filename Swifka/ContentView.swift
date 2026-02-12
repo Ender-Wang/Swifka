@@ -344,7 +344,7 @@ private struct SidebarFooterView: View {
                           color: .orange, connected: connected)
         }
         .padding(.horizontal, 12)
-        .padding(.bottom, 4)
+        .padding(.bottom, 12)
         .padding(.top, 2)
     }
 
@@ -439,7 +439,7 @@ private struct CompactSidebarFooterView: View {
             CompactMetricIcon(icon: "list.bullet.rectangle", count: appState.topics.count(where: { !$0.isInternal }), color: .green, connected: connected)
             CompactMetricIcon(icon: "square.split.2x2", count: appState.totalPartitions, color: .orange, connected: connected)
         }
-        .padding(.bottom, 4)
+        .padding(.bottom, 8)
     }
 }
 
