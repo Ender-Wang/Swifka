@@ -48,7 +48,7 @@ struct MessageBrowserView: View {
                         .fixedSize()
 
                         HStack(spacing: 4) {
-                            Text("\(l10n["messages.fetch.count"]):")
+                            Text(l10n["messages.fetch.count"])
                             TextField("", value: $maxMessages, format: .number)
                                 .textFieldStyle(.roundedBorder)
                                 .frame(minWidth: 40)
