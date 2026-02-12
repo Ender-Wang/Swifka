@@ -1,6 +1,6 @@
 <img src=".github/assets/Swifka.svg" alt="Swifka" width="128" align="left" />
 
-<b><font size="6">Swifka</font></b>
+<b><font>Swifka</font></b>
 
 A read-focused, lightweight, native macOS Kafka client for monitoring clusters, browsing topics, and tracking consumer lag.
 
@@ -21,7 +21,7 @@ A read-focused, lightweight, native macOS Kafka client for monitoring clusters, 
   <img src=".github/assets/Swifka_demo.gif" alt="Swifka Demo" width="800" />
 </p>
 
-## Features
+# Features
 
 - Connect to any Kafka-compatible cluster (Kafka, Redpanda, etc.)
 - Browse topics, partitions, and messages (UTF-8 / Hex / Base64)
@@ -29,7 +29,7 @@ A read-focused, lightweight, native macOS Kafka client for monitoring clusters, 
 - View broker stats and cluster metadata
 - All read-only by default — safe to point at production
 
-## Install
+# Install
 
 ```bash
 brew install --cask ender-wang/tap/swifka
@@ -37,7 +37,7 @@ brew install --cask ender-wang/tap/swifka
 
 Or download the latest `.dmg` from [Releases](https://github.com/Ender-Wang/Swifka/releases).
 
-## Built With
+# Built With
 
 - SwiftUI + Swift 6.2
 - [swift-kafka-client](https://github.com/swift-server/swift-kafka-client) + direct librdkafka C interop
@@ -46,9 +46,9 @@ Or download the latest `.dmg` from [Releases](https://github.com/Ender-Wang/Swif
 
 ---
 
-## Roadmap
+# Roadmap
 
-### Milestone 1: MVP Core
+## Milestone 1: MVP Core
 
 ✨ **Features**
 
@@ -68,7 +68,7 @@ Or download the latest `.dmg` from [Releases](https://github.com/Ender-Wang/Swif
 
 - [x] i18n framework — English + Simplified Chinese (JSON-based, easy to contribute)
 
-### Milestone 2: Dashboards & Visualization
+## Milestone 2: Dashboards & Visualization
 
 📊 **Features**
 
@@ -90,7 +90,7 @@ Or download the latest `.dmg` from [Releases](https://github.com/Ender-Wang/Swif
   - [ ] ISR history graph (track ISR changes over time)
 - [ ] Desktop notifications (macOS native alerts)
 
-### Milestone 3: Animations & Polish
+## Milestone 3: Animations & Polish
 
 🎨 **UI & Animations**
 
@@ -108,7 +108,7 @@ Or download the latest `.dmg` from [Releases](https://github.com/Ender-Wang/Swif
   - [ ] Duplicate/clone connection configs
   - [ ] Connection groups/folders for organization
 
-### Milestone 4: Write Operations & Experiments
+## Milestone 4: Write Operations & Experiments
 
 ✨ **Features**
 
@@ -120,7 +120,7 @@ Or download the latest `.dmg` from [Releases](https://github.com/Ender-Wang/Swif
 
 - [ ] Permission tiers (Read / Write / Admin / Dangerous) with double confirmation
 
-### Milestone 5: Advanced Features
+## Milestone 5: Advanced Features
 
 ✨ **Features**
 
@@ -145,11 +145,11 @@ Or download the latest `.dmg` from [Releases](https://github.com/Ender-Wang/Swif
 
 ---
 
-## Code Formatting
+# Code Formatting
 
 This project uses [SwiftFormat](https://github.com/nicklockwood/SwiftFormat) for consistent code style.
 
-### Configuration
+## Configuration
 
 Formatting rules are defined in **`.swiftformat`** at the project root. Both Xcode and Cursor (or other editors) use this file when formatting Swift code, so the result is the same everywhere.
 
@@ -159,7 +159,7 @@ The config includes:
 - Indentation, line breaks, wrapping
 - Rules such as `isEmpty` and `preferFinalClasses`
 
-### Setup for Contributors
+## Setup for Contributors
 
 **Requirements:**
 
@@ -177,7 +177,7 @@ The Xcode project has a **Run Script** build phase that runs SwiftFormat on the 
 
 If SwiftFormat is not installed, the script prints a warning and the build continues without formatting.
 
-### Format on Save (Cursor / VS Code)
+## Format on Save (Cursor / VS Code)
 
 Configure your editor to use SwiftFormat on save so that Cursor and Xcode stay in sync:
 
@@ -189,7 +189,7 @@ Both the editor and Xcode will then use the same `.swiftformat` file.
 
 ---
 
-## Localization
+# Localization
 
 Swifka uses a custom JSON-based i18n system. Currently supported:
 
@@ -198,7 +198,7 @@ Swifka uses a custom JSON-based i18n system. Currently supported:
 | English | `Resources/Locales/en.json` | Complete |
 | Simplified Chinese | `Resources/Locales/zh-Hans.json` | Complete |
 
-### Contributing a Translation
+## Contributing a Translation
 
 1. Copy `Resources/Locales/en.json`
 2. Rename to your language code (e.g. `ja.json`, `ko.json`, `fr.json`, `de.json`)
@@ -209,7 +209,7 @@ No code changes needed — the app picks up new locale files automatically.
 
 ---
 
-## Star History
+# Star History
 
 <a href="https://star-history.com/#Ender-Wang/Swifka&Date">
  <picture>
@@ -221,11 +221,11 @@ No code changes needed — the app picks up new locale files automatically.
 
 ---
 
-## License
+# License
 
 Swifka is licensed under the [GNU General Public License v3.0](LICENSE).
 
-### Acknowledgments
+# Acknowledgments
 
 Swifka is built on top of these open-source projects:
 
