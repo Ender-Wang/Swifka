@@ -1,10 +1,10 @@
 {
   "app.name": "Swifka",
 
-  "sidebar.section.overview": "OVERVIEW",
-  "sidebar.section.browse": "BROWSE",
-  "sidebar.section.monitor": "MONITOR",
-  "sidebar.section.system": "SYSTEM",
+  "sidebar.section.overview": "Overview",
+  "sidebar.section.browse": "Browse",
+  "sidebar.section.monitor": "Monitor",
+  "sidebar.section.system": "System",
 
   "sidebar.dashboard": "Dashboard",
   "sidebar.topics": "Topics",
