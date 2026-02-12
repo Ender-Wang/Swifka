@@ -13,6 +13,7 @@
   "sidebar.brokers": "Brokers",
   "sidebar.clusters": "集群",
   "sidebar.settings": "设置",
+  "sidebar.toggle": "切换侧栏",
 
   "cluster.add": "添加集群",
   "cluster.edit": "编辑集群",

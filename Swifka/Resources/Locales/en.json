@@ -13,6 +13,7 @@
   "sidebar.brokers": "Brokers",
   "sidebar.clusters": "Clusters",
   "sidebar.settings": "Settings",
+  "sidebar.toggle": "Toggle Sidebar",
 
   "cluster.add": "Add Cluster",
   "cluster.edit": "Edit Cluster",

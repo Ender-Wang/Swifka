@@ -22,6 +22,12 @@ struct SwifkaApp: App {
         )
         .windowToolbarStyle(.unified)
         .commands {
+            CommandGroup(before: .sidebar) {
+                Button(appState.l10n["sidebar.toggle"]) {
+                    NSApp.sendAction(#selector(NSSplitViewController.toggleSidebar(_:)), to: nil, from: nil)
+                }
+                .keyboardShortcut("s", modifiers: [.command, .shift])
+            }
             CommandMenu(appState.l10n["sidebar.section.overview"]) {
                 Button(appState.l10n["sidebar.dashboard"]) {
                     appState.selectedSidebarItem = .dashboard
