@@ -20,6 +20,7 @@ struct MessageBrowserView: View {
     @AppStorage("messages.format") private var messageFormat: MessageFormat = .utf8
     @State private var selectedMessageId: String?
     @State private var detailMessage: KafkaMessageRecord?
+    @State private var detailPanelWidth: CGFloat = 320
     @State private var refreshRotation: Double = 0
     @State private var refreshHovered = false
     @State private var controlsOverflow = false
@@ -283,11 +284,33 @@ struct MessageBrowserView: View {
         }
         .overlay(alignment: .trailing) {
             if let message = detailMessage {
-                MessageDetailView(message: message, format: messageFormat) {
-                    selectedMessageId = nil
-                    detailMessage = nil
+                HStack(spacing: 0) {
+                    // Drag handle on left edge
+                    Rectangle()
+                        .fill(Color.clear)
+                        .frame(width: 6)
+                        .contentShape(Rectangle())
+                        .onHover { hovering in
+                            if hovering {
+                                NSCursor.resizeLeftRight.push()
+                            } else {
+                                NSCursor.pop()
+                            }
+                        }
+                        .gesture(
+                            DragGesture(minimumDistance: 1)
+                                .onChanged { value in
+                                    let newWidth = detailPanelWidth - value.translation.width
+                                    detailPanelWidth = min(600, max(240, newWidth))
+                                },
+                        )
+
+                    MessageDetailView(message: message, format: messageFormat) {
+                        selectedMessageId = nil
+                        detailMessage = nil
+                    }
                 }
-                .frame(width: 320)
+                .frame(width: detailPanelWidth)
                 .compositingGroup()
                 .background(Color(nsColor: .windowBackgroundColor))
                 .clipShape(.rect(topLeadingRadius: 10, bottomLeadingRadius: 10))
@@ -511,13 +534,21 @@ struct MessageDetailView: View {
                         DetailRow(label: l10n["messages.timestamp"], value: ts.formatted())
                     }
 
-                    Text(l10n["messages.key"])
-                        .font(.subheadline.bold())
-                    codeBlock(message.keyPrettyString(format: format), copied: $keyCopied)
+                    HStack {
+                        Text(l10n["messages.key"])
+                            .font(.subheadline.bold())
+                        Spacer()
+                        CopyButton(text: message.keyPrettyString(format: format), copied: $keyCopied)
+                    }
+                    codeBlock(message.keyPrettyString(format: format))
 
-                    Text(l10n["messages.value"])
-                        .font(.subheadline.bold())
-                    codeBlock(message.valuePrettyString(format: format), copied: $valueCopied)
+                    HStack {
+                        Text(l10n["messages.value"])
+                            .font(.subheadline.bold())
+                        Spacer()
+                        CopyButton(text: message.valuePrettyString(format: format), copied: $valueCopied)
+                    }
+                    codeBlock(message.valuePrettyString(format: format))
 
                     if !message.headers.isEmpty {
                         Text(l10n["messages.headers"])
@@ -549,17 +580,14 @@ struct MessageDetailView: View {
     }
 
     @ViewBuilder
-    private func codeBlock(_ text: String, copied: Binding<Bool>) -> some View {
+    private func codeBlock(_ text: String) -> some View {
         if wrapText {
             colorizedText(text)
                 .font(.system(.body, design: .monospaced))
                 .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 50))
+                .padding(8)
                 .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
-                .overlay(alignment: .topTrailing) {
-                    CopyButton(text: text, copied: copied)
-                }
         } else {
             ScrollView(.horizontal, showsIndicators: true) {
                 colorizedText(text)
@@ -567,13 +595,10 @@ struct MessageDetailView: View {
                     .textSelection(.enabled)
                     .lineLimit(nil)
                     .fixedSize(horizontal: true, vertical: false)
-                    .padding(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 50))
+                    .padding(8)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
-            .overlay(alignment: .topTrailing) {
-                CopyButton(text: text, copied: copied)
-            }
         }
     }
 
@@ -666,7 +691,6 @@ private struct CopyButton: View {
         }
         .buttonStyle(.plain)
         .onHover { isHovered = $0 }
-        .padding(6)
     }
 }
 
