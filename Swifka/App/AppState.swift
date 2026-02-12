@@ -185,6 +185,9 @@ final class AppState {
         topic: String,
         partition: Int32?,
         maxMessages: Int,
+        newestFirst: Bool = true,
+        offsetFrom: Int64? = nil,
+        offsetTo: Int64? = nil,
     ) async throws -> [KafkaMessageRecord] {
         guard let cluster = configStore.selectedCluster else {
             throw SwifkaError.notConnected
@@ -197,6 +200,9 @@ final class AppState {
             topic: topic,
             partition: partition,
             maxMessages: maxMessages,
+            newestFirst: newestFirst,
+            offsetFrom: offsetFrom,
+            offsetTo: offsetTo,
             password: password,
         )
     }

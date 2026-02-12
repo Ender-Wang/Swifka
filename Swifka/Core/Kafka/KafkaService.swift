@@ -328,6 +328,9 @@ actor KafkaService {
         topic: String,
         partition: Int32?,
         maxMessages: Int = Constants.defaultMaxMessages,
+        newestFirst: Bool = true,
+        offsetFrom: Int64? = nil,
+        offsetTo: Int64? = nil,
         password: String? = nil,
     ) throws -> [KafkaMessageRecord] {
         // Create a separate consumer with a random group ID to avoid affecting business consumers
@@ -395,9 +398,45 @@ actor KafkaService {
             }
         }
 
-        // Set all partitions to start from beginning
+        // Normalize: swap if from > to
+        let normFrom: Int64? = if let f = offsetFrom, let t = offsetTo, f > t { t } else { offsetFrom }
+        let normTo: Int64? = if let f = offsetFrom, let t = offsetTo, f > t { f } else { offsetTo }
+
+        // Set partition offsets based on direction and range, clamped to watermarks
         for i in 0 ..< Int(topicPartitionList.pointee.cnt) {
-            topicPartitionList.pointee.elems[i].offset = Int64(RD_KAFKA_OFFSET_BEGINNING)
+            let partId = topicPartitionList.pointee.elems[i].partition
+
+            // Query watermarks for this partition to clamp offsets
+            var low: Int64 = 0
+            var high: Int64 = 0
+            let wErr = rd_kafka_query_watermark_offsets(
+                consumer, topic, partId, &low, &high, Constants.kafkaTimeout,
+            )
+            let hasWatermarks = wErr == RD_KAFKA_RESP_ERR_NO_ERROR
+
+            if let from = normFrom, let _ = normTo {
+                // Explicit range — clamp 'from' to valid range
+                let clamped = hasWatermarks ? max(low, min(from, high)) : max(0, from)
+                topicPartitionList.pointee.elems[i].offset = clamped
+            } else if let from = normFrom {
+                // Start from specific offset — clamp to valid range
+                let clamped = hasWatermarks ? max(low, min(from, high)) : max(0, from)
+                topicPartitionList.pointee.elems[i].offset = clamped
+            } else if let to = normTo {
+                // Fetch N messages ending at 'to'
+                let clampedTo = hasWatermarks ? min(to, high) : to
+                topicPartitionList.pointee.elems[i].offset = max(low, clampedTo - Int64(maxMessages) + 1)
+            } else if newestFirst {
+                // Newest: start near the end
+                if hasWatermarks {
+                    topicPartitionList.pointee.elems[i].offset = max(low, high - Int64(maxMessages))
+                } else {
+                    topicPartitionList.pointee.elems[i].offset = Int64(RD_KAFKA_OFFSET_END)
+                }
+            } else {
+                // Oldest: start from beginning
+                topicPartitionList.pointee.elems[i].offset = Int64(RD_KAFKA_OFFSET_BEGINNING)
+            }
         }
 
         let assignResult = rd_kafka_assign(consumer, topicPartitionList)
@@ -425,6 +464,12 @@ actor KafkaService {
                 if message.err == RD_KAFKA_RESP_ERR__PARTITION_EOF {
                     emptyPolls += 1
                 }
+                continue
+            }
+
+            // Skip messages past the upper bound
+            if let to = normTo, message.offset > to {
+                emptyPolls += 1
                 continue
             }
 

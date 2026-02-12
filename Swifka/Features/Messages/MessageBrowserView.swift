@@ -9,6 +9,11 @@ struct MessageBrowserView: View {
     }()
 
     @AppStorage("messages.fetchLimit") private var maxMessages = Constants.defaultMaxMessages
+    @AppStorage("messages.newestFirst") private var newestFirst = true
+    @State private var offsetFromText = ""
+    @State private var offsetToText = ""
+    @FocusState private var fromFieldFocused: Bool
+    @FocusState private var toFieldFocused: Bool
     @State private var messages: [KafkaMessageRecord] = []
     @State private var isFetching = false
     @State private var fetchError: String?
@@ -60,6 +65,80 @@ struct MessageBrowserView: View {
                         }
                         .fixedSize()
 
+                        Picker(l10n["messages.direction"], selection: $newestFirst) {
+                            Text(l10n["messages.direction.newest"]).tag(true)
+                            Text(l10n["messages.direction.oldest"]).tag(false)
+                        }
+                        .fixedSize()
+
+                        HStack(spacing: 4) {
+                            Text(l10n["messages.offset.from"])
+                            TextField(
+                                "",
+                                text: $offsetFromText,
+                                prompt: Text(effectiveLowWatermark.map(String.init) ?? "")
+                                    .foregroundStyle(.clear),
+                            )
+                            .textFieldStyle(.roundedBorder)
+                            .frame(minWidth: 50)
+                            .fixedSize()
+                            .multilineTextAlignment(.center)
+                            .focused($fromFieldFocused)
+                            .overlay(alignment: .center) {
+                                if offsetFromText.isEmpty, let wm = effectiveLowWatermark {
+                                    Text(String(wm))
+                                        .foregroundStyle(Color(.placeholderTextColor))
+                                        .contentTransition(.numericText())
+                                        .allowsHitTesting(false)
+                                }
+                            }
+                            .onChange(of: offsetFromText) { _, newValue in
+                                offsetFromText = newValue.filter(\.isNumber)
+                            }
+                            .onSubmit { clampOffsetFields() }
+                            .onChange(of: fromFieldFocused) { _, focused in
+                                if !focused { clampOffsetFields() }
+                            }
+                        }
+                        .fixedSize()
+                        .animation(.snappy, value: effectiveLowWatermark)
+                        .disabled(selectedPartition == nil)
+                        .opacity(selectedPartition == nil ? 0.5 : 1)
+
+                        HStack(spacing: 4) {
+                            Text(l10n["messages.offset.to"])
+                            TextField(
+                                "",
+                                text: $offsetToText,
+                                prompt: Text(effectiveHighWatermark.map(String.init) ?? "")
+                                    .foregroundStyle(.clear),
+                            )
+                            .textFieldStyle(.roundedBorder)
+                            .frame(minWidth: 50)
+                            .fixedSize()
+                            .multilineTextAlignment(.center)
+                            .focused($toFieldFocused)
+                            .overlay(alignment: .center) {
+                                if offsetToText.isEmpty, let wm = effectiveHighWatermark {
+                                    Text(String(wm))
+                                        .foregroundStyle(Color(.placeholderTextColor))
+                                        .contentTransition(.numericText())
+                                        .allowsHitTesting(false)
+                                }
+                            }
+                            .onChange(of: offsetToText) { _, newValue in
+                                offsetToText = newValue.filter(\.isNumber)
+                            }
+                            .onSubmit { clampOffsetFields() }
+                            .onChange(of: toFieldFocused) { _, focused in
+                                if !focused { clampOffsetFields() }
+                            }
+                        }
+                        .fixedSize()
+                        .disabled(selectedPartition == nil)
+                        .opacity(selectedPartition == nil ? 0.5 : 1)
+                        .animation(.snappy, value: effectiveHighWatermark)
+
                         if appState.defaultRefreshMode == .manual {
                             Button {
                                 fetchMessages()
@@ -71,7 +150,7 @@ struct MessageBrowserView: View {
                                     Text(l10n["messages.fetch"])
                                 }
                             }
-                            .disabled(selectedTopicName == nil || isFetching)
+                            .disabled(selectedTopicName == nil || isFetching || offsetRangeInvalid)
                         } else {
                             Button {
                                 fetchMessages()
@@ -89,7 +168,7 @@ struct MessageBrowserView: View {
                                     )
                             }
                             .buttonStyle(.plain)
-                            .disabled(selectedTopicName == nil || isFetching)
+                            .disabled(selectedTopicName == nil || isFetching || offsetRangeInvalid)
                             .onHover { refreshHovered = $0 }
                             .help(l10n["common.refresh"])
                         }
@@ -234,6 +313,8 @@ struct MessageBrowserView: View {
             selectedPartition = nil
             selectedMessageId = nil
             detailMessage = nil
+            offsetFromText = ""
+            offsetToText = ""
             if selectedTopicName != nil {
                 fetchMessages()
             } else {
@@ -247,6 +328,7 @@ struct MessageBrowserView: View {
             } else {
                 UserDefaults.standard.removeObject(forKey: "messages.selectedPartition")
             }
+            clampOffsetFields()
         }
         .onChange(of: appState.refreshManager.tick) {
             if selectedTopicName != nil {
@@ -316,6 +398,43 @@ struct MessageBrowserView: View {
         return appState.topics.first { $0.name == name }
     }
 
+    private var offsetRangeInvalid: Bool {
+        guard let from = Int64(offsetFromText), let to = Int64(offsetToText) else { return false }
+        return from > to
+    }
+
+    private var effectiveLowWatermark: Int64? {
+        guard let topic = selectedTopic else { return nil }
+        if let partId = selectedPartition {
+            return topic.partitions.first { $0.partitionId == partId }?.lowWatermark
+        }
+        let lows = topic.partitions.compactMap(\.lowWatermark)
+        return lows.isEmpty ? nil : lows.min()
+    }
+
+    /// Last readable offset (high watermark - 1), since high watermark is the next offset to be written.
+    private var effectiveHighWatermark: Int64? {
+        guard let topic = selectedTopic else { return nil }
+        let raw: Int64?
+        if let partId = selectedPartition {
+            raw = topic.partitions.first { $0.partitionId == partId }?.highWatermark
+        } else {
+            let highs = topic.partitions.compactMap(\.highWatermark)
+            raw = highs.isEmpty ? nil : highs.max()
+        }
+        guard let high = raw else { return nil }
+        return max(0, high - 1)
+    }
+
+    private func clampOffsetFields() {
+        if let value = Int64(offsetFromText), let low = effectiveLowWatermark, value < low {
+            offsetFromText = String(low)
+        }
+        if let value = Int64(offsetToText), let high = effectiveHighWatermark, value > high {
+            offsetToText = String(high)
+        }
+    }
+
     private func fetchMessages() {
         guard let topicName = selectedTopicName else { return }
         isFetching = true
@@ -323,10 +442,15 @@ struct MessageBrowserView: View {
 
         Task {
             do {
+                let parsedFrom = Int64(offsetFromText)
+                let parsedTo = Int64(offsetToText)
                 let newMessages = try await appState.fetchMessages(
                     topic: topicName,
                     partition: selectedPartition,
                     maxMessages: maxMessages,
+                    newestFirst: newestFirst,
+                    offsetFrom: parsedFrom,
+                    offsetTo: parsedTo,
                 )
 
                 // Reconcile selection: stable IDs mean the same message keeps the same ID
