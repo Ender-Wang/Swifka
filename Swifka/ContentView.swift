@@ -329,6 +329,7 @@ private struct SidebarFooterView: View {
                 ProgressView()
                     .controlSize(.mini)
                     .opacity(appState.isLoading ? 1 : 0)
+                    .animation(.easeInOut(duration: 0.25), value: appState.isLoading)
             }
 
             // Metric chips — always visible, counts animate on change
@@ -419,14 +420,12 @@ private struct CompactSidebarFooterView: View {
 
             ConnectionStatusBadge(status: appState.connectionStatus, size: 6)
                 .overlay {
-                    if appState.isLoading {
-                        ProgressView()
-                            .controlSize(.mini)
-                            .scaleEffect(0.5)
-                            .transition(.opacity)
-                    }
+                    ProgressView()
+                        .controlSize(.mini)
+                        .scaleEffect(0.5)
+                        .opacity(appState.isLoading ? 1 : 0)
+                        .animation(.easeInOut(duration: 0.25), value: appState.isLoading)
                 }
-                .animation(.easeInOut(duration: 0.25), value: appState.isLoading)
 
             if connected, let ping = appState.pingMs {
                 Text("\(ping)ms")

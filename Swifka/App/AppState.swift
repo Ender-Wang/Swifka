@@ -150,28 +150,35 @@ final class AppState {
     func refreshAll() async {
         guard connectionStatus.isConnected else { return }
         isLoading = true
-        defer { isLoading = false }
+        let start = ContinuousClock.now
 
         do {
             let metadata = try await kafkaService.fetchMetadata()
-            guard connectionStatus.isConnected else { return }
+            guard connectionStatus.isConnected else { isLoading = false; return }
             brokers = metadata.brokers
             topics = await kafkaService.fetchAllWatermarks(topics: metadata.topics)
-            guard connectionStatus.isConnected else { return }
+            guard connectionStatus.isConnected else { isLoading = false; return }
             let currentNames = Set(topics.map(\.name))
             expandedTopics.formIntersection(currentNames)
         } catch {
-            guard connectionStatus.isConnected else { return }
+            guard connectionStatus.isConnected else { isLoading = false; return }
             lastError = error.localizedDescription
         }
 
         do {
             consumerGroups = try await kafkaService.fetchConsumerGroups()
         } catch {
-            guard connectionStatus.isConnected else { return }
+            guard connectionStatus.isConnected else { isLoading = false; return }
             // Consumer groups might not be available; don't block on this
             print("Failed to fetch consumer groups: \(error)")
         }
+
+        // Ensure spinner is visible long enough to avoid flickering
+        let elapsed = ContinuousClock.now - start
+        if elapsed < .milliseconds(500) {
+            try? await Task.sleep(for: .milliseconds(500) - elapsed)
+        }
+        isLoading = false
     }
 
     func fetchMessages(
