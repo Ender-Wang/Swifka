@@ -1,6 +1,6 @@
 <img src=".github/assets/Swifka.svg" alt="Swifka" width="128" align="left" />
 
-# Swifka
+<b><font size="6">Swifka</font></b>
 
 A read-focused, lightweight, native macOS Kafka client for monitoring clusters, browsing topics, and tracking consumer lag.
 
