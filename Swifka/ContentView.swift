@@ -48,8 +48,11 @@ struct ContentView: View {
         }
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
-                // Refresh controls
-                if appState.connectionStatus.isConnected {
+                // Refresh controls (only on data pages)
+                if appState.connectionStatus.isConnected,
+                   appState.selectedSidebarItem != .clusters,
+                   appState.selectedSidebarItem != .settings
+                {
                     Menu {
                         Button(l10n["common.refresh"]) {
                             Task { await appState.refreshAll() }
