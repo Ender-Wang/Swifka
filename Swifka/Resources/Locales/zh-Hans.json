@@ -11,6 +11,7 @@
   "sidebar.messages": "消息",
   "sidebar.groups": "消费者组",
   "sidebar.brokers": "Brokers",
+  "sidebar.clusters": "集群",
   "sidebar.settings": "设置",
 
   "cluster.add": "添加集群",
@@ -21,6 +22,9 @@
   "cluster.brokers.placeholder": "localhost:9092",
   "cluster.none": "暂无集群",
   "cluster.none.description": "添加一个集群以开始使用",
+  "clusters.status.connected": "已连接",
+  "clusters.switch": "切换到此集群",
+  "clusters.delete.confirm": "确定要删除 \"{0}\" 吗？此操作无法撤消。",
 
   "connection.status.disconnected": "未连接",
   "connection.status.connecting": "连接中…",

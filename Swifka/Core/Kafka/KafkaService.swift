@@ -119,6 +119,30 @@ actor KafkaService {
         return true
     }
 
+    /// Lightweight ping — measures round-trip latency to the broker in milliseconds.
+    func ping() async throws -> Int {
+        guard let handle else {
+            throw SwifkaError.notConnected
+        }
+        let h = SendableHandle(pointer: handle)
+        let timeout = Constants.kafkaTimeout
+
+        return try await Self.offload {
+            let start = DispatchTime.now()
+            var metadataPtr: UnsafePointer<rd_kafka_metadata_t>?
+            let result = rd_kafka_metadata(h.pointer, 0, nil, &metadataPtr, timeout)
+            let elapsed = DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds
+            if let metadataPtr { rd_kafka_metadata_destroy(metadataPtr) }
+
+            guard result == RD_KAFKA_RESP_ERR_NO_ERROR else {
+                let errStr = String(cString: rd_kafka_err2str(result))
+                throw SwifkaError.metadataFailed(errStr)
+            }
+
+            return Int(elapsed / 1_000_000) // nanoseconds → milliseconds
+        }
+    }
+
     // MARK: - Metadata
 
     func fetchMetadata() async throws -> (brokers: [BrokerInfo], topics: [TopicInfo]) {

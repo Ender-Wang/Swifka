@@ -3,6 +3,7 @@ import SwiftUI
 struct ContentView: View {
     @Environment(AppState.self) private var appState
     @State private var columnVisibility: NavigationSplitViewVisibility = .automatic
+    @State private var showingAddClusterSheet = false
 
     private var sidebarHidden: Bool {
         columnVisibility == .detailOnly
@@ -33,6 +34,8 @@ struct ContentView: View {
                         ConsumerGroupsView()
                     case .brokers:
                         BrokersView()
+                    case .clusters:
+                        ClustersView()
                     case .settings:
                         SettingsView()
                     case .none:
@@ -85,6 +88,15 @@ struct ContentView: View {
                     }
                 }
 
+                // Add cluster (only on Clusters page)
+                if appState.selectedSidebarItem == .clusters {
+                    Button {
+                        showingAddClusterSheet = true
+                    } label: {
+                        Label(l10n["cluster.add"], systemImage: "plus")
+                    }
+                }
+
                 // Connection controls
                 if appState.connectionStatus.isConnected {
                     Button {
@@ -105,6 +117,15 @@ struct ContentView: View {
                         .foregroundStyle(.gray)
                 }
             }
+        }
+        .sheet(isPresented: $showingAddClusterSheet) {
+            ClusterFormView(mode: .add) { cluster, password in
+                appState.configStore.addCluster(cluster)
+                if let password, cluster.authType == .sasl {
+                    try? KeychainManager.save(password: password, for: cluster.id)
+                }
+            }
+            .environment(appState)
         }
         .task {
             // Auto-connect on launch if a cluster is selected
@@ -144,6 +165,7 @@ private struct CompactSidebarView: View {
             (.brokers, "server.rack"),
         ]),
         IconGroup(items: [
+            (.clusters, "square.stack.3d.up"),
             (.settings, "gear"),
         ]),
     ]
@@ -222,6 +244,8 @@ struct SidebarView: View {
             }
 
             Section(l10n["sidebar.section.system"]) {
+                Label(l10n["sidebar.clusters"], systemImage: "square.stack.3d.up")
+                    .tag(SidebarItem.clusters)
                 Label(l10n["sidebar.settings"], systemImage: "gear")
                     .tag(SidebarItem.settings)
             }

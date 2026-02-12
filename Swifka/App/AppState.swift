@@ -138,6 +138,11 @@ final class AppState {
         }
     }
 
+    func ping() async -> Int? {
+        guard connectionStatus.isConnected else { return nil }
+        return try? await kafkaService.ping()
+    }
+
     // MARK: - Data Fetching
 
     func refreshAll() async {

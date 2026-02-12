@@ -37,6 +37,8 @@ struct MenuBarView: View {
         Button(l10n["sidebar.brokers"]) { navigateTo(.brokers) }
             .keyboardShortcut("b", modifiers: [.command, .shift])
         Divider()
+        Button(l10n["sidebar.clusters"]) { navigateTo(.clusters) }
+            .keyboardShortcut("k", modifiers: [.command, .shift])
         Button(l10n["sidebar.settings"]) { navigateTo(.settings) }
             .keyboardShortcut(",")
 

@@ -11,6 +11,7 @@
   "sidebar.messages": "Messages",
   "sidebar.groups": "Consumer Groups",
   "sidebar.brokers": "Brokers",
+  "sidebar.clusters": "Clusters",
   "sidebar.settings": "Settings",
 
   "cluster.add": "Add Cluster",
@@ -21,6 +22,9 @@
   "cluster.brokers.placeholder": "localhost:9092",
   "cluster.none": "No Clusters",
   "cluster.none.description": "Add a cluster to get started",
+  "clusters.status.connected": "Connected",
+  "clusters.switch": "Switch to this cluster",
+  "clusters.delete.confirm": "Are you sure you want to delete \"{0}\"? This cannot be undone.",
 
   "connection.status.disconnected": "Disconnected",
   "connection.status.connecting": "Connecting…",

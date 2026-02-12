@@ -48,6 +48,12 @@ struct SwifkaApp: App {
                 }
                 .keyboardShortcut("b", modifiers: [.command, .shift])
             }
+            CommandMenu(appState.l10n["sidebar.section.system"]) {
+                Button(appState.l10n["sidebar.clusters"]) {
+                    appState.selectedSidebarItem = .clusters
+                }
+                .keyboardShortcut("k", modifiers: [.command, .shift])
+            }
             CommandGroup(replacing: .appSettings) {
                 Button(appState.l10n["sidebar.settings"]) {
                     appState.selectedSidebarItem = .settings

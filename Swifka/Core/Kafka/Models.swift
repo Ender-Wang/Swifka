@@ -348,5 +348,6 @@ nonisolated enum SidebarItem: String, Hashable, Sendable {
     case messages
     case consumerGroups
     case brokers
+    case clusters
     case settings
 }
