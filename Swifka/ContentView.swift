@@ -180,7 +180,7 @@ private struct CompactSidebarView: View {
 
             CompactSidebarFooterView()
         }
-        .padding(.vertical, 8)
+        .padding(.top, 8)
         .padding(.horizontal, 4)
         .frame(width: 44)
         .overlay(alignment: .trailing) { Divider() }
@@ -344,15 +344,23 @@ private struct CompactSidebarFooterView: View {
             Divider()
                 .padding(.horizontal, 8)
 
-            // Connection dot
-            ConnectionStatusBadge(status: appState.connectionStatus)
+            ConnectionStatusBadge(status: appState.connectionStatus, size: 6)
+                .overlay {
+                    if appState.isLoading {
+                        ProgressView()
+                            .controlSize(.mini)
+                            .scaleEffect(0.5)
+                            .transition(.opacity)
+                    }
+                }
+                .animation(.easeInOut(duration: 0.25), value: appState.isLoading)
                 .padding(.bottom, 2)
 
             CompactMetricIcon(icon: "server.rack", count: appState.brokers.count, color: .blue, connected: connected)
             CompactMetricIcon(icon: "list.bullet.rectangle", count: appState.topics.count(where: { !$0.isInternal }), color: .green, connected: connected)
             CompactMetricIcon(icon: "square.split.2x2", count: appState.totalPartitions, color: .orange, connected: connected)
         }
-        .padding(.bottom, 6)
+        .padding(.bottom, 4)
     }
 }
 
