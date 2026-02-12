@@ -3,9 +3,10 @@ import SwiftUI
 @main
 struct SwifkaApp: App {
     @State private var appState = AppState()
+    @Environment(\.openWindow) private var openWindow
 
     var body: some Scene {
-        WindowGroup {
+        WindowGroup(id: "main") {
             ContentView()
                 .environment(appState)
                 .frame(
@@ -23,6 +24,11 @@ struct SwifkaApp: App {
         .windowToolbarStyle(.unified)
         .commands {
             CommandGroup(before: .sidebar) {
+                Button(appState.l10n["menubar.show"]) {
+                    activateMainWindow()
+                }
+                .keyboardShortcut("n", modifiers: [.command, .shift])
+
                 Button(appState.l10n["sidebar.toggle"]) {
                     NSApp.sendAction(#selector(NSSplitViewController.toggleSidebar(_:)), to: nil, from: nil)
                 }
@@ -30,39 +36,39 @@ struct SwifkaApp: App {
             }
             CommandMenu(appState.l10n["sidebar.section.overview"]) {
                 Button(appState.l10n["sidebar.dashboard"]) {
-                    appState.selectedSidebarItem = .dashboard
+                    navigateTo(.dashboard)
                 }
                 .keyboardShortcut("d", modifiers: [.command, .shift])
             }
             CommandMenu(appState.l10n["sidebar.section.browse"]) {
                 Button(appState.l10n["sidebar.topics"]) {
-                    appState.selectedSidebarItem = .topics
+                    navigateTo(.topics)
                 }
                 .keyboardShortcut("t", modifiers: [.command, .shift])
                 Button(appState.l10n["sidebar.messages"]) {
-                    appState.selectedSidebarItem = .messages
+                    navigateTo(.messages)
                 }
                 .keyboardShortcut("m", modifiers: [.command, .shift])
             }
             CommandMenu(appState.l10n["sidebar.section.monitor"]) {
                 Button(appState.l10n["sidebar.groups"]) {
-                    appState.selectedSidebarItem = .consumerGroups
+                    navigateTo(.consumerGroups)
                 }
                 .keyboardShortcut("c", modifiers: [.command, .shift])
                 Button(appState.l10n["sidebar.brokers"]) {
-                    appState.selectedSidebarItem = .brokers
+                    navigateTo(.brokers)
                 }
                 .keyboardShortcut("b", modifiers: [.command, .shift])
             }
             CommandMenu(appState.l10n["sidebar.section.system"]) {
                 Button(appState.l10n["sidebar.clusters"]) {
-                    appState.selectedSidebarItem = .clusters
+                    navigateTo(.clusters)
                 }
                 .keyboardShortcut("k", modifiers: [.command, .shift])
             }
             CommandGroup(replacing: .appSettings) {
                 Button(appState.l10n["sidebar.settings"]) {
-                    appState.selectedSidebarItem = .settings
+                    navigateTo(.settings)
                 }
                 .keyboardShortcut(",")
             }
@@ -73,6 +79,20 @@ struct SwifkaApp: App {
         } label: {
             Image("MenuBarIcon")
         }
-        .menuBarExtraStyle(.menu)
+        .menuBarExtraStyle(.window)
+    }
+
+    private func activateMainWindow() {
+        if let window = NSApplication.shared.windows.first(where: { $0.canBecomeMain }) {
+            NSApplication.shared.activate()
+            window.makeKeyAndOrderFront(nil)
+        } else {
+            openWindow(id: "main")
+        }
+    }
+
+    private func navigateTo(_ item: SidebarItem) {
+        appState.selectedSidebarItem = item
+        activateMainWindow()
     }
 }
