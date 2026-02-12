@@ -16,6 +16,8 @@ struct MessageBrowserView: View {
     @State private var selectedMessageId: String?
     @State private var detailMessage: KafkaMessageRecord?
     @State private var refreshRotation: Double = 0
+    @State private var controlsOverflow = false
+    @State private var controlsContentWidth: CGFloat = 0
 
     var body: some View {
         @Bindable var appState = appState
@@ -84,8 +86,18 @@ struct MessageBrowserView: View {
                             .disabled(selectedTopicName == nil || isFetching)
                         }
                     }
+                    .onGeometryChange(for: CGFloat.self) { proxy in
+                        proxy.size.width
+                    } action: { contentWidth in
+                        controlsContentWidth = contentWidth
+                    }
                 }
-                // Trailing fade overlay to hint at overflow
+                .onGeometryChange(for: CGFloat.self) { proxy in
+                    proxy.size.width
+                } action: { viewportWidth in
+                    controlsOverflow = controlsContentWidth > viewportWidth
+                }
+                // Trailing fade overlay — only when content overflows
                 .overlay(alignment: .trailing) {
                     LinearGradient(
                         colors: [.clear, Color(nsColor: .windowBackgroundColor)],
@@ -94,6 +106,7 @@ struct MessageBrowserView: View {
                     )
                     .frame(width: 40)
                     .allowsHitTesting(false)
+                    .opacity(controlsOverflow ? 1 : 0)
                 }
 
                 // Right group — sits naturally, no extra background
