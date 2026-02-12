@@ -335,7 +335,7 @@ struct MessageDetailView: View {
     var onDismiss: () -> Void = {}
     @State private var keyCopied = false
     @State private var valueCopied = false
-    @State private var wrapText = true
+    @State private var wrapText = false
 
     var body: some View {
         let l10n = appState.l10n
