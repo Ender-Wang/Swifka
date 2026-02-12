@@ -1,12 +1,10 @@
-<p align="center">
-  <img src=".github/assets/Swifka.svg" alt="Swifka" width="128" />
-</p>
+<img src=".github/assets/Swifka.svg" alt="Swifka" width="128" align="left" />
 
-<h1 align="center">Swifka</h1>
+# Swifka
 
-<p align="center">
-  A read-focused, lightweight, native macOS Kafka client for monitoring clusters, browsing topics, and tracking consumer lag.
-</p>
+A read-focused, lightweight, native macOS Kafka client for monitoring clusters, browsing topics, and tracking consumer lag.
+
+<br clear="all" />
 
 <p align="center">
   <a href="https://github.com/Ender-Wang/Swifka/releases"><img src="https://img.shields.io/github/v/release/Ender-Wang/Swifka?label=Latest%20Release&color=green" alt="Latest Release" /></a>
