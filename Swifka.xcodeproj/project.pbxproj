@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		F86DB57B2F34E6F6009E3F6A /* Kafka in Frameworks */ = {isa = PBXBuildFile; productRef = F86DB57A2F34E6F6009E3F6A /* Kafka */; };
 		F86DB57D2F34E6F6009E3F6A /* KafkaFoundationCompat in Frameworks */ = {isa = PBXBuildFile; productRef = F86DB57C2F34E6F6009E3F6A /* KafkaFoundationCompat */; };
+		F8A1B0012F50A000009E3F6A /* SQLite in Frameworks */ = {isa = PBXBuildFile; productRef = F8A1B0032F50A000009E3F6A /* SQLite */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -30,6 +31,7 @@
 			files = (
 				F86DB57D2F34E6F6009E3F6A /* KafkaFoundationCompat in Frameworks */,
 				F86DB57B2F34E6F6009E3F6A /* Kafka in Frameworks */,
+				F8A1B0012F50A000009E3F6A /* SQLite in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -75,6 +77,7 @@
 			packageProductDependencies = (
 				F86DB57A2F34E6F6009E3F6A /* Kafka */,
 				F86DB57C2F34E6F6009E3F6A /* KafkaFoundationCompat */,
+				F8A1B0032F50A000009E3F6A /* SQLite */,
 			);
 			productName = Swifka;
 			productReference = F86DB56B2F34E4EB009E3F6A /* Swifka.app */;
@@ -106,6 +109,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				F86DB5792F34E6F6009E3F6A /* XCRemoteSwiftPackageReference "swift-kafka-client" */,
+				F8A1B0022F50A000009E3F6A /* XCRemoteSwiftPackageReference "SQLite" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = F86DB56C2F34E4EB009E3F6A /* Products */;
@@ -379,6 +383,14 @@
 				kind = branch;
 			};
 		};
+		F8A1B0022F50A000009E3F6A /* XCRemoteSwiftPackageReference "SQLite" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/stephencelis/SQLite.swift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.15.3;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -391,6 +403,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = F86DB5792F34E6F6009E3F6A /* XCRemoteSwiftPackageReference "swift-kafka-client" */;
 			productName = KafkaFoundationCompat;
+		};
+		F8A1B0032F50A000009E3F6A /* SQLite */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F8A1B0022F50A000009E3F6A /* XCRemoteSwiftPackageReference "SQLite" */;
+			productName = SQLite;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

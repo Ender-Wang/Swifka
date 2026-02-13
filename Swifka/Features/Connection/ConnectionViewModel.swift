@@ -36,6 +36,7 @@ final class ConnectionViewModel {
         }
         KeychainManager.deletePassword(for: id)
         appState.configStore.deleteCluster(id)
+        try? await appState.metricDatabase?.deleteClusterData(clusterId: id)
     }
 
     func testConnection(config: ClusterConfig, password: String?, appState: AppState) async {

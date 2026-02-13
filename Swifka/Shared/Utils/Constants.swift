@@ -18,4 +18,9 @@ nonisolated enum Constants {
 
     static let metricStoreCapacity = 300
     static let metricDisplayLimit = 60
+    static let metricsDatabaseFileName = "metrics.sqlite3"
+
+    /// Time gap threshold (seconds) between consecutive snapshots to break chart lines.
+    /// If two snapshots are more than 2 minutes apart, treat it as a discontinuity (e.g. app restart).
+    static let chartGapThreshold: TimeInterval = 120
 }

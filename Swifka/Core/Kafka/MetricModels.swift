@@ -32,6 +32,8 @@ nonisolated struct ThroughputPoint: Sendable, Identifiable {
     let timestamp: Date
     let topic: String
     let messagesPerSecond: Double
+    /// Segment index for gap detection — lines break between different segments.
+    let segment: Int
 
     var id: Int {
         var hasher = Hasher()
@@ -46,6 +48,7 @@ nonisolated struct LagPoint: Sendable, Identifiable {
     let timestamp: Date
     let group: String
     let totalLag: Int64
+    let segment: Int
 
     var id: Int {
         var hasher = Hasher()
@@ -59,6 +62,7 @@ nonisolated struct LagPoint: Sendable, Identifiable {
 nonisolated struct PingPoint: Sendable, Identifiable {
     let timestamp: Date
     let ms: Int
+    let segment: Int
 
     var id: Int {
         var hasher = Hasher()
@@ -71,6 +75,7 @@ nonisolated struct PingPoint: Sendable, Identifiable {
 nonisolated struct ISRHealthPoint: Sendable, Identifiable {
     let timestamp: Date
     let healthyRatio: Double
+    let segment: Int
 
     var id: Int {
         var hasher = Hasher()

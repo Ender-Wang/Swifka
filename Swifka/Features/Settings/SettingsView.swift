@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @Environment(AppState.self) private var appState
+    @State private var showClearDataConfirm = false
 
     var body: some View {
         @Bindable var state = appState
@@ -72,6 +73,34 @@ struct SettingsView: View {
                     Text(l10n["settings.appearance.system"]).tag(AppearanceMode.system)
                     Text(l10n["settings.appearance.light"]).tag(AppearanceMode.light)
                     Text(l10n["settings.appearance.dark"]).tag(AppearanceMode.dark)
+                }
+            }
+
+            // Data Retention
+            Section(l10n["settings.data.retention"]) {
+                Picker(l10n["settings.retention.policy"], selection: $state.retentionPolicy) {
+                    Text(l10n["settings.retention.1d"]).tag(DataRetentionPolicy.oneDay)
+                    Text(l10n["settings.retention.7d"]).tag(DataRetentionPolicy.sevenDays)
+                    Text(l10n["settings.retention.30d"]).tag(DataRetentionPolicy.thirtyDays)
+                    Text(l10n["settings.retention.90d"]).tag(DataRetentionPolicy.ninetyDays)
+                    Text(l10n["settings.retention.unlimited"]).tag(DataRetentionPolicy.unlimited)
+                }
+
+                Button(role: .destructive) {
+                    showClearDataConfirm = true
+                } label: {
+                    Text(l10n["settings.retention.clear"])
+                }
+                .confirmationDialog(
+                    l10n["settings.retention.clear.confirm"],
+                    isPresented: $showClearDataConfirm,
+                    titleVisibility: .visible,
+                ) {
+                    Button(l10n["common.delete"], role: .destructive) {
+                        Task {
+                            await appState.clearAllMetricData()
+                        }
+                    }
                 }
             }
 

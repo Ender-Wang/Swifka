@@ -154,6 +154,16 @@
   "settings.appearance.light": "浅色",
   "settings.appearance.dark": "深色",
 
+  "settings.data.retention": "数据保留",
+  "settings.retention.policy": "保留指标历史",
+  "settings.retention.1d": "1 天",
+  "settings.retention.7d": "7 天",
+  "settings.retention.30d": "30 天",
+  "settings.retention.90d": "90 天",
+  "settings.retention.unlimited": "不限",
+  "settings.retention.clear": "清除所有指标数据",
+  "settings.retention.clear.confirm": "确定要删除所有已存储的指标历史记录吗？此操作无法撤销。",
+
   "common.copy": "拷贝",
   "common.copied": "已拷贝",
   "common.save": "保存",

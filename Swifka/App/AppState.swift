@@ -7,6 +7,7 @@ final class AppState {
     let l10n: L10n
     let refreshManager: RefreshManager
     let metricStore: MetricStore
+    let metricDatabase: MetricDatabase?
 
     var connectionStatus: ConnectionStatus = .disconnected
     var brokers: [BrokerInfo] = []
@@ -62,18 +63,26 @@ final class AppState {
         }
     }
 
+    var retentionPolicy: DataRetentionPolicy = .sevenDays {
+        didSet {
+            UserDefaults.standard.set(retentionPolicy.rawValue, forKey: "settings.retentionPolicy")
+        }
+    }
+
     init(
         configStore: ConfigStore = ConfigStore(),
         kafkaService: KafkaService = KafkaService(),
         l10n: L10n = .shared,
         refreshManager: RefreshManager = RefreshManager(),
         metricStore: MetricStore = MetricStore(),
+        metricDatabase: MetricDatabase? = nil,
     ) {
         self.configStore = configStore
         self.kafkaService = kafkaService
         self.l10n = l10n
         self.refreshManager = refreshManager
         self.metricStore = metricStore
+        self.metricDatabase = metricDatabase ?? (try? MetricDatabase())
 
         // Restore persisted settings
         if let raw = UserDefaults.standard.string(forKey: "settings.operationLevel"),
@@ -97,6 +106,11 @@ final class AppState {
         {
             rowDensity = density
         }
+        if let raw = UserDefaults.standard.string(forKey: "settings.retentionPolicy"),
+           let policy = DataRetentionPolicy(rawValue: raw)
+        {
+            retentionPolicy = policy
+        }
         if let raw = UserDefaults.standard.string(forKey: "nav.sidebarItem"),
            let item = SidebarItem(rawValue: raw)
         {
@@ -105,6 +119,11 @@ final class AppState {
 
         self.refreshManager.onRefresh = { [weak self] in
             await self?.refreshAll()
+        }
+
+        // Prune old metrics on launch
+        Task { [weak self] in
+            await self?.pruneMetrics()
         }
     }
 
@@ -121,6 +140,7 @@ final class AppState {
                 : nil
             try await kafkaService.connect(config: cluster, password: password)
             connectionStatus = .connected
+            await loadHistoricalMetrics(for: cluster.id)
             await refreshAll()
         } catch {
             connectionStatus = .error(error.localizedDescription)
@@ -140,6 +160,7 @@ final class AppState {
         expandedTopics = []
         metricStore.clear()
         await kafkaService.disconnect()
+        await pruneMetrics()
     }
 
     func testConnection(config: ClusterConfig, password: String?) async -> Result<Bool, Error> {
@@ -294,6 +315,48 @@ final class AppState {
             pingMs: pingMs,
         )
         metricStore.record(snapshot)
+
+        // Persist to SQLite (fire-and-forget)
+        if let db = metricDatabase, let clusterId = configStore.selectedCluster?.id {
+            Task {
+                try? await db.insert(snapshot, clusterId: clusterId)
+            }
+        }
+    }
+
+    private func loadHistoricalMetrics(for clusterId: UUID) async {
+        guard let db = metricDatabase else { return }
+        do {
+            let historical = try await db.loadRecentSnapshots(clusterId: clusterId)
+            if !historical.isEmpty {
+                metricStore.loadHistorical(historical)
+            }
+        } catch {
+            print("Failed to load historical metrics: \(error)")
+        }
+    }
+
+    func clearAllMetricData() async {
+        metricStore.clear()
+        guard let db = metricDatabase else { return }
+        do {
+            let deleted = try await db.deleteAllData()
+            print("Cleared \(deleted) metric snapshots")
+        } catch {
+            print("Failed to clear metric data: \(error)")
+        }
+    }
+
+    private func pruneMetrics() async {
+        guard let db = metricDatabase else { return }
+        do {
+            let deleted = try await db.pruneAllClusters(retentionPolicy: retentionPolicy)
+            if deleted > 0 {
+                print("Pruned \(deleted) old metric snapshots")
+            }
+        } catch {
+            print("Failed to prune metrics: \(error)")
+        }
     }
 
     // MARK: - Status

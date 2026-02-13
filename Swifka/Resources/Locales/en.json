@@ -154,6 +154,16 @@
   "settings.appearance.light": "Light",
   "settings.appearance.dark": "Dark",
 
+  "settings.data.retention": "Data Retention",
+  "settings.retention.policy": "Keep Metric History",
+  "settings.retention.1d": "1 Day",
+  "settings.retention.7d": "7 Days",
+  "settings.retention.30d": "30 Days",
+  "settings.retention.90d": "90 Days",
+  "settings.retention.unlimited": "Unlimited",
+  "settings.retention.clear": "Clear All Metric Data",
+  "settings.retention.clear.confirm": "Are you sure you want to delete all stored metric history? This cannot be undone.",
+
   "common.copy": "Copy",
   "common.copied": "Copied",
   "common.save": "Save",

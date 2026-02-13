@@ -36,12 +36,14 @@ struct ClusterThroughputChart: View {
                 LineMark(
                     x: .value("Time", point.timestamp),
                     y: .value("msg/s", point.messagesPerSecond),
+                    series: .value("Segment", point.segment),
                 )
                 .interpolationMethod(.catmullRom)
 
                 AreaMark(
                     x: .value("Time", point.timestamp),
                     y: .value("msg/s", point.messagesPerSecond),
+                    series: .value("Segment", point.segment),
                 )
                 .foregroundStyle(.blue.opacity(0.1))
                 .interpolationMethod(.catmullRom)
@@ -72,6 +74,7 @@ struct PingLatencyChart: View {
                 LineMark(
                     x: .value("Time", point.timestamp),
                     y: .value("ms", point.ms),
+                    series: .value("Segment", point.segment),
                 )
                 .foregroundStyle(.green)
                 .interpolationMethod(.catmullRom)
@@ -132,6 +135,7 @@ struct TopicThroughputChart: View {
                         LineMark(
                             x: .value("Time", point.timestamp),
                             y: .value("msg/s", logScale ? max(0.1, point.messagesPerSecond) : point.messagesPerSecond),
+                            series: .value("Series", "\(topic)-\(point.segment)"),
                         )
                         .foregroundStyle(by: .value("Topic", topic))
                         .interpolationMethod(.catmullRom)
@@ -214,6 +218,7 @@ struct ConsumerGroupLagChart: View {
                             LineMark(
                                 x: .value("Time", point.timestamp),
                                 y: .value("Lag", logScale ? max(1, point.totalLag) : point.totalLag),
+                                series: .value("Series", "\(group)-\(point.segment)"),
                             )
                             .foregroundStyle(by: .value("Group", group))
                             .interpolationMethod(.catmullRom)
@@ -254,6 +259,7 @@ struct ISRHealthChart: View {
                 AreaMark(
                     x: .value("Time", point.timestamp),
                     y: .value("Health", point.healthyRatio * 100),
+                    series: .value("Segment", point.segment),
                 )
                 .foregroundStyle(.green.opacity(0.2))
                 .interpolationMethod(.catmullRom)
@@ -261,6 +267,7 @@ struct ISRHealthChart: View {
                 LineMark(
                     x: .value("Time", point.timestamp),
                     y: .value("Health", point.healthyRatio * 100),
+                    series: .value("Segment", point.segment),
                 )
                 .foregroundStyle(.green)
                 .interpolationMethod(.catmullRom)
