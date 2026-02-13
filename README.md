@@ -72,9 +72,9 @@ Or download the latest `.dmg` from [Releases](https://github.com/Ender-Wang/Swif
 
 📊 **Features**
 
-- [ ] Cluster health overview with production/consumption throughput
+- [x] Cluster health overview with production/consumption throughput
 - [ ] Per-topic lag ranking and total lag display
-- [ ] Swift Charts — lag trends, throughput trends, partition distribution
+- [x] Swift Charts — lag trends, throughput trends, partition distribution
 
 🔧 **Enhancements**
 
@@ -87,7 +87,7 @@ Or download the latest `.dmg` from [Releases](https://github.com/Ender-Wang/Swif
   - [ ] Alert: Under-replicated partitions (ISR < replication factor)
   - [ ] Alert: Critical ISR level (ISR = 1, single point of failure)
   - [ ] Alert: ISR below min.insync.replicas (partition at risk)
-  - [ ] ISR history graph (track ISR changes over time)
+  - [x] ISR history graph (track ISR changes over time)
 - [ ] Desktop notifications (macOS native alerts)
 
 ## Milestone 3: Animations & Polish
