@@ -90,7 +90,24 @@ struct TopicThroughputChart: View {
     let l10n: L10n
     @Binding var selectedTopics: Set<String>
 
+    /// Switch to log scale when selected topics span >20× difference in peak throughput.
+    /// At 20× ratio the smallest series gets ~12px on a 250px chart — below that, fluctuations are unreadable.
+    private var useLogScale: Bool {
+        guard selectedTopics.count > 1 else { return false }
+        var peaks: [Double] = []
+        for topic in selectedTopics {
+            let series = store.throughputSeries(for: topic)
+            if let peak = series.map(\.messagesPerSecond).max(), peak > 0 {
+                peaks.append(peak)
+            }
+        }
+        guard let lo = peaks.min(), let hi = peaks.max(), lo > 0 else { return false }
+        return hi / lo > 20
+    }
+
     var body: some View {
+        let logScale = useLogScale
+
         TrendCard(title: l10n["trends.topic.throughput"]) {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
@@ -108,13 +125,13 @@ struct TopicThroughputChart: View {
                 }
             }
 
-            Chart {
+            let chart = Chart {
                 ForEach(Array(selectedTopics), id: \.self) { topic in
                     let series = store.throughputSeries(for: topic)
                     ForEach(series) { point in
                         LineMark(
                             x: .value("Time", point.timestamp),
-                            y: .value("msg/s", point.messagesPerSecond),
+                            y: .value("msg/s", logScale ? max(0.1, point.messagesPerSecond) : point.messagesPerSecond),
                         )
                         .foregroundStyle(by: .value("Topic", topic))
                         .interpolationMethod(.catmullRom)
@@ -130,6 +147,12 @@ struct TopicThroughputChart: View {
             }
             .chartLegend(position: .top, alignment: .leading)
             .frame(height: 250)
+
+            if logScale {
+                chart.chartYScale(type: .log)
+            } else {
+                chart
+            }
         }
     }
 }
@@ -141,7 +164,24 @@ struct ConsumerGroupLagChart: View {
     let l10n: L10n
     @Binding var selectedGroups: Set<String>
 
+    /// Switch to log scale when selected groups span >20× difference in peak lag.
+    /// At 20× ratio the smallest series gets ~12px on a 250px chart — below that, fluctuations are unreadable.
+    private var useLogScale: Bool {
+        guard selectedGroups.count > 1 else { return false }
+        var peaks: [Double] = []
+        for group in selectedGroups {
+            let series = store.lagSeries(for: group)
+            if let peak = series.map({ Double($0.totalLag) }).max(), peak > 0 {
+                peaks.append(peak)
+            }
+        }
+        guard let lo = peaks.min(), let hi = peaks.max(), lo > 0 else { return false }
+        return hi / lo > 20
+    }
+
     var body: some View {
+        let logScale = useLogScale
+
         TrendCard(title: l10n["trends.consumer.lag"]) {
             if store.knownGroups.isEmpty {
                 ContentUnavailableView {
@@ -167,13 +207,13 @@ struct ConsumerGroupLagChart: View {
                     }
                 }
 
-                Chart {
+                let chart = Chart {
                     ForEach(Array(selectedGroups), id: \.self) { group in
                         let series = store.lagSeries(for: group)
                         ForEach(series) { point in
                             LineMark(
                                 x: .value("Time", point.timestamp),
-                                y: .value("Lag", point.totalLag),
+                                y: .value("Lag", logScale ? max(1, point.totalLag) : point.totalLag),
                             )
                             .foregroundStyle(by: .value("Group", group))
                             .interpolationMethod(.catmullRom)
@@ -189,6 +229,12 @@ struct ConsumerGroupLagChart: View {
                 }
                 .chartLegend(position: .top, alignment: .leading)
                 .frame(height: 250)
+
+                if logScale {
+                    chart.chartYScale(type: .log)
+                } else {
+                    chart
+                }
             }
         }
     }
