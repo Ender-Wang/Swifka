@@ -339,6 +339,96 @@ actor KafkaService {
         }
     }
 
+    // MARK: - Consumer Group Offsets
+
+    /// Fetch committed offsets for a consumer group using the admin API.
+    /// Returns only partitions with valid committed offsets (offset >= 0).
+    func fetchCommittedOffsets(
+        group: String,
+        partitions: [(topic: String, partition: Int32)],
+    ) async throws -> [(topic: String, partition: Int32, offset: Int64)] {
+        guard let handle else {
+            throw SwifkaError.notConnected
+        }
+        let h = SendableHandle(pointer: handle)
+        let timeout = Constants.kafkaTimeout
+        // Copy partition data into a Sendable array of tuples
+        let parts = partitions.map { (t: $0.topic, p: $0.partition) }
+
+        return try await Self.offload {
+            // 1. Build topic-partition list
+            let tpl = rd_kafka_topic_partition_list_new(Int32(parts.count))!
+            defer { rd_kafka_topic_partition_list_destroy(tpl) }
+            for p in parts {
+                rd_kafka_topic_partition_list_add(tpl, p.t, p.p)
+            }
+
+            // 2. Create admin request object
+            var request: OpaquePointer? = rd_kafka_ListConsumerGroupOffsets_new(group, tpl)
+            guard request != nil else {
+                throw SwifkaError.consumerGroupsFailed("Failed to create ListConsumerGroupOffsets request")
+            }
+            defer { rd_kafka_ListConsumerGroupOffsets_destroy(request) }
+
+            // 3. Create queue + options
+            let queue = rd_kafka_queue_new(h.pointer)!
+            defer { rd_kafka_queue_destroy(queue) }
+
+            let options = rd_kafka_AdminOptions_new(h.pointer, RD_KAFKA_ADMIN_OP_LISTCONSUMERGROUPOFFSETS)!
+            defer { rd_kafka_AdminOptions_destroy(options) }
+            let errstr = UnsafeMutablePointer<CChar>.allocate(capacity: 512)
+            defer { errstr.deallocate() }
+            rd_kafka_AdminOptions_set_request_timeout(options, Int32(timeout), errstr, 512)
+
+            // 4. Submit request (API requires exactly 1 group per call)
+            rd_kafka_ListConsumerGroupOffsets(h.pointer, &request, 1, options, queue)
+
+            // 5. Poll for result
+            guard let event = rd_kafka_queue_poll(queue, timeout) else {
+                throw SwifkaError.consumerGroupsFailed("Timeout waiting for offset result")
+            }
+            defer { rd_kafka_event_destroy(event) }
+
+            // 6. Extract result
+            guard let result = rd_kafka_event_ListConsumerGroupOffsets_result(event) else {
+                throw SwifkaError.consumerGroupsFailed("Unexpected event type")
+            }
+
+            var groupCnt = 0
+            guard let groups = rd_kafka_ListConsumerGroupOffsets_result_groups(result, &groupCnt),
+                  groupCnt > 0,
+                  let groupResult = groups[0]
+            else {
+                throw SwifkaError.consumerGroupsFailed("No group results returned")
+            }
+
+            // Check group-level error
+            if let err = rd_kafka_group_result_error(groupResult),
+               rd_kafka_error_code(err) != RD_KAFKA_RESP_ERR_NO_ERROR
+            {
+                let msg = String(cString: rd_kafka_error_string(err))
+                throw SwifkaError.consumerGroupsFailed(msg)
+            }
+
+            // 7. Parse committed offsets
+            guard let resultPartitions = rd_kafka_group_result_partitions(groupResult) else {
+                return []
+            }
+
+            var offsets: [(topic: String, partition: Int32, offset: Int64)] = []
+            for i in 0 ..< Int(resultPartitions.pointee.cnt) {
+                let tp = resultPartitions.pointee.elems[i]
+                guard tp.offset >= 0 else { continue }
+                offsets.append((
+                    topic: String(cString: tp.topic),
+                    partition: tp.partition,
+                    offset: tp.offset,
+                ))
+            }
+            return offsets
+        }
+    }
+
     // MARK: - Message Browsing
 
     func browseMessages(

@@ -12,6 +12,7 @@ final class AppState {
     var brokers: [BrokerInfo] = []
     var topics: [TopicInfo] = []
     var consumerGroups: [ConsumerGroupInfo] = []
+    private var consumerGroupLags: [String: Int64] = [:]
     var selectedSidebarItem: SidebarItem? = .dashboard {
         didSet {
             UserDefaults.standard.set(selectedSidebarItem?.rawValue, forKey: "nav.sidebarItem")
@@ -135,6 +136,7 @@ final class AppState {
         brokers = []
         topics = []
         consumerGroups = []
+        consumerGroupLags = [:]
         expandedTopics = []
         metricStore.clear()
         await kafkaService.disconnect()
@@ -183,6 +185,9 @@ final class AppState {
             print("Failed to fetch consumer groups: \(error)")
         }
 
+        // Fetch committed offsets and compute lag per consumer group
+        await fetchConsumerGroupLags()
+
         recordMetricSnapshot()
 
         // Ensure spinner is visible long enough to avoid flickering
@@ -219,6 +224,45 @@ final class AppState {
         )
     }
 
+    // MARK: - Consumer Group Lag
+
+    private func fetchConsumerGroupLags() async {
+        guard connectionStatus.isConnected, !consumerGroups.isEmpty else {
+            consumerGroupLags = [:]
+            return
+        }
+
+        let allPartitions: [(topic: String, partition: Int32)] = topics
+            .filter { !$0.isInternal }
+            .flatMap { topic in
+                topic.partitions.map { (topic: topic.name, partition: $0.partitionId) }
+            }
+        guard !allPartitions.isEmpty else {
+            consumerGroupLags = [:]
+            return
+        }
+
+        var lags: [String: Int64] = [:]
+        for group in consumerGroups {
+            guard connectionStatus.isConnected else { break }
+            guard let offsets = try? await kafkaService.fetchCommittedOffsets(
+                group: group.name, partitions: allPartitions,
+            ) else { continue }
+
+            var groupLag: Int64 = 0
+            for (topic, partition, committedOffset) in offsets {
+                if let topicInfo = topics.first(where: { $0.name == topic }),
+                   let partInfo = topicInfo.partitions.first(where: { $0.partitionId == partition }),
+                   let highWatermark = partInfo.highWatermark
+                {
+                    groupLag += max(0, highWatermark - committedOffset)
+                }
+            }
+            lags[group.name] = groupLag
+        }
+        consumerGroupLags = lags
+    }
+
     // MARK: - Metrics
 
     private func recordMetricSnapshot() {
@@ -241,9 +285,9 @@ final class AppState {
             id: UUID(),
             timestamp: Date(),
             topicWatermarks: topicWatermarks,
-            consumerGroupLags: [:],
+            consumerGroupLags: consumerGroupLags,
             totalHighWatermark: topicWatermarks.values.reduce(0, +),
-            totalLag: 0,
+            totalLag: consumerGroupLags.values.reduce(0, +),
             underReplicatedPartitions: underReplicated,
             totalPartitions: totalPartitionCount,
             brokerCount: brokers.count,
