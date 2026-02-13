@@ -7,6 +7,7 @@
   "sidebar.section.system": "系统",
 
   "sidebar.dashboard": "仪表盘",
+  "sidebar.trends": "趋势",
   "sidebar.topics": "Topics",
   "sidebar.messages": "消息",
   "sidebar.groups": "消费者组",
@@ -43,6 +44,19 @@
   "dashboard.partitions": "Partitions",
   "dashboard.not.connected": "未连接",
   "dashboard.not.connected.description": "选择一个集群并连接以查看仪表盘。",
+
+  "trends.title": "趋势",
+  "trends.not.connected": "未连接",
+  "trends.not.connected.description": "连接到集群以查看趋势。",
+  "trends.not.enough.data": "正在收集数据…",
+  "trends.not.enough.data.description": "至少需要两次刷新后才能显示趋势。",
+  "trends.cluster.throughput": "集群吞吐量",
+  "trends.topic.throughput": "Topic 吞吐量",
+  "trends.consumer.lag": "消费者组延迟",
+  "trends.ping.latency": "Ping 延迟",
+  "trends.isr.health": "ISR 健康状态",
+  "trends.messages.per.second": "条/秒",
+  "trends.lag.messages": "条消息",
 
   "topics.title": "Topics",
   "topics.search": "搜索 Topic…",

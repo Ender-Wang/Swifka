@@ -15,4 +15,7 @@ nonisolated enum Constants {
     static let configFileName = "clusters.json"
 
     static let keychainService = "io.github.ender-wang.Swifka"
+
+    static let metricStoreCapacity = 300
+    static let metricDisplayLimit = 60
 }

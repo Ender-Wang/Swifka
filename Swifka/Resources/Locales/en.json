@@ -7,6 +7,7 @@
   "sidebar.section.system": "System",
 
   "sidebar.dashboard": "Dashboard",
+  "sidebar.trends": "Trends",
   "sidebar.topics": "Topics",
   "sidebar.messages": "Messages",
   "sidebar.groups": "Consumer Groups",
@@ -43,6 +44,19 @@
   "dashboard.partitions": "Partitions",
   "dashboard.not.connected": "Not Connected",
   "dashboard.not.connected.description": "Select a cluster and connect to view the dashboard.",
+
+  "trends.title": "Trends",
+  "trends.not.connected": "Not Connected",
+  "trends.not.connected.description": "Connect to a cluster to view trends.",
+  "trends.not.enough.data": "Collecting Data…",
+  "trends.not.enough.data.description": "Trends will appear after at least two refresh cycles.",
+  "trends.cluster.throughput": "Cluster Throughput",
+  "trends.topic.throughput": "Topic Throughput",
+  "trends.consumer.lag": "Consumer Group Lag",
+  "trends.ping.latency": "Ping Latency",
+  "trends.isr.health": "ISR Health",
+  "trends.messages.per.second": "msg/s",
+  "trends.lag.messages": "messages",
 
   "topics.title": "Topics",
   "topics.search": "Search topics…",

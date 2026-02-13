@@ -6,6 +6,7 @@ final class AppState {
     let kafkaService: KafkaService
     let l10n: L10n
     let refreshManager: RefreshManager
+    let metricStore: MetricStore
 
     var connectionStatus: ConnectionStatus = .disconnected
     var brokers: [BrokerInfo] = []
@@ -18,6 +19,11 @@ final class AppState {
     }
 
     var expandedTopics: Set<String> = []
+
+    // MARK: - Trends Selection (session-scoped)
+
+    var trendSelectedTopics: Set<String> = []
+    var trendSelectedGroups: Set<String> = []
 
     // MARK: - Sort Orders (session-scoped, reset on app restart)
 
@@ -60,11 +66,13 @@ final class AppState {
         kafkaService: KafkaService = KafkaService(),
         l10n: L10n = .shared,
         refreshManager: RefreshManager = RefreshManager(),
+        metricStore: MetricStore = MetricStore(),
     ) {
         self.configStore = configStore
         self.kafkaService = kafkaService
         self.l10n = l10n
         self.refreshManager = refreshManager
+        self.metricStore = metricStore
 
         // Restore persisted settings
         if let raw = UserDefaults.standard.string(forKey: "settings.operationLevel"),
@@ -128,6 +136,7 @@ final class AppState {
         topics = []
         consumerGroups = []
         expandedTopics = []
+        metricStore.clear()
         await kafkaService.disconnect()
     }
 
@@ -173,6 +182,8 @@ final class AppState {
             print("Failed to fetch consumer groups: \(error)")
         }
 
+        recordMetricSnapshot()
+
         // Ensure spinner is visible long enough to avoid flickering
         let elapsed = ContinuousClock.now - start
         if elapsed < .milliseconds(500) {
@@ -205,6 +216,39 @@ final class AppState {
             offsetTo: offsetTo,
             password: password,
         )
+    }
+
+    // MARK: - Metrics
+
+    private func recordMetricSnapshot() {
+        var topicWatermarks: [String: Int64] = [:]
+        var underReplicated = 0
+        var totalPartitionCount = 0
+        for topic in topics where !topic.isInternal {
+            var total: Int64 = 0
+            for partition in topic.partitions {
+                total += partition.highWatermark ?? 0
+                totalPartitionCount += 1
+                if partition.isr.count < partition.replicas.count {
+                    underReplicated += 1
+                }
+            }
+            topicWatermarks[topic.name] = total
+        }
+
+        let snapshot = MetricSnapshot(
+            id: UUID(),
+            timestamp: Date(),
+            topicWatermarks: topicWatermarks,
+            consumerGroupLags: [:],
+            totalHighWatermark: topicWatermarks.values.reduce(0, +),
+            totalLag: 0,
+            underReplicatedPartitions: underReplicated,
+            totalPartitions: totalPartitionCount,
+            brokerCount: brokers.count,
+            pingMs: pingMs,
+        )
+        metricStore.record(snapshot)
     }
 
     // MARK: - Status

@@ -26,6 +26,8 @@ struct ContentView: View {
                     switch appState.selectedSidebarItem {
                     case .dashboard:
                         DashboardView()
+                    case .trends:
+                        TrendsView()
                     case .topics:
                         TopicListView()
                     case .messages:
@@ -173,6 +175,7 @@ private struct CompactSidebarView: View {
     private let groups: [IconGroup] = [
         IconGroup(items: [
             (.dashboard, "gauge.with.dots.needle.33percent"),
+            (.trends, "chart.xyaxis.line"),
         ]),
         IconGroup(items: [
             (.topics, "list.bullet.rectangle"),
@@ -238,6 +241,7 @@ private struct CompactSidebarView: View {
     private func sidebarLabel(for item: SidebarItem, l10n: L10n) -> String {
         switch item {
         case .dashboard: l10n["sidebar.dashboard"]
+        case .trends: l10n["sidebar.trends"]
         case .topics: l10n["sidebar.topics"]
         case .messages: l10n["sidebar.messages"]
         case .consumerGroups: l10n["sidebar.groups"]
@@ -266,6 +270,8 @@ struct SidebarView: View {
             Section(l10n["sidebar.section.overview"]) {
                 Label(l10n["sidebar.dashboard"], systemImage: "gauge.with.dots.needle.33percent")
                     .tag(SidebarItem.dashboard)
+                Label(l10n["sidebar.trends"], systemImage: "chart.xyaxis.line")
+                    .tag(SidebarItem.trends)
             }
 
             Section(l10n["sidebar.section.browse"]) {

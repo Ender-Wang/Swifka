@@ -57,6 +57,9 @@ struct MenuBarView: View {
             MenuBarItem(icon: "gauge.with.dots.needle.33percent", label: l10n["sidebar.dashboard"], shortcut: "⇧⌘ D", keyEquivalent: "d", keyModifiers: [.command, .shift]) {
                 navigateTo(.dashboard)
             }
+            MenuBarItem(icon: "chart.xyaxis.line", label: l10n["sidebar.trends"], shortcut: "⇧⌘ E", keyEquivalent: "e", keyModifiers: [.command, .shift]) {
+                navigateTo(.trends)
+            }
             MenuBarItem(icon: "list.bullet.rectangle", label: l10n["sidebar.topics"], shortcut: "⇧⌘ T", keyEquivalent: "t", keyModifiers: [.command, .shift]) {
                 navigateTo(.topics)
             }
