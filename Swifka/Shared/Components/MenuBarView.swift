@@ -27,18 +27,17 @@ struct MenuBarView: View {
                 )
             } else {
                 ForEach(appState.configStore.clusters) { cluster in
-                    let isConnected = appState.configStore.selectedClusterId == cluster.id
-                        && appState.connectionStatus.isConnected
-                    let isConnecting = appState.configStore.selectedClusterId == cluster.id
-                        && appState.connectionStatus == .connecting
+                    let isSelected = appState.configStore.selectedClusterId == cluster.id
+                    let isConnected = isSelected && appState.connectionStatus.isConnected
+                    let isConnecting = isSelected && appState.connectionStatus == .connecting
 
                     MenuBarItem(
-                        icon: isConnected ? "checkmark.circle.fill"
-                            : isConnecting ? "circle.dotted"
-                            : "circle",
+                        icon: isSelected ? "checkmark.circle.fill" : "circle",
                         label: cluster.name,
-                        iconColor: isConnected ? .green : isConnecting ? .orange : .secondary,
-                        enabled: !isConnected,
+                        iconColor: isConnected ? .green
+                            : isConnecting ? .orange
+                            : isSelected ? .secondary : .secondary,
+                        enabled: !isConnecting && !isConnected,
                     ) {
                         dismiss()
                         Task {
