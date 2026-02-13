@@ -37,7 +37,7 @@ actor KafkaService {
 
     // MARK: - Connection
 
-    func connect(config: ClusterConfig, password: String? = nil) throws {
+    func connect(config: ClusterConfig, password: String? = nil) async throws {
         disconnect()
 
         let conf = rd_kafka_conf_new()!
@@ -64,6 +64,24 @@ actor KafkaService {
         guard let kafkaHandle = rd_kafka_new(RD_KAFKA_CONSUMER, conf, errorChars, stringSize) else {
             let errorString = String(cString: errorChars)
             throw SwifkaError.connectionFailed(errorString)
+        }
+
+        // Verify broker is reachable before accepting the connection
+        let h = SendableHandle(pointer: kafkaHandle)
+        let timeout = Constants.kafkaTimeout
+        do {
+            try await Self.offload {
+                var metadataPtr: UnsafePointer<rd_kafka_metadata_t>?
+                let result = rd_kafka_metadata(h.pointer, 0, nil, &metadataPtr, timeout)
+                if let metadataPtr { rd_kafka_metadata_destroy(metadataPtr) }
+                guard result == RD_KAFKA_RESP_ERR_NO_ERROR else {
+                    let errStr = String(cString: rd_kafka_err2str(result))
+                    throw SwifkaError.connectionFailed(errStr)
+                }
+            }
+        } catch {
+            rd_kafka_destroy(kafkaHandle)
+            throw error
         }
 
         handle = kafkaHandle

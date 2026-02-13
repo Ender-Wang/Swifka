@@ -171,6 +171,7 @@ final class AppState {
             expandedTopics.formIntersection(currentNames)
         } catch {
             guard connectionStatus.isConnected else { isLoading = false; return }
+            connectionStatus = .error(error.localizedDescription)
             lastError = error.localizedDescription
         }
 
