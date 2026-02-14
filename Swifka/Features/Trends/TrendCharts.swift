@@ -589,7 +589,8 @@ struct TopicLagChart: View {
 
     @ViewBuilder
     private func topicLagTooltip(_ date: Date) -> some View {
-        let active = selectedTopics.filter { store.knownLagTopics.contains($0) }
+        let lagTopics = store.knownLagTopics.filter { !$0.hasPrefix("__") }
+        let active = selectedTopics.filter { lagTopics.contains($0) }
         let items: [GroupHoverItem] = active.compactMap { topic in
             let series = renderingMode.filterData(store.topicLagSeries(for: topic), by: \.timestamp)
             return nearest(series, to: date, by: \.timestamp).map { GroupHoverItem(id: topic, point: $0) }
@@ -598,7 +599,7 @@ struct TopicLagChart: View {
         if let first = items.first {
             ChartTooltip(date: first.point.timestamp) {
                 ForEach(items) { item in
-                    let colorIndex = selectedTopics.firstIndex(of: item.id) ?? 0
+                    let colorIndex = active.firstIndex(of: item.id) ?? 0
                     HStack(spacing: 4) {
                         Circle().fill(seriesColors[colorIndex % seriesColors.count]).frame(width: 8, height: 8)
                         Text("\(item.id): \(item.point.totalLag)")
@@ -681,8 +682,8 @@ struct TopicLagChart: View {
                         AxisGridLine()
                     }
                 }
-                .chartForegroundStyleScale(domain: selectedTopics, range: Array(seriesColors.prefix(max(selectedTopics.count, 1))))
-                .chartLegend(position: .top, alignment: .leading)
+                .chartForegroundStyleScale(domain: activeSeries, range: Array(seriesColors.prefix(max(activeSeries.count, 1))))
+                .chartLegend(.hidden)
                 .frame(height: 250)
 
                 switch renderingMode {
