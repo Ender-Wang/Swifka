@@ -24,6 +24,28 @@ extension TrendCard: View {
     }
 }
 
+// MARK: - Chip Toggle Style
+
+struct ChipToggleStyle: ToggleStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        Button {
+            configuration.isOn.toggle()
+        } label: {
+            configuration.label
+                .font(.caption)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(
+                    configuration.isOn ? AnyShapeStyle(.tint.opacity(0.15)) : AnyShapeStyle(.clear),
+                    in: Capsule(),
+                )
+                .foregroundStyle(configuration.isOn ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
+                .overlay(Capsule().strokeBorder(configuration.isOn ? AnyShapeStyle(.tint.opacity(0.4)) : AnyShapeStyle(.quaternary)))
+        }
+        .buttonStyle(.plain)
+    }
+}
+
 // MARK: - Cluster Throughput
 
 struct ClusterThroughputChart: View {
@@ -98,7 +120,7 @@ struct TopicThroughputChart: View {
     let store: MetricStore
     let l10n: L10n
     let timeDomain: ClosedRange<Date>
-    @Binding var selectedTopics: Set<String>
+    @Binding var selectedTopics: [String]
 
     /// Switch to log scale when selected topics span >20× difference in peak throughput.
     private var useLogScale: Bool {
@@ -124,18 +146,17 @@ struct TopicThroughputChart: View {
                         Toggle(topic, isOn: Binding(
                             get: { selectedTopics.contains(topic) },
                             set: { on in
-                                if on { selectedTopics.insert(topic) }
-                                else { selectedTopics.remove(topic) }
+                                if on { selectedTopics.append(topic) }
+                                else { selectedTopics.removeAll { $0 == topic } }
                             },
                         ))
-                        .toggleStyle(.button)
-                        .controlSize(.small)
+                        .toggleStyle(ChipToggleStyle())
                     }
                 }
             }
 
             let chart = Chart {
-                ForEach(Array(selectedTopics), id: \.self) { topic in
+                ForEach(selectedTopics, id: \.self) { topic in
                     let series = store.throughputSeries(for: topic)
                         .filter { timeDomain.contains($0.timestamp) }
                     ForEach(series) { point in
@@ -175,7 +196,7 @@ struct ConsumerGroupLagChart: View {
     let store: MetricStore
     let l10n: L10n
     let timeDomain: ClosedRange<Date>
-    @Binding var selectedGroups: Set<String>
+    @Binding var selectedGroups: [String]
 
     /// Switch to log scale when selected groups span >20× difference in peak lag.
     private var useLogScale: Bool {
@@ -209,18 +230,17 @@ struct ConsumerGroupLagChart: View {
                             Toggle(group, isOn: Binding(
                                 get: { selectedGroups.contains(group) },
                                 set: { on in
-                                    if on { selectedGroups.insert(group) }
-                                    else { selectedGroups.remove(group) }
+                                    if on { selectedGroups.append(group) }
+                                    else { selectedGroups.removeAll { $0 == group } }
                                 },
                             ))
-                            .toggleStyle(.button)
-                            .controlSize(.small)
+                            .toggleStyle(ChipToggleStyle())
                         }
                     }
                 }
 
                 let chart = Chart {
-                    ForEach(Array(selectedGroups), id: \.self) { group in
+                    ForEach(selectedGroups, id: \.self) { group in
                         let series = store.lagSeries(for: group)
                             .filter { timeDomain.contains($0.timestamp) }
                         ForEach(series) { point in

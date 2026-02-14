@@ -24,8 +24,8 @@ final class AppState {
 
     // MARK: - Trends (session-scoped)
 
-    var trendSelectedTopics: Set<String> = []
-    var trendSelectedGroups: Set<String> = []
+    var trendSelectedTopics: [String] = []
+    var trendSelectedGroups: [String] = []
     /// Per-session override for chart time window. nil = use chartTimeWindow setting.
     var trendTimeWindow: ChartTimeWindow?
 

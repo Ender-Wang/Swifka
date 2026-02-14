@@ -87,10 +87,10 @@ struct TrendsView: View {
                 if appState.trendSelectedTopics.isEmpty,
                    let first = store.knownTopics.first(where: { !$0.hasPrefix("__") })
                 {
-                    appState.trendSelectedTopics.insert(first)
+                    appState.trendSelectedTopics.append(first)
                 }
                 if appState.trendSelectedGroups.isEmpty, let first = store.knownGroups.first {
-                    appState.trendSelectedGroups.insert(first)
+                    appState.trendSelectedGroups.append(first)
                 }
             }
         }
