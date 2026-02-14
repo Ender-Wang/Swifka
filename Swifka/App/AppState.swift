@@ -24,6 +24,8 @@ final class AppState {
 
     // MARK: - Trends (session-scoped)
 
+    var trendsMode: TrendsMode = .live
+    let historyState = HistoryState()
     var trendSelectedTopics: [String] = []
     var trendSelectedGroups: [String] = []
     /// Per-session override for chart time window. nil = use chartTimeWindow setting.
@@ -177,6 +179,8 @@ final class AppState {
         consumerGroups = []
         consumerGroupLags = [:]
         expandedTopics = []
+        trendsMode = .live
+        historyState.store.clear()
         metricStore.clear()
         await kafkaService.disconnect()
         await pruneMetrics()

@@ -110,3 +110,23 @@ nonisolated struct ISRHealthPoint: Sendable, Identifiable {
         return hasher.finalize()
     }
 }
+
+// MARK: - Trends Mode
+
+nonisolated enum TrendsMode: String, CaseIterable, Identifiable, Sendable {
+    case live
+    case history
+
+    var id: String {
+        rawValue
+    }
+}
+
+// MARK: - Trend Rendering Mode
+
+nonisolated enum TrendRenderingMode: Sendable {
+    /// Live: fixed X domain, sliding window, no scrolling.
+    case live(timeDomain: ClosedRange<Date>)
+    /// History: scrollable chart, visible window of N seconds.
+    case history(visibleSeconds: TimeInterval)
+}

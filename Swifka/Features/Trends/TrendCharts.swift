@@ -46,34 +46,140 @@ struct ChipToggleStyle: ToggleStyle {
     }
 }
 
+// MARK: - Rendering Mode Helpers
+
+private extension TrendRenderingMode {
+    /// Filter data for live mode; return all data for history (chart handles scrolling).
+    func filterData<T>(_ data: [T], by timestamp: KeyPath<T, Date>) -> [T] {
+        switch self {
+        case let .live(timeDomain):
+            data.filter { timeDomain.contains($0[keyPath: timestamp]) }
+        case .history:
+            data
+        }
+    }
+}
+
+// MARK: - Hover Overlay
+
+/// Tooltip container with timestamp header.
+private struct ChartTooltip<Content: View>: View {
+    let date: Date
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(date, format: .dateTime.hour().minute().second())
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            content()
+        }
+        .padding(6)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 6))
+    }
+}
+
+private func nearest<T>(_ data: [T], to date: Date, by keyPath: KeyPath<T, Date>) -> T? {
+    data.min(by: { abs($0[keyPath: keyPath].timeIntervalSince(date)) < abs($1[keyPath: keyPath].timeIntervalSince(date)) })
+}
+
+private struct TopicHoverItem: Identifiable {
+    let id: String
+    let point: ThroughputPoint
+}
+
+private struct GroupHoverItem: Identifiable {
+    let id: String
+    let point: LagPoint
+}
+
+/// Color palette matching Swift Charts' default series colors.
+private let seriesColors: [Color] = [.blue, .green, .orange, .red, .purple, .pink, .yellow, .cyan, .mint, .indigo]
+
+/// Tracks mouse hover on the chart view and draws a rule line + tooltip
+/// via `.chartOverlay`. No marks are injected into the Chart content builder,
+/// so the chart's axis scales are never perturbed.
+private extension View {
+    func hoverOverlay(
+        hoverLocation: Binding<CGPoint?>,
+        @ViewBuilder tooltip: @escaping (Date) -> some View,
+    ) -> some View {
+        onContinuousHover { phase in
+            switch phase {
+            case let .active(location):
+                hoverLocation.wrappedValue = location
+            case .ended:
+                hoverLocation.wrappedValue = nil
+            }
+        }
+        .chartOverlay { proxy in
+            GeometryReader { geometry in
+                if let location = hoverLocation.wrappedValue,
+                   let frame = proxy.plotFrame
+                {
+                    let plotArea = geometry[frame]
+                    let plotX = location.x - plotArea.origin.x
+                    let plotY = location.y - plotArea.origin.y
+
+                    if plotX >= 0, plotX <= plotArea.width,
+                       plotY >= 0, plotY <= plotArea.height,
+                       let date: Date = proxy.value(atX: plotX, as: Date.self),
+                       let xPos = proxy.position(forX: date)
+                    {
+                        let screenX = plotArea.origin.x + xPos
+
+                        // Vertical rule line
+                        Rectangle()
+                            .fill(.secondary.opacity(0.3))
+                            .frame(width: 1, height: plotArea.height)
+                            .position(x: screenX, y: plotArea.midY)
+
+                        // Tooltip — offset left/right depending on cursor half
+                        let tooltipX = screenX > plotArea.midX
+                            ? max(screenX - 60, plotArea.minX + 40)
+                            : min(screenX + 60, plotArea.maxX - 40)
+
+                        tooltip(date)
+                            .fixedSize()
+                            .position(x: tooltipX, y: plotArea.minY + 24)
+                    }
+                }
+            }
+            .allowsHitTesting(false)
+        }
+    }
+}
+
 // MARK: - Cluster Throughput
 
 struct ClusterThroughputChart: View {
     let store: MetricStore
     let l10n: L10n
-    let timeDomain: ClosedRange<Date>
+    let renderingMode: TrendRenderingMode
+    @State private var hoverLocation: CGPoint?
 
     var body: some View {
-        let data = store.clusterThroughput.filter { timeDomain.contains($0.timestamp) }
+        let data = renderingMode.filterData(store.clusterThroughput, by: \.timestamp)
 
         TrendCard(title: l10n["trends.cluster.throughput"]) {
-            Chart(data) { point in
-                LineMark(
-                    x: .value("Time", point.timestamp),
-                    y: .value("msg/s", point.messagesPerSecond),
-                    series: .value("Segment", point.segment),
-                )
-                .interpolationMethod(.catmullRom)
+            let chart = Chart {
+                ForEach(data) { point in
+                    LineMark(
+                        x: .value("Time", point.timestamp),
+                        y: .value("msg/s", point.messagesPerSecond),
+                        series: .value("Segment", point.segment),
+                    )
+                    .interpolationMethod(.catmullRom)
 
-                AreaMark(
-                    x: .value("Time", point.timestamp),
-                    y: .value("msg/s", point.messagesPerSecond),
-                    series: .value("Segment", point.segment),
-                )
-                .foregroundStyle(.blue.opacity(0.1))
-                .interpolationMethod(.catmullRom)
+                    AreaMark(
+                        x: .value("Time", point.timestamp),
+                        y: .value("msg/s", point.messagesPerSecond),
+                        series: .value("Segment", point.segment),
+                    )
+                    .foregroundStyle(.blue.opacity(0.1))
+                    .interpolationMethod(.catmullRom)
+                }
             }
-            .chartXScale(domain: timeDomain)
             .chartYAxisLabel(l10n["trends.messages.per.second"])
             .chartXAxis {
                 AxisMarks(values: .automatic(desiredCount: 5)) {
@@ -82,6 +188,37 @@ struct ClusterThroughputChart: View {
                 }
             }
             .frame(height: 200)
+
+            switch renderingMode {
+            case let .live(timeDomain):
+                chart.chartXScale(domain: timeDomain)
+                    .hoverOverlay(hoverLocation: $hoverLocation) { date in
+                        if let p = nearest(data, to: date, by: \.timestamp) {
+                            ChartTooltip(date: p.timestamp) {
+                                HStack(spacing: 4) {
+                                    Circle().fill(.blue).frame(width: 8, height: 8)
+                                    Text(String(format: "%.1f msg/s", p.messagesPerSecond))
+                                        .font(.caption2).bold()
+                                }
+                            }
+                        }
+                    }
+            case let .history(visibleSeconds):
+                chart
+                    .chartScrollableAxes(.horizontal)
+                    .chartXVisibleDomain(length: visibleSeconds)
+                    .hoverOverlay(hoverLocation: $hoverLocation) { date in
+                        if let p = nearest(data, to: date, by: \.timestamp) {
+                            ChartTooltip(date: p.timestamp) {
+                                HStack(spacing: 4) {
+                                    Circle().fill(.blue).frame(width: 8, height: 8)
+                                    Text(String(format: "%.1f msg/s", p.messagesPerSecond))
+                                        .font(.caption2).bold()
+                                }
+                            }
+                        }
+                    }
+            }
         }
     }
 }
@@ -91,25 +228,63 @@ struct ClusterThroughputChart: View {
 struct PingLatencyChart: View {
     let store: MetricStore
     let l10n: L10n
-    let timeDomain: ClosedRange<Date>
+    let renderingMode: TrendRenderingMode
+    @State private var hoverLocation: CGPoint?
 
     var body: some View {
-        let data = store.pingHistory.filter { timeDomain.contains($0.timestamp) }
+        let data = renderingMode.filterData(store.pingHistory, by: \.timestamp)
 
         TrendCard(title: l10n["trends.ping.latency"]) {
-            Chart(data) { point in
-                LineMark(
-                    x: .value("Time", point.timestamp),
-                    y: .value("ms", point.ms),
-                    series: .value("Segment", point.segment),
-                )
-                .foregroundStyle(.green)
-                .interpolationMethod(.catmullRom)
+            let chart = Chart {
+                ForEach(data) { point in
+                    LineMark(
+                        x: .value("Time", point.timestamp),
+                        y: .value("ms", point.ms),
+                        series: .value("Segment", point.segment),
+                    )
+                    .foregroundStyle(.green)
+                    .interpolationMethod(.catmullRom)
+                }
             }
-            .chartXScale(domain: timeDomain)
             .chartYAxisLabel("ms")
-            .chartXAxis(.hidden)
+            .chartXAxis {
+                AxisMarks(values: .automatic(desiredCount: 5)) {
+                    AxisValueLabel(format: .dateTime.hour().minute().second())
+                    AxisGridLine()
+                }
+            }
             .frame(height: 200)
+
+            switch renderingMode {
+            case let .live(timeDomain):
+                chart.chartXScale(domain: timeDomain)
+                    .hoverOverlay(hoverLocation: $hoverLocation) { date in
+                        if let p = nearest(data, to: date, by: \.timestamp) {
+                            ChartTooltip(date: p.timestamp) {
+                                HStack(spacing: 4) {
+                                    Circle().fill(.green).frame(width: 8, height: 8)
+                                    Text("\(p.ms) ms")
+                                        .font(.caption2).bold()
+                                }
+                            }
+                        }
+                    }
+            case let .history(visibleSeconds):
+                chart
+                    .chartScrollableAxes(.horizontal)
+                    .chartXVisibleDomain(length: visibleSeconds)
+                    .hoverOverlay(hoverLocation: $hoverLocation) { date in
+                        if let p = nearest(data, to: date, by: \.timestamp) {
+                            ChartTooltip(date: p.timestamp) {
+                                HStack(spacing: 4) {
+                                    Circle().fill(.green).frame(width: 8, height: 8)
+                                    Text("\(p.ms) ms")
+                                        .font(.caption2).bold()
+                                }
+                            }
+                        }
+                    }
+            }
         }
     }
 }
@@ -119,8 +294,9 @@ struct PingLatencyChart: View {
 struct TopicThroughputChart: View {
     let store: MetricStore
     let l10n: L10n
-    let timeDomain: ClosedRange<Date>
+    let renderingMode: TrendRenderingMode
     @Binding var selectedTopics: [String]
+    @State private var hoverLocation: CGPoint?
 
     /// Switch to log scale when selected topics span >20× difference in peak throughput.
     private var useLogScale: Bool {
@@ -134,6 +310,27 @@ struct TopicThroughputChart: View {
         }
         guard let lo = peaks.min(), let hi = peaks.max(), lo > 0 else { return false }
         return hi / lo > 20
+    }
+
+    @ViewBuilder
+    private func topicTooltip(_ date: Date) -> some View {
+        let items: [TopicHoverItem] = selectedTopics.compactMap { topic in
+            let series = renderingMode.filterData(store.throughputSeries(for: topic), by: \.timestamp)
+            return nearest(series, to: date, by: \.timestamp).map { TopicHoverItem(id: topic, point: $0) }
+        }
+        .sorted { $0.point.messagesPerSecond > $1.point.messagesPerSecond }
+        if let first = items.first {
+            ChartTooltip(date: first.point.timestamp) {
+                ForEach(items) { item in
+                    let colorIndex = selectedTopics.firstIndex(of: item.id) ?? 0
+                    HStack(spacing: 4) {
+                        Circle().fill(seriesColors[colorIndex % seriesColors.count]).frame(width: 8, height: 8)
+                        Text(String(format: "%@: %.1f msg/s", item.id, item.point.messagesPerSecond))
+                            .font(.caption2)
+                    }
+                }
+            }
+        }
     }
 
     var body: some View {
@@ -175,8 +372,9 @@ struct TopicThroughputChart: View {
 
             let chart = Chart {
                 ForEach(selectedTopics, id: \.self) { topic in
-                    let series = store.throughputSeries(for: topic)
-                        .filter { timeDomain.contains($0.timestamp) }
+                    let series = renderingMode.filterData(
+                        store.throughputSeries(for: topic), by: \.timestamp,
+                    )
                     ForEach(series) { point in
                         LineMark(
                             x: .value("Time", point.timestamp),
@@ -188,7 +386,6 @@ struct TopicThroughputChart: View {
                     }
                 }
             }
-            .chartXScale(domain: timeDomain)
             .chartYAxisLabel(l10n["trends.messages.per.second"])
             .chartXAxis {
                 AxisMarks(values: .automatic(desiredCount: 5)) {
@@ -196,13 +393,30 @@ struct TopicThroughputChart: View {
                     AxisGridLine()
                 }
             }
+            .chartForegroundStyleScale(domain: selectedTopics, range: Array(seriesColors.prefix(max(selectedTopics.count, 1))))
             .chartLegend(position: .top, alignment: .leading)
             .frame(height: 250)
 
-            if logScale {
-                chart.chartYScale(type: .log)
-            } else {
-                chart
+            switch renderingMode {
+            case let .live(timeDomain):
+                if logScale {
+                    chart.chartXScale(domain: timeDomain).chartYScale(type: .log)
+                        .hoverOverlay(hoverLocation: $hoverLocation) { date in topicTooltip(date) }
+                } else {
+                    chart.chartXScale(domain: timeDomain)
+                        .hoverOverlay(hoverLocation: $hoverLocation) { date in topicTooltip(date) }
+                }
+            case let .history(visibleSeconds):
+                if logScale {
+                    chart.chartScrollableAxes(.horizontal)
+                        .chartXVisibleDomain(length: visibleSeconds)
+                        .chartYScale(type: .log)
+                        .hoverOverlay(hoverLocation: $hoverLocation) { date in topicTooltip(date) }
+                } else {
+                    chart.chartScrollableAxes(.horizontal)
+                        .chartXVisibleDomain(length: visibleSeconds)
+                        .hoverOverlay(hoverLocation: $hoverLocation) { date in topicTooltip(date) }
+                }
             }
         }
     }
@@ -213,8 +427,9 @@ struct TopicThroughputChart: View {
 struct ConsumerGroupLagChart: View {
     let store: MetricStore
     let l10n: L10n
-    let timeDomain: ClosedRange<Date>
+    let renderingMode: TrendRenderingMode
     @Binding var selectedGroups: [String]
+    @State private var hoverLocation: CGPoint?
 
     /// Switch to log scale when selected groups span >20× difference in peak lag.
     private var useLogScale: Bool {
@@ -228,6 +443,27 @@ struct ConsumerGroupLagChart: View {
         }
         guard let lo = peaks.min(), let hi = peaks.max(), lo > 0 else { return false }
         return hi / lo > 20
+    }
+
+    @ViewBuilder
+    private func groupTooltip(_ date: Date) -> some View {
+        let items: [GroupHoverItem] = selectedGroups.compactMap { group in
+            let series = renderingMode.filterData(store.lagSeries(for: group), by: \.timestamp)
+            return nearest(series, to: date, by: \.timestamp).map { GroupHoverItem(id: group, point: $0) }
+        }
+        .sorted { $0.point.totalLag > $1.point.totalLag }
+        if let first = items.first {
+            ChartTooltip(date: first.point.timestamp) {
+                ForEach(items) { item in
+                    let colorIndex = selectedGroups.firstIndex(of: item.id) ?? 0
+                    HStack(spacing: 4) {
+                        Circle().fill(seriesColors[colorIndex % seriesColors.count]).frame(width: 8, height: 8)
+                        Text("\(item.id): \(item.point.totalLag)")
+                            .font(.caption2)
+                    }
+                }
+            }
+        }
     }
 
     var body: some View {
@@ -276,8 +512,9 @@ struct ConsumerGroupLagChart: View {
 
                 let chart = Chart {
                     ForEach(selectedGroups, id: \.self) { group in
-                        let series = store.lagSeries(for: group)
-                            .filter { timeDomain.contains($0.timestamp) }
+                        let series = renderingMode.filterData(
+                            store.lagSeries(for: group), by: \.timestamp,
+                        )
                         ForEach(series) { point in
                             LineMark(
                                 x: .value("Time", point.timestamp),
@@ -289,7 +526,6 @@ struct ConsumerGroupLagChart: View {
                         }
                     }
                 }
-                .chartXScale(domain: timeDomain)
                 .chartYAxisLabel(l10n["trends.lag.messages"])
                 .chartXAxis {
                     AxisMarks(values: .automatic(desiredCount: 5)) {
@@ -297,13 +533,30 @@ struct ConsumerGroupLagChart: View {
                         AxisGridLine()
                     }
                 }
+                .chartForegroundStyleScale(domain: selectedGroups, range: Array(seriesColors.prefix(max(selectedGroups.count, 1))))
                 .chartLegend(position: .top, alignment: .leading)
                 .frame(height: 250)
 
-                if logScale {
-                    chart.chartYScale(type: .log)
-                } else {
-                    chart
+                switch renderingMode {
+                case let .live(timeDomain):
+                    if logScale {
+                        chart.chartXScale(domain: timeDomain).chartYScale(type: .log)
+                            .hoverOverlay(hoverLocation: $hoverLocation) { date in groupTooltip(date) }
+                    } else {
+                        chart.chartXScale(domain: timeDomain)
+                            .hoverOverlay(hoverLocation: $hoverLocation) { date in groupTooltip(date) }
+                    }
+                case let .history(visibleSeconds):
+                    if logScale {
+                        chart.chartScrollableAxes(.horizontal)
+                            .chartXVisibleDomain(length: visibleSeconds)
+                            .chartYScale(type: .log)
+                            .hoverOverlay(hoverLocation: $hoverLocation) { date in groupTooltip(date) }
+                    } else {
+                        chart.chartScrollableAxes(.horizontal)
+                            .chartXVisibleDomain(length: visibleSeconds)
+                            .hoverOverlay(hoverLocation: $hoverLocation) { date in groupTooltip(date) }
+                    }
                 }
             }
         }
@@ -315,30 +568,32 @@ struct ConsumerGroupLagChart: View {
 struct ISRHealthChart: View {
     let store: MetricStore
     let l10n: L10n
-    let timeDomain: ClosedRange<Date>
+    let renderingMode: TrendRenderingMode
+    @State private var hoverLocation: CGPoint?
 
     var body: some View {
-        let data = store.isrHealthSeries.filter { timeDomain.contains($0.timestamp) }
+        let data = renderingMode.filterData(store.isrHealthSeries, by: \.timestamp)
 
         TrendCard(title: l10n["trends.isr.health"]) {
-            Chart(data) { point in
-                AreaMark(
-                    x: .value("Time", point.timestamp),
-                    y: .value("Health", point.healthyRatio * 100),
-                    series: .value("Segment", point.segment),
-                )
-                .foregroundStyle(.green.opacity(0.2))
-                .interpolationMethod(.catmullRom)
+            let chart = Chart {
+                ForEach(data) { point in
+                    AreaMark(
+                        x: .value("Time", point.timestamp),
+                        y: .value("Health", point.healthyRatio * 100),
+                        series: .value("Segment", point.segment),
+                    )
+                    .foregroundStyle(.green.opacity(0.2))
+                    .interpolationMethod(.catmullRom)
 
-                LineMark(
-                    x: .value("Time", point.timestamp),
-                    y: .value("Health", point.healthyRatio * 100),
-                    series: .value("Segment", point.segment),
-                )
-                .foregroundStyle(.green)
-                .interpolationMethod(.catmullRom)
+                    LineMark(
+                        x: .value("Time", point.timestamp),
+                        y: .value("Health", point.healthyRatio * 100),
+                        series: .value("Segment", point.segment),
+                    )
+                    .foregroundStyle(.green)
+                    .interpolationMethod(.catmullRom)
+                }
             }
-            .chartXScale(domain: timeDomain)
             .chartYScale(domain: 0 ... 100)
             .chartYAxisLabel("%")
             .chartXAxis {
@@ -348,6 +603,37 @@ struct ISRHealthChart: View {
                 }
             }
             .frame(height: 150)
+
+            switch renderingMode {
+            case let .live(timeDomain):
+                chart.chartXScale(domain: timeDomain)
+                    .hoverOverlay(hoverLocation: $hoverLocation) { date in
+                        if let p = nearest(data, to: date, by: \.timestamp) {
+                            ChartTooltip(date: p.timestamp) {
+                                HStack(spacing: 4) {
+                                    Circle().fill(.green).frame(width: 8, height: 8)
+                                    Text(String(format: "%.1f%%", p.healthyRatio * 100))
+                                        .font(.caption2).bold()
+                                }
+                            }
+                        }
+                    }
+            case let .history(visibleSeconds):
+                chart
+                    .chartScrollableAxes(.horizontal)
+                    .chartXVisibleDomain(length: visibleSeconds)
+                    .hoverOverlay(hoverLocation: $hoverLocation) { date in
+                        if let p = nearest(data, to: date, by: \.timestamp) {
+                            ChartTooltip(date: p.timestamp) {
+                                HStack(spacing: 4) {
+                                    Circle().fill(.green).frame(width: 8, height: 8)
+                                    Text(String(format: "%.1f%%", p.healthyRatio * 100))
+                                        .font(.caption2).bold()
+                                }
+                            }
+                        }
+                    }
+            }
         }
     }
 }

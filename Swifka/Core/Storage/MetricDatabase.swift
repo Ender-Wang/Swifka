@@ -148,6 +148,67 @@ actor MetricDatabase {
         return results.reversed()
     }
 
+    // MARK: - Time-Range Query
+
+    func loadSnapshots(
+        clusterId: UUID,
+        from startDate: Date,
+        to endDate: Date,
+    ) throws -> [MetricSnapshot] {
+        let query = snapshots
+            .filter(colClusterId == clusterId.uuidString)
+            .filter(colTimestamp >= startDate.timeIntervalSince1970)
+            .filter(colTimestamp <= endDate.timeIntervalSince1970)
+            .order(colTimestamp.asc)
+
+        var results: [MetricSnapshot] = []
+        let decoder = JSONDecoder()
+
+        for row in try db.prepare(query) {
+            let watermarks = try decoder.decode(
+                [String: Int64].self,
+                from: row[colTopicWatermarks].data(using: .utf8)!,
+            )
+            let lags = try decoder.decode(
+                [String: Int64].self,
+                from: row[colConsumerGroupLags].data(using: .utf8)!,
+            )
+
+            results.append(MetricSnapshot(
+                id: UUID(uuidString: row[colId])!,
+                timestamp: Date(timeIntervalSince1970: row[colTimestamp]),
+                granularity: row[colGranularity],
+                topicWatermarks: watermarks,
+                consumerGroupLags: lags,
+                totalHighWatermark: row[colTotalHighWatermark],
+                totalLag: row[colTotalLag],
+                underReplicatedPartitions: Int(row[colUnderReplicatedPartitions]),
+                totalPartitions: Int(row[colTotalPartitions]),
+                brokerCount: Int(row[colBrokerCount]),
+                pingMs: row[colPingMs].map { Int($0) },
+            ))
+        }
+
+        return results
+    }
+
+    // MARK: - Timestamp Bounds
+
+    func timestampBounds(clusterId: UUID) throws -> (min: Date, max: Date)? {
+        let query = snapshots
+            .filter(colClusterId == clusterId.uuidString)
+            .select(colTimestamp.min, colTimestamp.max)
+
+        guard let row = try db.pluck(query) else { return nil }
+        guard let minTS = row[colTimestamp.min],
+              let maxTS = row[colTimestamp.max] else { return nil }
+
+        return (
+            min: Date(timeIntervalSince1970: minTS),
+            max: Date(timeIntervalSince1970: maxTS),
+        )
+    }
+
     // MARK: - Pruning
 
     @discardableResult
