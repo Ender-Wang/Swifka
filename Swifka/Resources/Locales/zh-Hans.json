@@ -57,6 +57,7 @@
   "trends.isr.health": "ISR 健康状态",
   "trends.messages.per.second": "条/秒",
   "trends.lag.messages": "条消息",
+  "trends.time.window": "时间窗口",
 
   "topics.title": "Topics",
   "topics.search": "搜索 Topic…",
@@ -142,6 +143,9 @@
   "settings.language.system": "跟随系统",
   "settings.language.en": "English",
   "settings.language.zh": "简体中文",
+
+  "settings.charts": "图表",
+  "settings.charts.time.window": "默认时间窗口",
 
   "settings.display": "显示",
   "settings.display.density": "行大小",

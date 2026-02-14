@@ -1,11 +1,38 @@
 import Foundation
 
+// MARK: - Chart Time Window
+
+nonisolated enum ChartTimeWindow: String, CaseIterable, Identifiable, Sendable {
+    case oneMinute = "1m"
+    case fiveMinutes = "5m"
+    case fifteenMinutes = "15m"
+    case thirtyMinutes = "30m"
+
+    var id: String {
+        rawValue
+    }
+
+    var seconds: TimeInterval {
+        switch self {
+        case .oneMinute: 60
+        case .fiveMinutes: 300
+        case .fifteenMinutes: 900
+        case .thirtyMinutes: 1800
+        }
+    }
+}
+
 // MARK: - Metric Snapshot
 
 /// A single point-in-time snapshot captured at the end of each refresh cycle.
 nonisolated struct MetricSnapshot: Sendable, Identifiable {
     let id: UUID
     let timestamp: Date
+
+    /// The polling interval (seconds) when this snapshot was recorded.
+    /// Auto-refresh: the interval setting (1, 3, 5, …). Manual: 0.
+    /// Used for gap detection — lines break when the actual time gap exceeds the expected granularity.
+    let granularity: TimeInterval
 
     /// Per-topic: sum of high watermarks across all partitions.
     let topicWatermarks: [String: Int64]

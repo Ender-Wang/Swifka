@@ -7,7 +7,6 @@ struct TrendsView: View {
         @Bindable var state = appState
         let l10n = appState.l10n
         let store = appState.metricStore
-
         if !appState.connectionStatus.isConnected {
             ContentUnavailableView(
                 l10n["trends.not.connected"],
@@ -21,33 +20,56 @@ struct TrendsView: View {
                 description: Text(l10n["trends.not.enough.data.description"]),
             )
         } else {
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 20) {
-                    // Row 1: Cluster throughput + Ping latency
-                    HStack(spacing: 16) {
-                        ClusterThroughputChart(store: store, l10n: l10n)
-                        PingLatencyChart(store: store, l10n: l10n)
-                            .frame(maxWidth: 300)
+            TimelineView(.periodic(from: .now, by: 1)) { timeline in
+                let now = timeline.date
+                let timeDomain = now.addingTimeInterval(-appState.effectiveTimeWindow.seconds) ... now
+
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 20) {
+                        // Time window picker
+                        HStack {
+                            Spacer()
+                            Picker(l10n["trends.time.window"], selection: Binding(
+                                get: { appState.effectiveTimeWindow },
+                                set: { appState.trendTimeWindow = $0 },
+                            )) {
+                                ForEach(ChartTimeWindow.allCases) { window in
+                                    Text(window.rawValue).tag(window)
+                                }
+                            }
+                            .pickerStyle(.segmented)
+                            .frame(maxWidth: 240)
+                        }
+
+                        // Row 1: Cluster throughput + Ping latency
+                        HStack(spacing: 16) {
+                            ClusterThroughputChart(store: store, l10n: l10n, timeDomain: timeDomain)
+                            PingLatencyChart(store: store, l10n: l10n, timeDomain: timeDomain)
+                                .frame(maxWidth: 300)
+                        }
+
+                        // Row 2: Per-topic throughput
+                        TopicThroughputChart(
+                            store: store,
+                            l10n: l10n,
+                            timeDomain: timeDomain,
+                            selectedTopics: $state.trendSelectedTopics,
+                        )
+
+                        // Row 3: Consumer group lag
+                        ConsumerGroupLagChart(
+                            store: store,
+                            l10n: l10n,
+                            timeDomain: timeDomain,
+                            selectedGroups: $state.trendSelectedGroups,
+                        )
+
+                        // Row 4: ISR health
+                        ISRHealthChart(store: store, l10n: l10n, timeDomain: timeDomain)
                     }
-
-                    // Row 2: Per-topic throughput
-                    TopicThroughputChart(
-                        store: store,
-                        l10n: l10n,
-                        selectedTopics: $state.trendSelectedTopics,
-                    )
-
-                    // Row 3: Consumer group lag
-                    ConsumerGroupLagChart(
-                        store: store,
-                        l10n: l10n,
-                        selectedGroups: $state.trendSelectedGroups,
-                    )
-
-                    // Row 4: ISR health
-                    ISRHealthChart(store: store, l10n: l10n)
+                    .padding()
                 }
-                .padding()
+                .transaction { $0.animation = nil }
             }
             .navigationTitle(l10n["trends.title"])
             .onAppear {

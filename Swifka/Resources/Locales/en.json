@@ -57,6 +57,7 @@
   "trends.isr.health": "ISR Health",
   "trends.messages.per.second": "msg/s",
   "trends.lag.messages": "messages",
+  "trends.time.window": "Time Window",
 
   "topics.title": "Topics",
   "topics.search": "Search topics…",
@@ -142,6 +143,9 @@
   "settings.language.system": "System",
   "settings.language.en": "English",
   "settings.language.zh": "简体中文",
+
+  "settings.charts": "Charts",
+  "settings.charts.time.window": "Default Time Window",
 
   "settings.display": "Display",
   "settings.display.density": "Row Size",

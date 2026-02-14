@@ -17,10 +17,10 @@ nonisolated enum Constants {
     static let keychainService = "io.github.ender-wang.Swifka"
 
     static let metricStoreCapacity = 300
-    static let metricDisplayLimit = 60
     static let metricsDatabaseFileName = "metrics.sqlite3"
 
-    /// Time gap threshold (seconds) between consecutive snapshots to break chart lines.
-    /// If two snapshots are more than 2 minutes apart, treat it as a discontinuity (e.g. app restart).
-    static let chartGapThreshold: TimeInterval = 120
+    /// Multiplier for gap detection: break chart lines when actual gap > granularity × this factor.
+    /// At 2×, a single slow refresh still connects; two missed refreshes cause a break.
+    /// When both points are manual (granularity=0), any positive gap > 0 → always breaks.
+    static let gapToleranceFactor: Double = 2.0
 }

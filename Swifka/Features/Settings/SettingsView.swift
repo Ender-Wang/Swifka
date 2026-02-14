@@ -58,6 +58,15 @@ struct SettingsView: View {
                 }
             }
 
+            // Charts
+            Section(l10n["settings.charts"]) {
+                Picker(l10n["settings.charts.time.window"], selection: $state.chartTimeWindow) {
+                    ForEach(ChartTimeWindow.allCases) { window in
+                        Text(window.rawValue).tag(window)
+                    }
+                }
+            }
+
             // Display
             Section(l10n["settings.display"]) {
                 Picker(l10n["settings.display.density"], selection: $state.rowDensity) {

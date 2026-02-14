@@ -22,10 +22,12 @@ final class AppState {
 
     var expandedTopics: Set<String> = []
 
-    // MARK: - Trends Selection (session-scoped)
+    // MARK: - Trends (session-scoped)
 
     var trendSelectedTopics: Set<String> = []
     var trendSelectedGroups: Set<String> = []
+    /// Per-session override for chart time window. nil = use chartTimeWindow setting.
+    var trendTimeWindow: ChartTimeWindow?
 
     // MARK: - Sort Orders (session-scoped, reset on app restart)
 
@@ -67,6 +69,17 @@ final class AppState {
         didSet {
             UserDefaults.standard.set(retentionPolicy.rawValue, forKey: "settings.retentionPolicy")
         }
+    }
+
+    var chartTimeWindow: ChartTimeWindow = .fiveMinutes {
+        didSet {
+            UserDefaults.standard.set(chartTimeWindow.rawValue, forKey: "settings.chartTimeWindow")
+        }
+    }
+
+    /// Effective chart time window: session override if set, else persisted setting.
+    var effectiveTimeWindow: ChartTimeWindow {
+        trendTimeWindow ?? chartTimeWindow
     }
 
     init(
@@ -111,6 +124,11 @@ final class AppState {
         {
             retentionPolicy = policy
         }
+        if let raw = UserDefaults.standard.string(forKey: "settings.chartTimeWindow"),
+           let window = ChartTimeWindow(rawValue: raw)
+        {
+            chartTimeWindow = window
+        }
         if let raw = UserDefaults.standard.string(forKey: "nav.sidebarItem"),
            let item = SidebarItem(rawValue: raw)
         {
@@ -142,6 +160,7 @@ final class AppState {
             connectionStatus = .connected
             await loadHistoricalMetrics(for: cluster.id)
             await refreshAll()
+            refreshManager.restart()
         } catch {
             connectionStatus = .error(error.localizedDescription)
             lastError = error.localizedDescription
@@ -302,9 +321,16 @@ final class AppState {
             topicWatermarks[topic.name] = total
         }
 
+        let granularity: TimeInterval = if case let .interval(seconds) = defaultRefreshMode {
+            TimeInterval(seconds)
+        } else {
+            0
+        }
+
         let snapshot = MetricSnapshot(
             id: UUID(),
             timestamp: Date(),
+            granularity: granularity,
             topicWatermarks: topicWatermarks,
             consumerGroupLags: consumerGroupLags,
             totalHighWatermark: topicWatermarks.values.reduce(0, +),

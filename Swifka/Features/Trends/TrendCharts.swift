@@ -3,10 +3,12 @@ import SwiftUI
 
 // MARK: - Shared Card Wrapper
 
-struct TrendCard<Content: View>: View {
+struct TrendCard<Content: View> {
     let title: String
     @ViewBuilder let content: () -> Content
+}
 
+extension TrendCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
@@ -27,9 +29,10 @@ struct TrendCard<Content: View>: View {
 struct ClusterThroughputChart: View {
     let store: MetricStore
     let l10n: L10n
+    let timeDomain: ClosedRange<Date>
 
     var body: some View {
-        let data = store.clusterThroughput
+        let data = store.clusterThroughput.filter { timeDomain.contains($0.timestamp) }
 
         TrendCard(title: l10n["trends.cluster.throughput"]) {
             Chart(data) { point in
@@ -48,6 +51,7 @@ struct ClusterThroughputChart: View {
                 .foregroundStyle(.blue.opacity(0.1))
                 .interpolationMethod(.catmullRom)
             }
+            .chartXScale(domain: timeDomain)
             .chartYAxisLabel(l10n["trends.messages.per.second"])
             .chartXAxis {
                 AxisMarks(values: .automatic(desiredCount: 5)) {
@@ -65,9 +69,10 @@ struct ClusterThroughputChart: View {
 struct PingLatencyChart: View {
     let store: MetricStore
     let l10n: L10n
+    let timeDomain: ClosedRange<Date>
 
     var body: some View {
-        let data = store.pingHistory
+        let data = store.pingHistory.filter { timeDomain.contains($0.timestamp) }
 
         TrendCard(title: l10n["trends.ping.latency"]) {
             Chart(data) { point in
@@ -79,6 +84,7 @@ struct PingLatencyChart: View {
                 .foregroundStyle(.green)
                 .interpolationMethod(.catmullRom)
             }
+            .chartXScale(domain: timeDomain)
             .chartYAxisLabel("ms")
             .chartXAxis(.hidden)
             .frame(height: 200)
@@ -91,10 +97,10 @@ struct PingLatencyChart: View {
 struct TopicThroughputChart: View {
     let store: MetricStore
     let l10n: L10n
+    let timeDomain: ClosedRange<Date>
     @Binding var selectedTopics: Set<String>
 
     /// Switch to log scale when selected topics span >20× difference in peak throughput.
-    /// At 20× ratio the smallest series gets ~12px on a 250px chart — below that, fluctuations are unreadable.
     private var useLogScale: Bool {
         guard selectedTopics.count > 1 else { return false }
         var peaks: [Double] = []
@@ -131,6 +137,7 @@ struct TopicThroughputChart: View {
             let chart = Chart {
                 ForEach(Array(selectedTopics), id: \.self) { topic in
                     let series = store.throughputSeries(for: topic)
+                        .filter { timeDomain.contains($0.timestamp) }
                     ForEach(series) { point in
                         LineMark(
                             x: .value("Time", point.timestamp),
@@ -142,6 +149,7 @@ struct TopicThroughputChart: View {
                     }
                 }
             }
+            .chartXScale(domain: timeDomain)
             .chartYAxisLabel(l10n["trends.messages.per.second"])
             .chartXAxis {
                 AxisMarks(values: .automatic(desiredCount: 5)) {
@@ -166,10 +174,10 @@ struct TopicThroughputChart: View {
 struct ConsumerGroupLagChart: View {
     let store: MetricStore
     let l10n: L10n
+    let timeDomain: ClosedRange<Date>
     @Binding var selectedGroups: Set<String>
 
     /// Switch to log scale when selected groups span >20× difference in peak lag.
-    /// At 20× ratio the smallest series gets ~12px on a 250px chart — below that, fluctuations are unreadable.
     private var useLogScale: Bool {
         guard selectedGroups.count > 1 else { return false }
         var peaks: [Double] = []
@@ -214,6 +222,7 @@ struct ConsumerGroupLagChart: View {
                 let chart = Chart {
                     ForEach(Array(selectedGroups), id: \.self) { group in
                         let series = store.lagSeries(for: group)
+                            .filter { timeDomain.contains($0.timestamp) }
                         ForEach(series) { point in
                             LineMark(
                                 x: .value("Time", point.timestamp),
@@ -225,6 +234,7 @@ struct ConsumerGroupLagChart: View {
                         }
                     }
                 }
+                .chartXScale(domain: timeDomain)
                 .chartYAxisLabel(l10n["trends.lag.messages"])
                 .chartXAxis {
                     AxisMarks(values: .automatic(desiredCount: 5)) {
@@ -250,9 +260,10 @@ struct ConsumerGroupLagChart: View {
 struct ISRHealthChart: View {
     let store: MetricStore
     let l10n: L10n
+    let timeDomain: ClosedRange<Date>
 
     var body: some View {
-        let data = store.isrHealthSeries
+        let data = store.isrHealthSeries.filter { timeDomain.contains($0.timestamp) }
 
         TrendCard(title: l10n["trends.isr.health"]) {
             Chart(data) { point in
@@ -272,6 +283,7 @@ struct ISRHealthChart: View {
                 .foregroundStyle(.green)
                 .interpolationMethod(.catmullRom)
             }
+            .chartXScale(domain: timeDomain)
             .chartYScale(domain: 0 ... 100)
             .chartYAxisLabel("%")
             .chartXAxis {

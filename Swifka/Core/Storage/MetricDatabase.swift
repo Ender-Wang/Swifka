@@ -18,6 +18,7 @@ actor MetricDatabase {
     private let colTotalPartitions = SQLite.Expression<Int64>("total_partitions")
     private let colBrokerCount = SQLite.Expression<Int64>("broker_count")
     private let colPingMs = SQLite.Expression<Int64?>("ping_ms")
+    private let colGranularity = SQLite.Expression<Double>("granularity")
 
     // MARK: - Init
 
@@ -51,6 +52,7 @@ actor MetricDatabase {
         let colTotalPartitions = SQLite.Expression<Int64>("total_partitions")
         let colBrokerCount = SQLite.Expression<Int64>("broker_count")
         let colPingMs = SQLite.Expression<Int64?>("ping_ms")
+        let colGranularity = SQLite.Expression<Double>("granularity")
 
         try conn.run(table.create(ifNotExists: true) { t in
             t.column(colId, primaryKey: true)
@@ -64,6 +66,7 @@ actor MetricDatabase {
             t.column(colTotalPartitions)
             t.column(colBrokerCount)
             t.column(colPingMs)
+            t.column(colGranularity)
         })
 
         try conn.run(table.createIndex(
@@ -98,6 +101,7 @@ actor MetricDatabase {
             colTotalPartitions <- Int64(snapshot.totalPartitions),
             colBrokerCount <- Int64(snapshot.brokerCount),
             colPingMs <- snapshot.pingMs.map { Int64($0) },
+            colGranularity <- snapshot.granularity,
         ))
     }
 
@@ -128,6 +132,7 @@ actor MetricDatabase {
             results.append(MetricSnapshot(
                 id: UUID(uuidString: row[colId])!,
                 timestamp: Date(timeIntervalSince1970: row[colTimestamp]),
+                granularity: row[colGranularity],
                 topicWatermarks: watermarks,
                 consumerGroupLags: lags,
                 totalHighWatermark: row[colTotalHighWatermark],
