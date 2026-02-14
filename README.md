@@ -77,7 +77,8 @@ Or download the latest `.dmg` from [Releases](https://github.com/Ender-Wang/Swif
 📊 **Features**
 
 - [x] Cluster health overview with production/consumption throughput
-- [ ] Per-topic lag ranking and total lag display
+- [x] Per-topic lag ranking and total lag display
+- [x] Per-partition lag breakdown in consumer group detail panel
 - [x] Swift Charts — lag trends, throughput trends, partition distribution
 
 🔧 **Enhancements**
