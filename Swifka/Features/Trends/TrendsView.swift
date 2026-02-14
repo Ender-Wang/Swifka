@@ -19,12 +19,17 @@ struct TrendsView: View {
                 systemImage: "chart.xyaxis.line",
                 description: Text(l10n["trends.not.enough.data.description"]),
             )
+        } else if !appState.refreshManager.isAutoRefresh {
+            ContentUnavailableView(
+                l10n["trends.manual.mode"],
+                systemImage: "chart.xyaxis.line",
+                description: Text(l10n["trends.manual.mode.description"]),
+            )
         } else {
-            let isAutoRefresh = appState.refreshManager.isAutoRefresh
             let tickInterval: TimeInterval = if case let .interval(seconds) = appState.refreshManager.mode {
                 TimeInterval(seconds)
             } else {
-                86400 // manual: effectively never tick
+                1
             }
             TimelineView(.periodic(from: .now, by: tickInterval)) { timeline in
                 let now = timeline.date
@@ -77,9 +82,6 @@ struct TrendsView: View {
                 }
                 .transaction { $0.animation = nil }
             }
-            // Manual mode: new data → pingHistory.count changes → id changes → TimelineView
-            // recreates with fresh Date(). Auto-refresh: id is stable (0), ticks normally.
-            .id(isAutoRefresh ? 0 : store.pingHistory.count)
             .navigationTitle(l10n["trends.title"])
             .onAppear {
                 if appState.trendSelectedTopics.isEmpty,

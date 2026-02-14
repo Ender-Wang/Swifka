@@ -50,6 +50,8 @@
   "trends.not.connected.description": "Connect to a cluster to view trends.",
   "trends.not.enough.data": "Collecting Data…",
   "trends.not.enough.data.description": "Trends will appear after at least two refresh cycles.",
+  "trends.manual.mode": "Manual Refresh Mode",
+  "trends.manual.mode.description": "Live charts require auto-refresh. Switch to an auto-refresh interval in Settings to enable live trends.",
   "trends.cluster.throughput": "Cluster Throughput",
   "trends.topic.throughput": "Topic Throughput",
   "trends.consumer.lag": "Consumer Group Lag",
