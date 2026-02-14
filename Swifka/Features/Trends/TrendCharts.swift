@@ -140,9 +140,12 @@ struct TopicThroughputChart: View {
         let logScale = useLogScale
 
         TrendCard(title: l10n["trends.topic.throughput"]) {
+            let userTopics = store.knownTopics.filter { !$0.hasPrefix("__") }
+            let allSelected = userTopics.allSatisfy { selectedTopics.contains($0) }
+
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
-                    ForEach(store.knownTopics.filter { !$0.hasPrefix("__") }, id: \.self) { topic in
+                    ForEach(userTopics, id: \.self) { topic in
                         Toggle(topic, isOn: Binding(
                             get: { selectedTopics.contains(topic) },
                             set: { on in
@@ -152,6 +155,21 @@ struct TopicThroughputChart: View {
                         ))
                         .toggleStyle(ChipToggleStyle())
                     }
+
+                    Divider().frame(height: 16)
+
+                    Button {
+                        if allSelected {
+                            selectedTopics.removeAll()
+                        } else {
+                            selectedTopics = userTopics
+                        }
+                    } label: {
+                        Image(systemName: allSelected ? "checklist.unchecked" : "checklist.checked")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
 
@@ -224,6 +242,8 @@ struct ConsumerGroupLagChart: View {
                 }
                 .frame(height: 200)
             } else {
+                let allGroupsSelected = store.knownGroups.allSatisfy { selectedGroups.contains($0) }
+
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 6) {
                         ForEach(store.knownGroups, id: \.self) { group in
@@ -236,6 +256,21 @@ struct ConsumerGroupLagChart: View {
                             ))
                             .toggleStyle(ChipToggleStyle())
                         }
+
+                        Divider().frame(height: 16)
+
+                        Button {
+                            if allGroupsSelected {
+                                selectedGroups.removeAll()
+                            } else {
+                                selectedGroups = store.knownGroups
+                            }
+                        } label: {
+                            Image(systemName: allGroupsSelected ? "checklist.unchecked" : "checklist.checked")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
 
