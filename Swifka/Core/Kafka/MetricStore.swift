@@ -91,13 +91,9 @@ final class MetricStore {
                 let prevG = snapshots[i - 1].granularity
                 let currG = snapshots[i].granularity
 
-                // Use the earlier point's granularity if auto-refresh, else the later's.
+                // Use the larger granularity so interval changes don't cause spurious breaks.
                 // If both are manual (0), any positive gap > 0 × 2 = 0 → always breaks.
-                let effectiveGranularity: TimeInterval = if prevG > 0 {
-                    prevG
-                } else {
-                    currG
-                }
+                let effectiveGranularity = max(prevG, currG)
 
                 if gap > effectiveGranularity * Constants.gapToleranceFactor {
                     currentSegment += 1

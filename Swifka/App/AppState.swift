@@ -321,7 +321,7 @@ final class AppState {
             topicWatermarks[topic.name] = total
         }
 
-        let granularity: TimeInterval = if case let .interval(seconds) = defaultRefreshMode {
+        let granularity: TimeInterval = if case let .interval(seconds) = refreshManager.mode {
             TimeInterval(seconds)
         } else {
             0
