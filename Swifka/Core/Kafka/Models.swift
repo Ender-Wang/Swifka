@@ -219,6 +219,19 @@ nonisolated struct GroupMemberInfo: Identifiable, Hashable, Sendable {
     let clientHost: String
 }
 
+/// Per-partition lag for a single consumer group.
+nonisolated struct PartitionLag: Identifiable, Sendable {
+    let topic: String
+    let partition: Int32
+    let committedOffset: Int64
+    let highWatermark: Int64
+    let lag: Int64
+
+    var id: String {
+        "\(topic)-\(partition)"
+    }
+}
+
 // MARK: - Settings
 
 nonisolated enum OperationLevel: String, Codable, CaseIterable, Identifiable, Sendable {

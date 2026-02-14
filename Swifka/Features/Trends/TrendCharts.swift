@@ -683,7 +683,7 @@ struct TopicLagChart: View {
                     }
                 }
                 .chartForegroundStyleScale(domain: activeSeries, range: Array(seriesColors.prefix(max(activeSeries.count, 1))))
-                .chartLegend(.hidden)
+                .chartLegend(position: .top, alignment: .leading)
                 .frame(height: 250)
 
                 switch renderingMode {

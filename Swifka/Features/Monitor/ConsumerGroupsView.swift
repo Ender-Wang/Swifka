@@ -115,6 +115,12 @@ struct GroupDetailView: View {
     let group: ConsumerGroupInfo
     var onDismiss: () -> Void = {}
     @State private var nameCopied = false
+    @State private var selectedTab: GroupDetailTab = .members
+
+    private enum GroupDetailTab: String, CaseIterable {
+        case members
+        case partitionLag
+    }
 
     var body: some View {
         let l10n = appState.l10n
@@ -148,30 +154,122 @@ struct GroupDetailView: View {
 
             Divider()
 
-            if group.members.isEmpty {
-                ContentUnavailableView(
-                    "No Members",
-                    systemImage: "person.slash",
-                    description: Text("This consumer group has no active members."),
-                )
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-            } else {
-                Text("\(group.members.count) " + l10n["groups.members"])
-                    .font(.headline)
-                    .padding(.horizontal)
-                    .padding(.top, 8)
-                    .padding(.bottom, 4)
+            Picker("", selection: $selectedTab) {
+                Text(l10n["groups.tab.members"]).tag(GroupDetailTab.members)
+                Text(l10n["groups.tab.partition.lag"]).tag(GroupDetailTab.partitionLag)
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal)
+            .padding(.vertical, 8)
 
-                List(group.members) { member in
-                    VStack(alignment: .leading, spacing: 6) {
-                        DetailRow(label: l10n["groups.member.client.id"], value: member.clientId)
-                        DetailRow(label: l10n["groups.member.id"], value: member.memberId)
-                        DetailRow(label: l10n["groups.member.host"], value: member.clientHost)
-                    }
-                    .padding(.vertical, 4)
-                }
-                .listStyle(.plain)
+            switch selectedTab {
+            case .members:
+                membersTab(l10n: l10n)
+            case .partitionLag:
+                partitionLagTab(l10n: l10n)
             }
         }
+    }
+
+    @ViewBuilder
+    private func membersTab(l10n: L10n) -> some View {
+        if group.members.isEmpty {
+            ContentUnavailableView(
+                l10n["groups.no.members"],
+                systemImage: "person.slash",
+                description: Text(l10n["groups.no.members.description"]),
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+        } else {
+            Text("\(group.members.count) " + l10n["groups.members"])
+                .font(.headline)
+                .padding(.horizontal)
+                .padding(.bottom, 4)
+
+            List(group.members) { member in
+                VStack(alignment: .leading, spacing: 6) {
+                    DetailRow(label: l10n["groups.member.client.id"], value: member.clientId)
+                    DetailRow(label: l10n["groups.member.id"], value: member.memberId)
+                    DetailRow(label: l10n["groups.member.host"], value: member.clientHost)
+                }
+                .padding(.vertical, 4)
+            }
+            .listStyle(.plain)
+        }
+    }
+
+    @ViewBuilder
+    private func partitionLagTab(l10n: L10n) -> some View {
+        let partitions = appState.partitionLags[group.name] ?? []
+        if partitions.isEmpty {
+            ContentUnavailableView(
+                l10n["groups.no.partition.lag"],
+                systemImage: "chart.bar",
+                description: Text(l10n["groups.no.partition.lag.description"]),
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+        } else {
+            let byTopic = Dictionary(grouping: partitions, by: \.topic)
+                .sorted { $0.key < $1.key }
+
+            List {
+                ForEach(byTopic, id: \.key) { topic, topicPartitions in
+                    let topicLag = topicPartitions.reduce(0) { $0 + $1.lag }
+                    DisclosureGroup {
+                        ForEach(topicPartitions.sorted(by: { $0.partition < $1.partition })) { p in
+                            HStack {
+                                Text("P\(p.partition)")
+                                    .font(.caption.monospaced())
+                                    .foregroundStyle(.secondary)
+                                    .frame(width: 30, alignment: .leading)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    HStack(spacing: 4) {
+                                        Text(l10n["groups.partition.committed"])
+                                            .font(.caption2)
+                                            .foregroundStyle(.tertiary)
+                                        Text("\(p.committedOffset)")
+                                            .font(.caption.monospaced())
+                                    }
+                                    HStack(spacing: 4) {
+                                        Text(l10n["groups.partition.watermark"])
+                                            .font(.caption2)
+                                            .foregroundStyle(.tertiary)
+                                        Text("\(p.highWatermark)")
+                                            .font(.caption.monospaced())
+                                    }
+                                }
+                                Spacer()
+                                Text(formatLag(p.lag))
+                                    .font(.caption.monospaced().bold())
+                                    .foregroundStyle(lagColor(p.lag))
+                            }
+                            .padding(.vertical, 2)
+                        }
+                    } label: {
+                        HStack {
+                            Text(topic)
+                                .fontWeight(.medium)
+                            Spacer()
+                            Text(formatLag(topicLag))
+                                .font(.caption.monospaced())
+                                .foregroundStyle(lagColor(topicLag))
+                        }
+                    }
+                }
+            }
+            .listStyle(.plain)
+        }
+    }
+
+    private func formatLag(_ lag: Int64) -> String {
+        if lag >= 1_000_000 { return String(format: "%.1fM", Double(lag) / 1_000_000) }
+        if lag >= 1000 { return String(format: "%.1fK", Double(lag) / 1000) }
+        return "\(lag)"
+    }
+
+    private func lagColor(_ lag: Int64) -> Color {
+        if lag == 0 { return .secondary }
+        if lag > 10000 { return .red }
+        return .orange
     }
 }

@@ -15,6 +15,8 @@ final class AppState {
     var consumerGroups: [ConsumerGroupInfo] = []
     var consumerGroupLags: [String: Int64] = [:]
     var topicLags: [String: Int64] = [:]
+    /// Per-partition lag breakdown for each consumer group (group name → partitions).
+    var partitionLags: [String: [PartitionLag]] = [:]
     var selectedSidebarItem: SidebarItem? = .dashboard {
         didSet {
             UserDefaults.standard.set(selectedSidebarItem?.rawValue, forKey: "nav.sidebarItem")
@@ -180,6 +182,7 @@ final class AppState {
         consumerGroups = []
         consumerGroupLags = [:]
         topicLags = [:]
+        partitionLags = [:]
         expandedTopics = []
         trendsMode = .live
         historyState.store.clear()
@@ -290,6 +293,7 @@ final class AppState {
 
         var lags: [String: Int64] = [:]
         var allTopicLags: [String: Int64] = [:]
+        var allPartitionLags: [String: [PartitionLag]] = [:]
         for group in consumerGroups {
             guard connectionStatus.isConnected else { break }
             guard let offsets = try? await kafkaService.fetchCommittedOffsets(
@@ -297,6 +301,7 @@ final class AppState {
             ) else { continue }
 
             var groupLag: Int64 = 0
+            var groupPartitions: [PartitionLag] = []
             for (topic, partition, committedOffset) in offsets {
                 if let topicInfo = topics.first(where: { $0.name == topic }),
                    let partInfo = topicInfo.partitions.first(where: { $0.partitionId == partition }),
@@ -305,12 +310,21 @@ final class AppState {
                     let lag = max(0, highWatermark - committedOffset)
                     groupLag += lag
                     allTopicLags[topic, default: 0] += lag
+                    groupPartitions.append(PartitionLag(
+                        topic: topic,
+                        partition: partition,
+                        committedOffset: committedOffset,
+                        highWatermark: highWatermark,
+                        lag: lag,
+                    ))
                 }
             }
             lags[group.name] = groupLag
+            allPartitionLags[group.name] = groupPartitions
         }
         consumerGroupLags = lags
         topicLags = allTopicLags
+        partitionLags = allPartitionLags
     }
 
     // MARK: - Metrics
