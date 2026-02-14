@@ -60,6 +60,7 @@ struct ContentView: View {
                             Task { await appState.refreshAll() }
                         }
                         .keyboardShortcut("r")
+                        .disabled(appState.refreshManager.isAutoRefresh)
 
                         Divider()
 
