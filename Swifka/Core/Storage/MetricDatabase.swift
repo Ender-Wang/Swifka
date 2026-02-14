@@ -20,6 +20,7 @@ actor MetricDatabase {
     private let colPingMs = SQLite.Expression<Int64?>("ping_ms")
     private let colGranularity = SQLite.Expression<Double>("granularity")
     private let colTopicLags = SQLite.Expression<String>("topic_lags")
+    private let colPartitionLagDetail = SQLite.Expression<String>("partition_lag_detail")
 
     // MARK: - Init
 
@@ -80,6 +81,11 @@ actor MetricDatabase {
             SQLite.Expression<String>("topic_lags"), defaultValue: "{}",
         ))
 
+        // Migration: add partition_lag_detail column
+        try? conn.run(table.addColumn(
+            SQLite.Expression<String>("partition_lag_detail"), defaultValue: "{}",
+        ))
+
         return conn
     }
 
@@ -98,6 +104,10 @@ actor MetricDatabase {
             data: JSONEncoder().encode(snapshot.topicLags),
             encoding: .utf8,
         )!
+        let partitionLagDetailJSON = try String(
+            data: JSONEncoder().encode(snapshot.partitionLagDetail),
+            encoding: .utf8,
+        )!
 
         try db.run(snapshots.insert(
             colId <- snapshot.id.uuidString,
@@ -106,6 +116,7 @@ actor MetricDatabase {
             colTopicWatermarks <- watermarksJSON,
             colConsumerGroupLags <- lagsJSON,
             colTopicLags <- topicLagsJSON,
+            colPartitionLagDetail <- partitionLagDetailJSON,
             colTotalHighWatermark <- snapshot.totalHighWatermark,
             colTotalLag <- snapshot.totalLag,
             colUnderReplicatedPartitions <- Int64(snapshot.underReplicatedPartitions),
@@ -176,6 +187,10 @@ actor MetricDatabase {
             [String: Int64].self,
             from: row[colTopicLags].data(using: .utf8)!,
         )
+        let partitionLagDetail = try decoder.decode(
+            [String: Int64].self,
+            from: row[colPartitionLagDetail].data(using: .utf8)!,
+        )
 
         return MetricSnapshot(
             id: UUID(uuidString: row[colId])!,
@@ -184,6 +199,7 @@ actor MetricDatabase {
             topicWatermarks: watermarks,
             consumerGroupLags: lags,
             topicLags: topicLags,
+            partitionLagDetail: partitionLagDetail,
             totalHighWatermark: row[colTotalHighWatermark],
             totalLag: row[colTotalLag],
             underReplicatedPartitions: Int(row[colUnderReplicatedPartitions]),

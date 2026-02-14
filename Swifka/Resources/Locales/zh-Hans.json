@@ -56,6 +56,8 @@
   "trends.topic.throughput": "Topic 吞吐量",
   "trends.consumer.lag": "消费者组延迟",
   "trends.topic.lag": "Topic 延迟",
+  "trends.partition.lag": "分区延迟",
+  "trends.partition.lag.select": "选择一个 Topic 以查看分区延迟。",
   "trends.ping.latency": "Ping 延迟",
   "trends.isr.health": "ISR 健康状态",
   "trends.messages.per.second": "条/秒",

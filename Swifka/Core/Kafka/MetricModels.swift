@@ -43,6 +43,9 @@ nonisolated struct MetricSnapshot: Sendable, Identifiable {
     /// Per-topic: sum of consumer lag across all groups for each topic.
     let topicLags: [String: Int64]
 
+    /// Per-partition lag aggregated across all groups. Key = "topic:partition", value = lag.
+    let partitionLagDetail: [String: Int64]
+
     /// Cluster-wide aggregates.
     let totalHighWatermark: Int64
     let totalLag: Int64

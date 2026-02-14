@@ -30,6 +30,11 @@ final class MetricStore {
     private var topicLagCache: [String: [LagPoint]] = [:]
     private(set) var knownLagTopics: [String] = []
 
+    /// Per-partition lag cache. Key = "topic:partition", value = [LagPoint].
+    private var partitionLagCache: [String: [LagPoint]] = [:]
+    /// All known partition keys, grouped by topic. Key = topic, value = sorted ["topic:0", "topic:1", ...].
+    private(set) var knownPartitionsByTopic: [String: [String]] = [:]
+
     init(capacity: Int = Constants.metricStoreCapacity) {
         self.capacity = capacity
     }
@@ -73,6 +78,10 @@ final class MetricStore {
 
     func topicLagSeries(for topic: String) -> [LagPoint] {
         topicLagCache[topic] ?? []
+    }
+
+    func partitionLagSeries(for key: String) -> [LagPoint] {
+        partitionLagCache[key] ?? []
     }
 
     // MARK: - Granularity
@@ -153,6 +162,36 @@ final class MetricStore {
             }
         }
         topicLagCache = newTopicLagCache
+
+        // Per-partition lag (absolute values, keyed as "topic:partition")
+        var allPartitionKeys = Set<String>()
+        for snap in snapshots {
+            allPartitionKeys.formUnion(snap.partitionLagDetail.keys)
+        }
+        var newPartitionLagCache: [String: [LagPoint]] = [:]
+        for key in allPartitionKeys {
+            newPartitionLagCache[key] = zip(segments, snapshots).compactMap { seg, snap in
+                guard let lag = snap.partitionLagDetail[key] else { return nil }
+                return LagPoint(timestamp: snap.timestamp, group: key, totalLag: lag, segment: seg)
+            }
+        }
+        partitionLagCache = newPartitionLagCache
+        // Group partition keys by topic
+        var byTopic: [String: [String]] = [:]
+        for key in allPartitionKeys {
+            if let colonIdx = key.lastIndex(of: ":") {
+                let topic = String(key[key.startIndex ..< colonIdx])
+                byTopic[topic, default: []].append(key)
+            }
+        }
+        for topic in byTopic.keys {
+            byTopic[topic]?.sort { a, b in
+                let aP = Int32(a.suffix(from: a.index(after: a.lastIndex(of: ":")!))) ?? 0
+                let bP = Int32(b.suffix(from: b.index(after: b.lastIndex(of: ":")!))) ?? 0
+                return aP < bP
+            }
+        }
+        knownPartitionsByTopic = byTopic
 
         guard snapshots.count >= 2 else {
             clusterThroughput = []

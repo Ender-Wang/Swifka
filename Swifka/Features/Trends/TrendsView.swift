@@ -274,7 +274,15 @@ struct TrendsView: View {
             selectedTopics: selectedTopics,
         )
 
-        // Row 5: ISR health
+        // Row 5: Per-partition lag
+        PartitionLagChart(
+            store: store,
+            l10n: l10n,
+            renderingMode: renderingMode,
+            selectedTopics: selectedTopics,
+        )
+
+        // Row 6: ISR health
         ISRHealthChart(store: store, l10n: l10n, renderingMode: renderingMode)
     }
 

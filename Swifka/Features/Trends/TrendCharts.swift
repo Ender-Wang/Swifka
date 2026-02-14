@@ -712,6 +712,163 @@ struct TopicLagChart: View {
     }
 }
 
+// MARK: - Per-Partition Lag
+
+struct PartitionLagChart: View {
+    let store: MetricStore
+    let l10n: L10n
+    let renderingMode: TrendRenderingMode
+    @Binding var selectedTopics: [String]
+    @State private var hoverLocation: CGPoint?
+
+    @ViewBuilder
+    private func partitionTooltip(_ date: Date, topic _: String, partitionKeys: [String]) -> some View {
+        let items: [(key: String, label: String, point: LagPoint)] = partitionKeys.compactMap { key in
+            let series = renderingMode.filterData(store.partitionLagSeries(for: key), by: \.timestamp)
+            guard let point = nearest(series, to: date, by: \.timestamp) else { return nil }
+            let label = "P" + (key.split(separator: ":").last.map(String.init) ?? key)
+            return (key: key, label: label, point: point)
+        }
+        .sorted { $0.point.totalLag > $1.point.totalLag }
+        if let first = items.first {
+            ChartTooltip(date: first.point.timestamp) {
+                ForEach(items, id: \.key) { item in
+                    let colorIndex = partitionKeys.firstIndex(of: item.key) ?? 0
+                    HStack(spacing: 4) {
+                        Circle().fill(seriesColors[colorIndex % seriesColors.count]).frame(width: 8, height: 8)
+                        Text("\(item.label): \(item.point.totalLag)")
+                            .font(.caption2)
+                    }
+                }
+            }
+        }
+    }
+
+    var body: some View {
+        let lagTopics = Array(store.knownPartitionsByTopic.keys).sorted().filter { !$0.hasPrefix("__") }
+
+        TrendCard(title: l10n["trends.partition.lag"]) {
+            if lagTopics.isEmpty {
+                ContentUnavailableView {
+                    Label(l10n["trends.partition.lag"], systemImage: "chart.bar.xaxis")
+                } description: {
+                    Text(l10n["trends.not.enough.data.description"])
+                }
+                .frame(height: 200)
+            } else {
+                let allSelected = lagTopics.allSatisfy { selectedTopics.contains($0) }
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(lagTopics, id: \.self) { topic in
+                            Toggle(topic, isOn: Binding(
+                                get: { selectedTopics.contains(topic) },
+                                set: { on in
+                                    if on { selectedTopics.append(topic) }
+                                    else { selectedTopics.removeAll { $0 == topic } }
+                                },
+                            ))
+                            .toggleStyle(ChipToggleStyle())
+                        }
+
+                        Divider().frame(height: 16)
+
+                        Button {
+                            if allSelected {
+                                selectedTopics.removeAll { lagTopics.contains($0) }
+                            } else {
+                                for topic in lagTopics where !selectedTopics.contains(topic) {
+                                    selectedTopics.append(topic)
+                                }
+                            }
+                        } label: {
+                            Image(systemName: allSelected ? "checklist.unchecked" : "checklist.checked")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
+                // Show one chart per selected topic that has partition data
+                let activeTopics = selectedTopics.filter { lagTopics.contains($0) }
+                ForEach(activeTopics, id: \.self) { topic in
+                    let partitionKeys = store.knownPartitionsByTopic[topic] ?? []
+                    if !partitionKeys.isEmpty {
+                        partitionChart(topic: topic, partitionKeys: partitionKeys)
+                    }
+                }
+
+                if activeTopics.isEmpty {
+                    Text(l10n["trends.partition.lag.select"])
+                        .foregroundStyle(.secondary)
+                        .frame(height: 200)
+                        .frame(maxWidth: .infinity)
+                }
+            }
+        }
+    }
+
+    private func partitionLabel(for key: String) -> String {
+        "P" + (key.split(separator: ":").last.map(String.init) ?? key)
+    }
+
+    @ViewBuilder
+    private func partitionChart(topic: String, partitionKeys: [String]) -> some View {
+        let labels = partitionKeys.map { partitionLabel(for: $0) }
+        let colorRange = Array(seriesColors.prefix(max(labels.count, 1)))
+
+        VStack(alignment: .leading, spacing: 4) {
+            Text(topic)
+                .font(.caption.bold())
+                .foregroundStyle(.secondary)
+
+            let chart = Chart {
+                ForEach(partitionKeys.indices, id: \.self) { idx in
+                    let key = partitionKeys[idx]
+                    let label = labels[idx]
+                    let series = renderingMode.filterData(
+                        store.partitionLagSeries(for: key), by: \.timestamp,
+                    )
+                    ForEach(series) { point in
+                        LineMark(
+                            x: .value("Time", point.timestamp),
+                            y: .value("Lag", point.totalLag),
+                            series: .value("Series", "\(label)-\(point.segment)"),
+                        )
+                        .foregroundStyle(by: .value("Partition", label))
+                        .interpolationMethod(.catmullRom)
+                    }
+                }
+            }
+            .chartYAxisLabel(l10n["trends.lag.messages"])
+            .chartXAxis {
+                AxisMarks(values: .automatic(desiredCount: 5)) {
+                    AxisValueLabel(format: .dateTime.hour().minute().second())
+                    AxisGridLine()
+                }
+            }
+            .chartForegroundStyleScale(domain: labels, range: colorRange)
+            .chartLegend(position: .top, alignment: .leading)
+            .frame(height: 200)
+
+            switch renderingMode {
+            case let .live(timeDomain):
+                chart.chartXScale(domain: timeDomain)
+                    .hoverOverlay(hoverLocation: $hoverLocation) { date in
+                        partitionTooltip(date, topic: topic, partitionKeys: partitionKeys)
+                    }
+            case let .history(visibleSeconds):
+                chart.chartScrollableAxes(.horizontal)
+                    .chartXVisibleDomain(length: visibleSeconds)
+                    .hoverOverlay(hoverLocation: $hoverLocation) { date in
+                        partitionTooltip(date, topic: topic, partitionKeys: partitionKeys)
+                    }
+            }
+        }
+    }
+}
+
 // MARK: - ISR Health
 
 struct ISRHealthChart: View {

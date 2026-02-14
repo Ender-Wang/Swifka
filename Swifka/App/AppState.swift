@@ -17,6 +17,8 @@ final class AppState {
     var topicLags: [String: Int64] = [:]
     /// Per-partition lag breakdown for each consumer group (group name → partitions).
     var partitionLags: [String: [PartitionLag]] = [:]
+    /// Per-partition lag aggregated across all groups (key = "topic:partition", value = lag).
+    var partitionLagDetail: [String: Int64] = [:]
     var selectedSidebarItem: SidebarItem? = .dashboard {
         didSet {
             UserDefaults.standard.set(selectedSidebarItem?.rawValue, forKey: "nav.sidebarItem")
@@ -183,6 +185,7 @@ final class AppState {
         consumerGroupLags = [:]
         topicLags = [:]
         partitionLags = [:]
+        partitionLagDetail = [:]
         expandedTopics = []
         trendsMode = .live
         historyState.store.clear()
@@ -294,6 +297,7 @@ final class AppState {
         var lags: [String: Int64] = [:]
         var allTopicLags: [String: Int64] = [:]
         var allPartitionLags: [String: [PartitionLag]] = [:]
+        var allPartitionLagDetail: [String: Int64] = [:]
         for group in consumerGroups {
             guard connectionStatus.isConnected else { break }
             guard let offsets = try? await kafkaService.fetchCommittedOffsets(
@@ -310,6 +314,7 @@ final class AppState {
                     let lag = max(0, highWatermark - committedOffset)
                     groupLag += lag
                     allTopicLags[topic, default: 0] += lag
+                    allPartitionLagDetail["\(topic):\(partition)", default: 0] += lag
                     groupPartitions.append(PartitionLag(
                         topic: topic,
                         partition: partition,
@@ -325,6 +330,7 @@ final class AppState {
         consumerGroupLags = lags
         topicLags = allTopicLags
         partitionLags = allPartitionLags
+        partitionLagDetail = allPartitionLagDetail
     }
 
     // MARK: - Metrics
@@ -358,6 +364,7 @@ final class AppState {
             topicWatermarks: topicWatermarks,
             consumerGroupLags: consumerGroupLags,
             topicLags: topicLags,
+            partitionLagDetail: partitionLagDetail,
             totalHighWatermark: topicWatermarks.values.reduce(0, +),
             totalLag: consumerGroupLags.values.reduce(0, +),
             underReplicatedPartitions: underReplicated,

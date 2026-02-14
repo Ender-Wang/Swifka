@@ -56,6 +56,8 @@
   "trends.topic.throughput": "Topic Throughput",
   "trends.consumer.lag": "Consumer Group Lag",
   "trends.topic.lag": "Topic Lag",
+  "trends.partition.lag": "Partition Lag",
+  "trends.partition.lag.select": "Select a topic to view partition lag.",
   "trends.ping.latency": "Ping Latency",
   "trends.isr.health": "ISR Health",
   "trends.messages.per.second": "msg/s",
