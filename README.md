@@ -7,6 +7,10 @@ A read-focused, lightweight, native macOS Kafka client for monitoring clusters, 
 <br clear="all" />
 
 <p align="center">
+  <b>⚠️ Swifka is currently under active development. We are aiming for a 1.0 stable release.</b>
+</p>
+
+<p align="center">
   <a href="https://github.com/Ender-Wang/Swifka/releases"><img src="https://img.shields.io/github/v/release/Ender-Wang/Swifka?label=Latest%20Release&color=green" alt="Latest Release" /></a>
   <a href="https://github.com/Ender-Wang/Swifka/releases"><img src="https://img.shields.io/github/downloads/Ender-Wang/Swifka/total?color=green" alt="Total Downloads" /></a>
   <br />
@@ -78,7 +82,9 @@ Or download the latest `.dmg` from [Releases](https://github.com/Ender-Wang/Swif
 
 🔧 **Enhancements**
 
-- [ ] Local database storage (SQLite / SwiftData) with configurable retention
+- [x] Local database storage (SQLite ~~/ SwiftData~~) with configurable retention
+- [x] Historical data browsing with date range filtering and scrollable charts
+- [x] Hover-to-inspect tooltips on trend charts with color markers and value ranking
 - [ ] Pagination and virtual lists for large datasets
 
 ⚠️ **Health & Alerts**
