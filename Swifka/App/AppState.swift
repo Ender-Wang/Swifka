@@ -13,7 +13,8 @@ final class AppState {
     var brokers: [BrokerInfo] = []
     var topics: [TopicInfo] = []
     var consumerGroups: [ConsumerGroupInfo] = []
-    private var consumerGroupLags: [String: Int64] = [:]
+    var consumerGroupLags: [String: Int64] = [:]
+    var topicLags: [String: Int64] = [:]
     var selectedSidebarItem: SidebarItem? = .dashboard {
         didSet {
             UserDefaults.standard.set(selectedSidebarItem?.rawValue, forKey: "nav.sidebarItem")
@@ -178,6 +179,7 @@ final class AppState {
         topics = []
         consumerGroups = []
         consumerGroupLags = [:]
+        topicLags = [:]
         expandedTopics = []
         trendsMode = .live
         historyState.store.clear()
@@ -287,6 +289,7 @@ final class AppState {
         }
 
         var lags: [String: Int64] = [:]
+        var allTopicLags: [String: Int64] = [:]
         for group in consumerGroups {
             guard connectionStatus.isConnected else { break }
             guard let offsets = try? await kafkaService.fetchCommittedOffsets(
@@ -299,12 +302,15 @@ final class AppState {
                    let partInfo = topicInfo.partitions.first(where: { $0.partitionId == partition }),
                    let highWatermark = partInfo.highWatermark
                 {
-                    groupLag += max(0, highWatermark - committedOffset)
+                    let lag = max(0, highWatermark - committedOffset)
+                    groupLag += lag
+                    allTopicLags[topic, default: 0] += lag
                 }
             }
             lags[group.name] = groupLag
         }
         consumerGroupLags = lags
+        topicLags = allTopicLags
     }
 
     // MARK: - Metrics
@@ -337,6 +343,7 @@ final class AppState {
             granularity: granularity,
             topicWatermarks: topicWatermarks,
             consumerGroupLags: consumerGroupLags,
+            topicLags: topicLags,
             totalHighWatermark: topicWatermarks.values.reduce(0, +),
             totalLag: consumerGroupLags.values.reduce(0, +),
             underReplicatedPartitions: underReplicated,

@@ -26,6 +26,10 @@ final class MetricStore {
     /// Per-group lag cache.
     private var groupLagCache: [String: [LagPoint]] = [:]
 
+    /// Per-topic lag cache (lag summed across all consumer groups).
+    private var topicLagCache: [String: [LagPoint]] = [:]
+    private(set) var knownLagTopics: [String] = []
+
     init(capacity: Int = Constants.metricStoreCapacity) {
         self.capacity = capacity
     }
@@ -65,6 +69,10 @@ final class MetricStore {
 
     func lagSeries(for group: String) -> [LagPoint] {
         groupLagCache[group] ?? []
+    }
+
+    func topicLagSeries(for topic: String) -> [LagPoint] {
+        topicLagCache[topic] ?? []
     }
 
     // MARK: - Granularity
@@ -130,6 +138,21 @@ final class MetricStore {
         clusterLagSeries = zip(segments, snapshots).map { seg, snap in
             LagPoint(timestamp: snap.timestamp, group: "__cluster__", totalLag: snap.totalLag, segment: seg)
         }
+
+        // Per-topic lag (absolute values, no pair derivation needed)
+        var allLagTopics = Set<String>()
+        for snap in snapshots {
+            allLagTopics.formUnion(snap.topicLags.keys)
+        }
+        knownLagTopics = allLagTopics.sorted()
+        var newTopicLagCache: [String: [LagPoint]] = [:]
+        for topic in allLagTopics {
+            newTopicLagCache[topic] = zip(segments, snapshots).compactMap { seg, snap in
+                guard let lag = snap.topicLags[topic] else { return nil }
+                return LagPoint(timestamp: snap.timestamp, group: topic, totalLag: lag, segment: seg)
+            }
+        }
+        topicLagCache = newTopicLagCache
 
         guard snapshots.count >= 2 else {
             clusterThroughput = []

@@ -37,8 +37,11 @@ nonisolated struct MetricSnapshot: Sendable, Identifiable {
     /// Per-topic: sum of high watermarks across all partitions.
     let topicWatermarks: [String: Int64]
 
-    /// Per-consumer-group: total lag (empty until committed offset fetching is added).
+    /// Per-consumer-group: total lag.
     let consumerGroupLags: [String: Int64]
+
+    /// Per-topic: sum of consumer lag across all groups for each topic.
+    let topicLags: [String: Int64]
 
     /// Cluster-wide aggregates.
     let totalHighWatermark: Int64

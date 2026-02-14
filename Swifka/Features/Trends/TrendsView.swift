@@ -266,7 +266,15 @@ struct TrendsView: View {
             selectedGroups: selectedGroups,
         )
 
-        // Row 4: ISR health
+        // Row 4: Per-topic lag
+        TopicLagChart(
+            store: store,
+            l10n: l10n,
+            renderingMode: renderingMode,
+            selectedTopics: selectedTopics,
+        )
+
+        // Row 5: ISR health
         ISRHealthChart(store: store, l10n: l10n, renderingMode: renderingMode)
     }
 

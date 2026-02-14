@@ -563,6 +563,154 @@ struct ConsumerGroupLagChart: View {
     }
 }
 
+// MARK: - Per-Topic Lag
+
+struct TopicLagChart: View {
+    let store: MetricStore
+    let l10n: L10n
+    let renderingMode: TrendRenderingMode
+    @Binding var selectedTopics: [String]
+    @State private var hoverLocation: CGPoint?
+
+    /// Switch to log scale when selected topics span >20× difference in peak lag.
+    private var useLogScale: Bool {
+        let active = selectedTopics.filter { store.knownLagTopics.contains($0) }
+        guard active.count > 1 else { return false }
+        var peaks: [Double] = []
+        for topic in active {
+            let series = store.topicLagSeries(for: topic)
+            if let peak = series.map({ Double($0.totalLag) }).max(), peak > 0 {
+                peaks.append(peak)
+            }
+        }
+        guard let lo = peaks.min(), let hi = peaks.max(), lo > 0 else { return false }
+        return hi / lo > 20
+    }
+
+    @ViewBuilder
+    private func topicLagTooltip(_ date: Date) -> some View {
+        let active = selectedTopics.filter { store.knownLagTopics.contains($0) }
+        let items: [GroupHoverItem] = active.compactMap { topic in
+            let series = renderingMode.filterData(store.topicLagSeries(for: topic), by: \.timestamp)
+            return nearest(series, to: date, by: \.timestamp).map { GroupHoverItem(id: topic, point: $0) }
+        }
+        .sorted { $0.point.totalLag > $1.point.totalLag }
+        if let first = items.first {
+            ChartTooltip(date: first.point.timestamp) {
+                ForEach(items) { item in
+                    let colorIndex = selectedTopics.firstIndex(of: item.id) ?? 0
+                    HStack(spacing: 4) {
+                        Circle().fill(seriesColors[colorIndex % seriesColors.count]).frame(width: 8, height: 8)
+                        Text("\(item.id): \(item.point.totalLag)")
+                            .font(.caption2)
+                    }
+                }
+            }
+        }
+    }
+
+    var body: some View {
+        let logScale = useLogScale
+        let lagTopics = store.knownLagTopics.filter { !$0.hasPrefix("__") }
+
+        TrendCard(title: l10n["trends.topic.lag"]) {
+            if lagTopics.isEmpty {
+                ContentUnavailableView {
+                    Label(l10n["trends.topic.lag"], systemImage: "chart.line.downtrend.xyaxis")
+                } description: {
+                    Text(l10n["trends.not.enough.data.description"])
+                }
+                .frame(height: 200)
+            } else {
+                let allSelected = lagTopics.allSatisfy { selectedTopics.contains($0) }
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(lagTopics, id: \.self) { topic in
+                            Toggle(topic, isOn: Binding(
+                                get: { selectedTopics.contains(topic) },
+                                set: { on in
+                                    if on { selectedTopics.append(topic) }
+                                    else { selectedTopics.removeAll { $0 == topic } }
+                                },
+                            ))
+                            .toggleStyle(ChipToggleStyle())
+                        }
+
+                        Divider().frame(height: 16)
+
+                        Button {
+                            if allSelected {
+                                selectedTopics.removeAll { lagTopics.contains($0) }
+                            } else {
+                                for topic in lagTopics where !selectedTopics.contains(topic) {
+                                    selectedTopics.append(topic)
+                                }
+                            }
+                        } label: {
+                            Image(systemName: allSelected ? "checklist.unchecked" : "checklist.checked")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
+                let activeSeries = selectedTopics.filter { lagTopics.contains($0) }
+
+                let chart = Chart {
+                    ForEach(activeSeries, id: \.self) { topic in
+                        let series = renderingMode.filterData(
+                            store.topicLagSeries(for: topic), by: \.timestamp,
+                        )
+                        ForEach(series) { point in
+                            LineMark(
+                                x: .value("Time", point.timestamp),
+                                y: .value("Lag", logScale ? max(1, point.totalLag) : point.totalLag),
+                                series: .value("Series", "\(topic)-\(point.segment)"),
+                            )
+                            .foregroundStyle(by: .value("Topic", topic))
+                            .interpolationMethod(.catmullRom)
+                        }
+                    }
+                }
+                .chartYAxisLabel(l10n["trends.lag.messages"])
+                .chartXAxis {
+                    AxisMarks(values: .automatic(desiredCount: 5)) {
+                        AxisValueLabel(format: .dateTime.hour().minute().second())
+                        AxisGridLine()
+                    }
+                }
+                .chartForegroundStyleScale(domain: selectedTopics, range: Array(seriesColors.prefix(max(selectedTopics.count, 1))))
+                .chartLegend(position: .top, alignment: .leading)
+                .frame(height: 250)
+
+                switch renderingMode {
+                case let .live(timeDomain):
+                    if logScale {
+                        chart.chartXScale(domain: timeDomain).chartYScale(type: .log)
+                            .hoverOverlay(hoverLocation: $hoverLocation) { date in topicLagTooltip(date) }
+                    } else {
+                        chart.chartXScale(domain: timeDomain)
+                            .hoverOverlay(hoverLocation: $hoverLocation) { date in topicLagTooltip(date) }
+                    }
+                case let .history(visibleSeconds):
+                    if logScale {
+                        chart.chartScrollableAxes(.horizontal)
+                            .chartXVisibleDomain(length: visibleSeconds)
+                            .chartYScale(type: .log)
+                            .hoverOverlay(hoverLocation: $hoverLocation) { date in topicLagTooltip(date) }
+                    } else {
+                        chart.chartScrollableAxes(.horizontal)
+                            .chartXVisibleDomain(length: visibleSeconds)
+                            .hoverOverlay(hoverLocation: $hoverLocation) { date in topicLagTooltip(date) }
+                    }
+                }
+            }
+        }
+    }
+}
+
 // MARK: - ISR Health
 
 struct ISRHealthChart: View {

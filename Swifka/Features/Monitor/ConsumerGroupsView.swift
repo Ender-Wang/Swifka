@@ -31,6 +31,14 @@ struct ConsumerGroupsView: View {
             }
             .width(min: 50, ideal: 80)
 
+            TableColumn(l10n["groups.lag"]) { group in
+                let lag = appState.consumerGroupLags[group.name] ?? 0
+                Text(formatLag(lag))
+                    .foregroundStyle(lagColor(lag))
+                    .padding(.vertical, appState.rowDensity.tablePadding)
+            }
+            .width(min: 60, ideal: 100)
+
             TableColumn(l10n["groups.protocol.type"], value: \.protocolType) { group in
                 Text(group.protocolType)
                     .padding(.vertical, appState.rowDensity.tablePadding)
@@ -87,6 +95,18 @@ struct ConsumerGroupsView: View {
         case "preparingrebalance", "completingrebalance": .yellow
         default: .secondary
         }
+    }
+
+    private func formatLag(_ lag: Int64) -> String {
+        if lag >= 1_000_000 { return String(format: "%.1fM", Double(lag) / 1_000_000) }
+        if lag >= 1000 { return String(format: "%.1fK", Double(lag) / 1000) }
+        return "\(lag)"
+    }
+
+    private func lagColor(_ lag: Int64) -> Color {
+        if lag == 0 { return .secondary }
+        if lag > 10000 { return .red }
+        return .orange
     }
 }
 

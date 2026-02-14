@@ -19,6 +19,7 @@ actor MetricDatabase {
     private let colBrokerCount = SQLite.Expression<Int64>("broker_count")
     private let colPingMs = SQLite.Expression<Int64?>("ping_ms")
     private let colGranularity = SQLite.Expression<Double>("granularity")
+    private let colTopicLags = SQLite.Expression<String>("topic_lags")
 
     // MARK: - Init
 
@@ -74,6 +75,11 @@ actor MetricDatabase {
             ifNotExists: true,
         ))
 
+        // Migration: add topic_lags column
+        try? conn.run(table.addColumn(
+            SQLite.Expression<String>("topic_lags"), defaultValue: "{}",
+        ))
+
         return conn
     }
 
@@ -88,6 +94,10 @@ actor MetricDatabase {
             data: JSONEncoder().encode(snapshot.consumerGroupLags),
             encoding: .utf8,
         )!
+        let topicLagsJSON = try String(
+            data: JSONEncoder().encode(snapshot.topicLags),
+            encoding: .utf8,
+        )!
 
         try db.run(snapshots.insert(
             colId <- snapshot.id.uuidString,
@@ -95,6 +105,7 @@ actor MetricDatabase {
             colTimestamp <- snapshot.timestamp.timeIntervalSince1970,
             colTopicWatermarks <- watermarksJSON,
             colConsumerGroupLags <- lagsJSON,
+            colTopicLags <- topicLagsJSON,
             colTotalHighWatermark <- snapshot.totalHighWatermark,
             colTotalLag <- snapshot.totalLag,
             colUnderReplicatedPartitions <- Int64(snapshot.underReplicatedPartitions),
@@ -120,28 +131,7 @@ actor MetricDatabase {
         let decoder = JSONDecoder()
 
         for row in try db.prepare(query) {
-            let watermarks = try decoder.decode(
-                [String: Int64].self,
-                from: row[colTopicWatermarks].data(using: .utf8)!,
-            )
-            let lags = try decoder.decode(
-                [String: Int64].self,
-                from: row[colConsumerGroupLags].data(using: .utf8)!,
-            )
-
-            results.append(MetricSnapshot(
-                id: UUID(uuidString: row[colId])!,
-                timestamp: Date(timeIntervalSince1970: row[colTimestamp]),
-                granularity: row[colGranularity],
-                topicWatermarks: watermarks,
-                consumerGroupLags: lags,
-                totalHighWatermark: row[colTotalHighWatermark],
-                totalLag: row[colTotalLag],
-                underReplicatedPartitions: Int(row[colUnderReplicatedPartitions]),
-                totalPartitions: Int(row[colTotalPartitions]),
-                brokerCount: Int(row[colBrokerCount]),
-                pingMs: row[colPingMs].map { Int($0) },
-            ))
+            try results.append(decodeSnapshot(row: row, decoder: decoder))
         }
 
         // Return in chronological order (oldest first)
@@ -165,31 +155,42 @@ actor MetricDatabase {
         let decoder = JSONDecoder()
 
         for row in try db.prepare(query) {
-            let watermarks = try decoder.decode(
-                [String: Int64].self,
-                from: row[colTopicWatermarks].data(using: .utf8)!,
-            )
-            let lags = try decoder.decode(
-                [String: Int64].self,
-                from: row[colConsumerGroupLags].data(using: .utf8)!,
-            )
-
-            results.append(MetricSnapshot(
-                id: UUID(uuidString: row[colId])!,
-                timestamp: Date(timeIntervalSince1970: row[colTimestamp]),
-                granularity: row[colGranularity],
-                topicWatermarks: watermarks,
-                consumerGroupLags: lags,
-                totalHighWatermark: row[colTotalHighWatermark],
-                totalLag: row[colTotalLag],
-                underReplicatedPartitions: Int(row[colUnderReplicatedPartitions]),
-                totalPartitions: Int(row[colTotalPartitions]),
-                brokerCount: Int(row[colBrokerCount]),
-                pingMs: row[colPingMs].map { Int($0) },
-            ))
+            try results.append(decodeSnapshot(row: row, decoder: decoder))
         }
 
         return results
+    }
+
+    // MARK: - Row Decoding
+
+    private func decodeSnapshot(row: Row, decoder: JSONDecoder) throws -> MetricSnapshot {
+        let watermarks = try decoder.decode(
+            [String: Int64].self,
+            from: row[colTopicWatermarks].data(using: .utf8)!,
+        )
+        let lags = try decoder.decode(
+            [String: Int64].self,
+            from: row[colConsumerGroupLags].data(using: .utf8)!,
+        )
+        let topicLags = try decoder.decode(
+            [String: Int64].self,
+            from: row[colTopicLags].data(using: .utf8)!,
+        )
+
+        return MetricSnapshot(
+            id: UUID(uuidString: row[colId])!,
+            timestamp: Date(timeIntervalSince1970: row[colTimestamp]),
+            granularity: row[colGranularity],
+            topicWatermarks: watermarks,
+            consumerGroupLags: lags,
+            topicLags: topicLags,
+            totalHighWatermark: row[colTotalHighWatermark],
+            totalLag: row[colTotalLag],
+            underReplicatedPartitions: Int(row[colUnderReplicatedPartitions]),
+            totalPartitions: Int(row[colTotalPartitions]),
+            brokerCount: Int(row[colBrokerCount]),
+            pingMs: row[colPingMs].map { Int($0) },
+        )
     }
 
     // MARK: - Timestamp Bounds
