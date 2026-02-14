@@ -136,6 +136,7 @@
   "groups.member.id": "成员 ID",
   "groups.member.client.id": "客户端 ID",
   "groups.member.host": "主机",
+  "groups.member.assignments": "分区",
 
   "brokers.title": "Brokers",
   "brokers.id": "Broker ID",

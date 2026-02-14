@@ -217,6 +217,14 @@ nonisolated struct GroupMemberInfo: Identifiable, Hashable, Sendable {
     let memberId: String
     let clientId: String
     let clientHost: String
+    /// Partition assignments decoded from the Kafka consumer protocol `member_assignment` blob.
+    let assignments: [PartitionAssignment]
+}
+
+/// A topic + partition list assigned to a consumer group member.
+nonisolated struct PartitionAssignment: Hashable, Sendable {
+    let topic: String
+    let partitions: [Int32]
 }
 
 /// Per-partition lag for a single consumer group.

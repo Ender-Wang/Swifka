@@ -319,10 +319,15 @@ actor KafkaService {
                 var members: [GroupMemberInfo] = []
                 for j in 0 ..< Int(group.member_cnt) {
                     let member = group.members[j]
+                    let assignments = Self.decodeMemberAssignment(
+                        ptr: member.member_assignment,
+                        size: Int(member.member_assignment_size),
+                    )
                     members.append(GroupMemberInfo(
                         memberId: String(cString: member.member_id),
                         clientId: String(cString: member.client_id),
                         clientHost: String(cString: member.client_host),
+                        assignments: assignments,
                     ))
                 }
 
@@ -337,6 +342,60 @@ actor KafkaService {
 
             return groups
         }
+    }
+
+    // MARK: - Member Assignment Decoder
+
+    /// Decode the Kafka consumer protocol `member_assignment` binary blob.
+    /// Format (big-endian): version(int16), numTopics(int32),
+    /// then per topic: nameLen(int16), name(bytes), numPartitions(int32), partitions(int32 each).
+    private static func decodeMemberAssignment(
+        ptr: UnsafeMutableRawPointer?,
+        size: Int,
+    ) -> [PartitionAssignment] {
+        guard let ptr, size > 4 else { return [] }
+        let data = Data(bytes: ptr, count: size)
+        var offset = 0
+
+        func readInt16() -> Int16? {
+            guard offset + 2 <= data.count else { return nil }
+            let value = Int16(data[offset]) << 8 | Int16(data[offset + 1])
+            offset += 2
+            return value
+        }
+
+        func readInt32() -> Int32? {
+            guard offset + 4 <= data.count else { return nil }
+            let value = Int32(data[offset]) << 24 | Int32(data[offset + 1]) << 16
+                | Int32(data[offset + 2]) << 8 | Int32(data[offset + 3])
+            offset += 4
+            return value
+        }
+
+        // Version
+        guard readInt16() != nil else { return [] }
+
+        // Number of topics
+        guard let numTopics = readInt32(), numTopics >= 0 else { return [] }
+
+        var assignments: [PartitionAssignment] = []
+        for _ in 0 ..< numTopics {
+            // Topic name (int16 length + bytes)
+            guard let nameLen = readInt16(), nameLen >= 0, offset + Int(nameLen) <= data.count else { break }
+            let topicName = String(data: data[offset ..< offset + Int(nameLen)], encoding: .utf8) ?? ""
+            offset += Int(nameLen)
+
+            // Partitions (int32 count + int32 each)
+            guard let numPartitions = readInt32(), numPartitions >= 0 else { break }
+            var partitions: [Int32] = []
+            for _ in 0 ..< numPartitions {
+                guard let partId = readInt32() else { break }
+                partitions.append(partId)
+            }
+            partitions.sort()
+            assignments.append(PartitionAssignment(topic: topicName, partitions: partitions))
+        }
+        return assignments
     }
 
     // MARK: - Consumer Group Offsets

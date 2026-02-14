@@ -191,11 +191,30 @@ struct GroupDetailView: View {
                     DetailRow(label: l10n["groups.member.client.id"], value: member.clientId)
                     DetailRow(label: l10n["groups.member.id"], value: member.memberId)
                     DetailRow(label: l10n["groups.member.host"], value: member.clientHost)
+                    if !member.assignments.isEmpty {
+                        let partitionText = member.assignments
+                            .map { "\($0.topic) [\($0.partitions.map(String.init).joined(separator: ","))]" }
+                            .joined(separator: ", ")
+                        DetailRow(label: l10n["groups.member.assignments"], value: partitionText)
+                    }
                 }
                 .padding(.vertical, 4)
             }
             .listStyle(.plain)
         }
+    }
+
+    /// Build a reverse lookup: "topic:partition" → clientId from member assignments.
+    private var partitionOwnerMap: [String: String] {
+        var map: [String: String] = [:]
+        for member in group.members {
+            for assignment in member.assignments {
+                for partition in assignment.partitions {
+                    map["\(assignment.topic):\(partition)"] = member.clientId
+                }
+            }
+        }
+        return map
     }
 
     @ViewBuilder
@@ -211,37 +230,51 @@ struct GroupDetailView: View {
         } else {
             let byTopic = Dictionary(grouping: partitions, by: \.topic)
                 .sorted { $0.key < $1.key }
+            let owners = partitionOwnerMap
 
             List {
                 ForEach(byTopic, id: \.key) { topic, topicPartitions in
                     let topicLag = topicPartitions.reduce(0) { $0 + $1.lag }
                     DisclosureGroup {
                         ForEach(topicPartitions.sorted(by: { $0.partition < $1.partition })) { p in
-                            HStack {
-                                Text("P\(p.partition)")
-                                    .font(.caption.monospaced())
-                                    .foregroundStyle(.secondary)
-                                    .frame(width: 30, alignment: .leading)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    HStack(spacing: 4) {
-                                        Text(l10n["groups.partition.committed"])
-                                            .font(.caption2)
-                                            .foregroundStyle(.tertiary)
-                                        Text("\(p.committedOffset)")
-                                            .font(.caption.monospaced())
+                            VStack(alignment: .leading, spacing: 2) {
+                                HStack {
+                                    Text("P\(p.partition)")
+                                        .font(.caption.monospaced())
+                                        .foregroundStyle(.secondary)
+                                        .frame(width: 30, alignment: .leading)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        HStack(spacing: 4) {
+                                            Text(l10n["groups.partition.committed"])
+                                                .font(.caption2)
+                                                .foregroundStyle(.tertiary)
+                                            Text("\(p.committedOffset)")
+                                                .font(.caption.monospaced())
+                                        }
+                                        HStack(spacing: 4) {
+                                            Text(l10n["groups.partition.watermark"])
+                                                .font(.caption2)
+                                                .foregroundStyle(.tertiary)
+                                            Text("\(p.highWatermark)")
+                                                .font(.caption.monospaced())
+                                        }
                                     }
-                                    HStack(spacing: 4) {
-                                        Text(l10n["groups.partition.watermark"])
-                                            .font(.caption2)
-                                            .foregroundStyle(.tertiary)
-                                        Text("\(p.highWatermark)")
-                                            .font(.caption.monospaced())
-                                    }
+                                    Spacer()
+                                    Text(formatLag(p.lag))
+                                        .font(.caption.monospaced().bold())
+                                        .foregroundStyle(lagColor(p.lag))
                                 }
-                                Spacer()
-                                Text(formatLag(p.lag))
-                                    .font(.caption.monospaced().bold())
-                                    .foregroundStyle(lagColor(p.lag))
+                                if let owner = owners["\(p.topic):\(p.partition)"] {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "person.fill")
+                                            .font(.caption2)
+                                            .foregroundStyle(.tertiary)
+                                        Text(owner)
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    .padding(.leading, 34)
+                                }
                             }
                             .padding(.vertical, 2)
                         }

@@ -136,6 +136,7 @@
   "groups.member.id": "Member ID",
   "groups.member.client.id": "Client ID",
   "groups.member.host": "Host",
+  "groups.member.assignments": "Partitions",
 
   "brokers.title": "Brokers",
   "brokers.id": "Broker ID",
