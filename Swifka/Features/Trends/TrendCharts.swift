@@ -208,7 +208,6 @@ struct ClusterThroughputChart: View {
                 chart
                     .chartScrollableAxes(.horizontal)
                     .chartXVisibleDomain(length: visibleSeconds)
-                    .drawingGroup()
                     .hoverOverlay(hoverLocation: $hoverLocation) { date in
                         if let p = nearest(data, to: date, by: \.timestamp) {
                             ChartTooltip(date: p.timestamp) {
@@ -276,7 +275,6 @@ struct PingLatencyChart: View {
                 chart
                     .chartScrollableAxes(.horizontal)
                     .chartXVisibleDomain(length: visibleSeconds)
-                    .drawingGroup()
                     .hoverOverlay(hoverLocation: $hoverLocation) { date in
                         if let p = nearest(data, to: date, by: \.timestamp) {
                             ChartTooltip(date: p.timestamp) {
@@ -417,12 +415,10 @@ struct TopicThroughputChart: View {
                     chart.chartScrollableAxes(.horizontal)
                         .chartXVisibleDomain(length: visibleSeconds)
                         .chartYScale(type: .log)
-                        .drawingGroup()
                         .hoverOverlay(hoverLocation: $hoverLocation) { date in topicTooltip(date) }
                 } else {
                     chart.chartScrollableAxes(.horizontal)
                         .chartXVisibleDomain(length: visibleSeconds)
-                        .drawingGroup()
                         .hoverOverlay(hoverLocation: $hoverLocation) { date in topicTooltip(date) }
                 }
             }
@@ -561,12 +557,10 @@ struct ConsumerGroupLagChart: View {
                         chart.chartScrollableAxes(.horizontal)
                             .chartXVisibleDomain(length: visibleSeconds)
                             .chartYScale(type: .log)
-                            .drawingGroup()
                             .hoverOverlay(hoverLocation: $hoverLocation) { date in groupTooltip(date) }
                     } else {
                         chart.chartScrollableAxes(.horizontal)
                             .chartXVisibleDomain(length: visibleSeconds)
-                            .drawingGroup()
                             .hoverOverlay(hoverLocation: $hoverLocation) { date in groupTooltip(date) }
                     }
                 }
@@ -714,12 +708,10 @@ struct TopicLagChart: View {
                         chart.chartScrollableAxes(.horizontal)
                             .chartXVisibleDomain(length: visibleSeconds)
                             .chartYScale(type: .log)
-                            .drawingGroup()
                             .hoverOverlay(hoverLocation: $hoverLocation) { date in topicLagTooltip(date) }
                     } else {
                         chart.chartScrollableAxes(.horizontal)
                             .chartXVisibleDomain(length: visibleSeconds)
-                            .drawingGroup()
                             .hoverOverlay(hoverLocation: $hoverLocation) { date in topicLagTooltip(date) }
                     }
                 }
@@ -894,7 +886,6 @@ private struct PartitionSubChart: View {
             case let .history(visibleSeconds):
                 chart.chartScrollableAxes(.horizontal)
                     .chartXVisibleDomain(length: visibleSeconds)
-                    .drawingGroup()
                     .hoverOverlay(hoverLocation: $hoverLocation) { date in
                         partitionTooltip(date)
                     }
@@ -963,7 +954,6 @@ struct ISRHealthChart: View {
                 chart
                     .chartScrollableAxes(.horizontal)
                     .chartXVisibleDomain(length: visibleSeconds)
-                    .drawingGroup()
                     .hoverOverlay(hoverLocation: $hoverLocation) { date in
                         if let p = nearest(data, to: date, by: \.timestamp) {
                             ChartTooltip(date: p.timestamp) {
