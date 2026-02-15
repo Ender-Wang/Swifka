@@ -176,10 +176,12 @@ struct TrendsView: View {
         let history = appState.historyState
         @Bindable var historyBindable = history
 
-        if history.isLoading {
+        if history.isLoading, !history.store.hasEnoughData {
+            // Only show full-screen spinner when there's no previous data.
+            // If the store already has data, keep showing charts while loading updates in background.
             ProgressView(l10n["common.loading"])
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else if !history.store.hasEnoughData {
+        } else if !history.isLoading, !history.store.hasEnoughData {
             ContentUnavailableView(
                 l10n["trends.history.no.data"],
                 systemImage: "clock.arrow.circlepath",
