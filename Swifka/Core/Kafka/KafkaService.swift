@@ -44,6 +44,9 @@ actor KafkaService {
 
         try setConfig(conf, key: "bootstrap.servers", value: config.bootstrapServers)
         try setConfig(conf, key: "client.id", value: "swifka-monitor")
+        // Resilience: cap internal timeouts so librdkafka releases stale broker state faster
+        try setConfig(conf, key: "socket.timeout.ms", value: "10000")
+        try setConfig(conf, key: "reconnect.backoff.max.ms", value: "5000")
 
         if config.authType == .sasl, let mechanism = config.saslMechanism {
             try setConfig(conf, key: "security.protocol", value: config.useTLS ? "sasl_ssl" : "sasl_plaintext")
@@ -61,7 +64,10 @@ actor KafkaService {
         let errorChars = UnsafeMutablePointer<CChar>.allocate(capacity: stringSize)
         defer { errorChars.deallocate() }
 
-        guard let kafkaHandle = rd_kafka_new(RD_KAFKA_CONSUMER, conf, errorChars, stringSize) else {
+        // Use PRODUCER handle — we only need metadata, watermarks, and admin API calls.
+        // CONSUMER handles run group coordination on rdk:main, which crashes (EXC_BAD_ACCESS)
+        // when a broker goes down. browseMessages() creates its own separate consumer.
+        guard let kafkaHandle = rd_kafka_new(RD_KAFKA_PRODUCER, conf, errorChars, stringSize) else {
             let errorString = String(cString: errorChars)
             throw SwifkaError.connectionFailed(errorString)
         }
@@ -119,7 +125,7 @@ actor KafkaService {
         let errorChars = UnsafeMutablePointer<CChar>.allocate(capacity: stringSize)
         defer { errorChars.deallocate() }
 
-        guard let testHandle = rd_kafka_new(RD_KAFKA_CONSUMER, testConf, errorChars, stringSize) else {
+        guard let testHandle = rd_kafka_new(RD_KAFKA_PRODUCER, testConf, errorChars, stringSize) else {
             let errorString = String(cString: errorChars)
             throw SwifkaError.connectionFailed(errorString)
         }

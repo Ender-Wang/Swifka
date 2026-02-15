@@ -183,6 +183,11 @@
   "settings.charts": "图表",
   "settings.charts.time.window": "默认时间窗口",
 
+  "settings.alerts": "告警",
+  "settings.alerts.isr.enabled": "ISR 健康告警",
+  "settings.alerts.min.isr": "最小同步副本数",
+  "settings.alerts.min.isr.description": "当 ISR 数量低于此值时发出告警。通常应与 Broker/Topic 的 min.insync.replicas 设置一致。",
+
   "settings.display": "显示",
   "settings.display.density": "行大小",
   "settings.density.compact": "紧凑",
@@ -211,6 +216,7 @@
   "common.delete": "删除",
   "common.refresh": "刷新",
   "common.close": "关闭",
+  "common.dismiss": "关闭",
   "common.loading": "加载中…",
   "common.error": "错误",
   "common.ok": "确定",
@@ -231,6 +237,13 @@
   "error.messages.failed": "获取消息失败",
   "error.config.save.failed": "保存配置失败",
   "error.config.load.failed": "加载配置失败",
+
+  "alert.isr.severity.warning": "副本不足",
+  "alert.isr.severity.critical": "ISR 严重不足",
+  "alert.isr.severity.danger": "ISR 低于最小值",
+  "alert.isr.summary.warning": "{1} 个分区中有 {0} 个副本不足",
+  "alert.isr.summary.critical": "{1} 个分区中有 {0} 个 ISR=1（单点故障）",
+  "alert.isr.summary.danger": "{1} 个分区中有 {0} 个低于 min.insync.replicas",
 
   "menubar.quit": "退出 Swifka",
   "menubar.show": "显示 Swifka"

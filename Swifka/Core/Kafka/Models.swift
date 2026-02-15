@@ -374,3 +374,33 @@ nonisolated enum SidebarItem: String, Hashable, Sendable {
     case clusters
     case settings
 }
+
+// MARK: - ISR Alerts
+
+nonisolated enum ISRAlertSeverity: Int, Comparable, Sendable {
+    case warning = 0 // Under-replicated (ISR < replicas but ISR > 1)
+    case critical = 1 // ISR = 1 (single point of failure)
+    case danger = 2 // ISR < min.insync.replicas
+
+    nonisolated static func < (lhs: Self, rhs: Self) -> Bool {
+        lhs.rawValue < rhs.rawValue
+    }
+}
+
+nonisolated struct ISRAlertDetail: Equatable, Sendable {
+    let topic: String
+    let partition: Int32
+    let isrCount: Int
+    let replicaCount: Int
+    let severity: ISRAlertSeverity
+}
+
+nonisolated struct ISRAlertState: Equatable, Sendable {
+    let severity: ISRAlertSeverity
+    let timestamp: Date
+    let affectedPartitions: [ISRAlertDetail]
+    let totalPartitions: Int
+    let underReplicatedCount: Int
+    let criticalCount: Int // ISR = 1
+    let belowMinISRCount: Int // ISR < min.insync.replicas
+}

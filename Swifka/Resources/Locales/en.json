@@ -183,6 +183,11 @@
   "settings.charts": "Charts",
   "settings.charts.time.window": "Default Time Window",
 
+  "settings.alerts": "Alerts",
+  "settings.alerts.isr.enabled": "ISR Health Alerts",
+  "settings.alerts.min.isr": "Min In-Sync Replicas",
+  "settings.alerts.min.isr.description": "Alert when ISR count drops below this value. Typically matches the broker/topic min.insync.replicas setting.",
+
   "settings.display": "Display",
   "settings.display.density": "Row Size",
   "settings.density.compact": "Compact",
@@ -211,6 +216,7 @@
   "common.delete": "Delete",
   "common.refresh": "Refresh",
   "common.close": "Close",
+  "common.dismiss": "Dismiss",
   "common.loading": "Loading…",
   "common.error": "Error",
   "common.ok": "OK",
@@ -231,6 +237,13 @@
   "error.messages.failed": "Failed to fetch messages",
   "error.config.save.failed": "Failed to save configuration",
   "error.config.load.failed": "Failed to load configuration",
+
+  "alert.isr.severity.warning": "Under-Replicated",
+  "alert.isr.severity.critical": "Critical ISR",
+  "alert.isr.severity.danger": "ISR Below Minimum",
+  "alert.isr.summary.warning": "{0} of {1} partitions under-replicated",
+  "alert.isr.summary.critical": "{0} of {1} partitions at ISR=1 (single point of failure)",
+  "alert.isr.summary.danger": "{0} of {1} partitions below min.insync.replicas",
 
   "menubar.quit": "Quit Swifka",
   "menubar.show": "Show Swifka"

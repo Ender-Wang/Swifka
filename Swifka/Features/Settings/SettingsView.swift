@@ -67,6 +67,30 @@ struct SettingsView: View {
                 }
             }
 
+            // Alerts
+            Section(l10n["settings.alerts"]) {
+                Toggle(l10n["settings.alerts.isr.enabled"], isOn: $state.isrAlertsEnabled)
+
+                if appState.isrAlertsEnabled {
+                    Stepper(
+                        value: $state.minInsyncReplicas,
+                        in: 1 ... 10,
+                    ) {
+                        HStack {
+                            Text(l10n["settings.alerts.min.isr"])
+                            Spacer()
+                            Text("\(appState.minInsyncReplicas)")
+                                .monospacedDigit()
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    Text(l10n["settings.alerts.min.isr.description"])
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
             // Display
             Section(l10n["settings.display"]) {
                 Picker(l10n["settings.display.density"], selection: $state.rowDensity) {

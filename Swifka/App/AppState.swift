@@ -103,6 +103,42 @@ final class AppState {
         trendTimeWindow ?? chartTimeWindow
     }
 
+    var isrAlertsEnabled: Bool = true {
+        didSet {
+            UserDefaults.standard.set(isrAlertsEnabled, forKey: "settings.isrAlerts.enabled")
+            if !isrAlertsEnabled {
+                activeISRAlertState = nil
+                isrAlertDismissed = false
+                previousISRSeverity = nil
+            }
+        }
+    }
+
+    var minInsyncReplicas: Int = 2 {
+        didSet {
+            UserDefaults.standard.set(minInsyncReplicas, forKey: "settings.isrAlerts.minISR")
+        }
+    }
+
+    // MARK: - ISR Alerts (session-scoped)
+
+    /// Active ISR alert state, nil when all partitions are healthy.
+    var activeISRAlertState: ISRAlertState?
+
+    /// Whether the user has manually dismissed the current alert.
+    var isrAlertDismissed: Bool = false
+
+    @ObservationIgnored
+    private var previousISRSeverity: ISRAlertSeverity?
+
+    /// Prevents overlapping refreshAll() calls (e.g. timer fires while previous refresh still blocking).
+    @ObservationIgnored
+    private var isRefreshing = false
+
+    /// Consecutive refresh failures — stops auto-refresh after 3 to avoid crashing librdkafka.
+    @ObservationIgnored
+    private var consecutiveRefreshErrors = 0
+
     init(
         configStore: ConfigStore = ConfigStore(),
         kafkaService: KafkaService = KafkaService(),
@@ -149,6 +185,13 @@ final class AppState {
            let window = ChartTimeWindow(rawValue: raw)
         {
             chartTimeWindow = window
+        }
+        if UserDefaults.standard.object(forKey: "settings.isrAlerts.enabled") != nil {
+            isrAlertsEnabled = UserDefaults.standard.bool(forKey: "settings.isrAlerts.enabled")
+        }
+        let storedMinISR = UserDefaults.standard.integer(forKey: "settings.isrAlerts.minISR")
+        if storedMinISR > 0 {
+            minInsyncReplicas = storedMinISR
         }
         if let raw = UserDefaults.standard.string(forKey: "nav.sidebarItem"),
            let item = SidebarItem(rawValue: raw)
@@ -203,6 +246,10 @@ final class AppState {
         expandedTopics = []
         trendsMode = .live
         lagMode = .live
+        activeISRAlertState = nil
+        isrAlertDismissed = false
+        previousISRSeverity = nil
+        consecutiveRefreshErrors = 0
         historyState.store.clear()
         lagHistoryState.store.clear()
         metricStore.clear()
@@ -227,9 +274,13 @@ final class AppState {
     // MARK: - Data Fetching
 
     func refreshAll() async {
-        guard connectionStatus.isConnected else { return }
+        guard connectionStatus.isConnected, !isRefreshing else { return }
+        isRefreshing = true
+        defer { isRefreshing = false }
+
         isLoading = true
         let start = ContinuousClock.now
+        var metadataFailed = false
 
         do {
             let metadata = try await kafkaService.fetchMetadata()
@@ -239,10 +290,27 @@ final class AppState {
             guard connectionStatus.isConnected else { isLoading = false; return }
             let currentNames = Set(topics.map(\.name))
             expandedTopics.formIntersection(currentNames)
+            consecutiveRefreshErrors = 0
         } catch {
             guard connectionStatus.isConnected else { isLoading = false; return }
-            connectionStatus = .error(error.localizedDescription)
+            metadataFailed = true
+            consecutiveRefreshErrors += 1
             lastError = error.localizedDescription
+
+            // Circuit breaker: stop auto-refresh after 3 consecutive failures
+            // to avoid hammering librdkafka while brokers are down
+            if consecutiveRefreshErrors >= 3 {
+                refreshManager.stop()
+                connectionStatus = .error(error.localizedDescription)
+                isLoading = false
+                return
+            }
+        }
+
+        // Skip downstream calls if metadata fetch failed — no fresh data to work with
+        guard !metadataFailed else {
+            isLoading = false
+            return
         }
 
         do {
@@ -257,6 +325,7 @@ final class AppState {
         await fetchConsumerGroupLags()
 
         recordMetricSnapshot()
+        checkISRHealth()
 
         // Ensure spinner is visible long enough to avoid flickering
         let elapsed = ContinuousClock.now - start
@@ -355,12 +424,14 @@ final class AppState {
         var topicWatermarks: [String: Int64] = [:]
         var underReplicated = 0
         var totalPartitionCount = 0
+        let aliveBrokerIds = Set(brokers.map(\.id))
         for topic in topics where !topic.isInternal {
             var total: Int64 = 0
             for partition in topic.partitions {
                 total += partition.highWatermark ?? 0
                 totalPartitionCount += 1
-                if partition.isr.count < partition.replicas.count {
+                let effectiveISR = partition.isr.count(where: { aliveBrokerIds.contains($0) })
+                if effectiveISR < partition.replicas.count {
                     underReplicated += 1
                 }
             }
@@ -396,6 +467,83 @@ final class AppState {
                 try? await db.insert(snapshot, clusterId: clusterId)
             }
         }
+    }
+
+    private func checkISRHealth() {
+        guard isrAlertsEnabled, connectionStatus.isConnected else {
+            activeISRAlertState = nil
+            previousISRSeverity = nil
+            return
+        }
+
+        var details: [ISRAlertDetail] = []
+        var totalPartitionCount = 0
+
+        // Redpanda (Raft-based) may not shrink ISR when a broker goes down —
+        // it keeps reporting the dead broker in the ISR list. Cross-reference
+        // ISR broker IDs against alive brokers from the metadata response.
+        let aliveBrokerIds = Set(brokers.map(\.id))
+
+        for topic in topics where !topic.isInternal {
+            for partition in topic.partitions {
+                totalPartitionCount += 1
+                let replicaCount = partition.replicas.count
+
+                // Effective ISR = reported ISR filtered to only alive brokers
+                let effectiveISRCount = partition.isr.count(where: { aliveBrokerIds.contains($0) })
+
+                guard effectiveISRCount < replicaCount else { continue }
+
+                let severity: ISRAlertSeverity = if effectiveISRCount < minInsyncReplicas {
+                    .danger
+                } else if effectiveISRCount == 1 {
+                    .critical
+                } else {
+                    .warning
+                }
+
+                details.append(ISRAlertDetail(
+                    topic: topic.name,
+                    partition: partition.partitionId,
+                    isrCount: effectiveISRCount,
+                    replicaCount: replicaCount,
+                    severity: severity,
+                ))
+            }
+        }
+
+        if details.isEmpty {
+            if activeISRAlertState != nil {
+                activeISRAlertState = nil
+                isrAlertDismissed = false
+            }
+            previousISRSeverity = nil
+            return
+        }
+
+        let maxSeverity = details.map(\.severity).max() ?? .warning
+        let criticalCount = details.count(where: { $0.severity == .critical })
+        let belowMinCount = details.count(where: { $0.severity == .danger })
+
+        let newState = ISRAlertState(
+            severity: maxSeverity,
+            timestamp: Date(),
+            affectedPartitions: details,
+            totalPartitions: totalPartitionCount,
+            underReplicatedCount: details.count,
+            criticalCount: criticalCount,
+            belowMinISRCount: belowMinCount,
+        )
+
+        // Reset dismiss flag when severity escalates or affected partitions change
+        if maxSeverity != previousISRSeverity
+            || activeISRAlertState?.affectedPartitions != newState.affectedPartitions
+        {
+            isrAlertDismissed = false
+        }
+
+        activeISRAlertState = newState
+        previousISRSeverity = maxSeverity
     }
 
     private func loadHistoricalMetrics(for clusterId: UUID) async {

@@ -131,6 +131,19 @@ struct ContentView: View {
                 }
             }
         }
+        .overlay(alignment: .top) {
+            if let alert = appState.activeISRAlertState,
+               !appState.isrAlertDismissed
+            {
+                ISRAlertBanner(
+                    alert: alert,
+                    l10n: appState.l10n,
+                    onDismiss: { appState.isrAlertDismissed = true },
+                )
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .animation(.easeInOut(duration: 0.3), value: appState.activeISRAlertState != nil && !appState.isrAlertDismissed)
         .sheet(isPresented: $showingAddClusterSheet) {
             ClusterFormView(mode: .add) { cluster, password in
                 appState.configStore.addCluster(cluster)
@@ -476,6 +489,89 @@ private struct CompactMetricIcon: View {
         .opacity(connected ? 1 : 0.35)
         .animation(.default, value: count)
         .animation(.default, value: connected)
+    }
+}
+
+// MARK: - ISR Alert Banner
+
+private struct ISRAlertBanner: View {
+    let alert: ISRAlertState
+    let l10n: L10n
+    let onDismiss: () -> Void
+
+    private var bannerColor: Color {
+        switch alert.severity {
+        case .warning: .orange
+        case .critical, .danger: .red
+        }
+    }
+
+    private var severityIcon: String {
+        switch alert.severity {
+        case .warning: "exclamationmark.triangle.fill"
+        case .critical: "exclamationmark.octagon.fill"
+        case .danger: "xmark.octagon.fill"
+        }
+    }
+
+    private var severityLabel: String {
+        switch alert.severity {
+        case .warning: l10n["alert.isr.severity.warning"]
+        case .critical: l10n["alert.isr.severity.critical"]
+        case .danger: l10n["alert.isr.severity.danger"]
+        }
+    }
+
+    private var summaryText: String {
+        switch alert.severity {
+        case .warning:
+            l10n.t(
+                "alert.isr.summary.warning",
+                "\(alert.underReplicatedCount)",
+                "\(alert.totalPartitions)",
+            )
+        case .critical:
+            l10n.t(
+                "alert.isr.summary.critical",
+                "\(alert.criticalCount)",
+                "\(alert.totalPartitions)",
+            )
+        case .danger:
+            l10n.t(
+                "alert.isr.summary.danger",
+                "\(alert.belowMinISRCount)",
+                "\(alert.totalPartitions)",
+            )
+        }
+    }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: severityIcon)
+                .foregroundStyle(bannerColor)
+
+            Text(severityLabel)
+                .fontWeight(.medium)
+
+            Text(summaryText)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+
+            Button {
+                onDismiss()
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help(l10n["common.dismiss"])
+        }
+        .font(.callout)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(.ultraThinMaterial, in: Capsule())
+        .shadow(color: .black.opacity(0.1), radius: 8, y: 4)
+        .padding(.top, 8)
     }
 }
 
