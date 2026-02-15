@@ -43,6 +43,10 @@ struct SwifkaApp: App {
                     navigateTo(.trends)
                 }
                 .keyboardShortcut("e", modifiers: [.command, .shift])
+                Button(appState.l10n["sidebar.lag"]) {
+                    navigateTo(.lag)
+                }
+                .keyboardShortcut("l", modifiers: [.command, .shift])
             }
             CommandMenu(appState.l10n["sidebar.section.browse"]) {
                 Button(appState.l10n["sidebar.topics"]) {

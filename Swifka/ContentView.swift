@@ -28,6 +28,8 @@ struct ContentView: View {
                         DashboardView()
                     case .trends:
                         TrendsView()
+                    case .lag:
+                        LagView()
                     case .topics:
                         TopicListView()
                     case .messages:
@@ -177,6 +179,7 @@ private struct CompactSidebarView: View {
         IconGroup(items: [
             (.dashboard, "gauge.with.dots.needle.33percent"),
             (.trends, "chart.xyaxis.line"),
+            (.lag, "chart.line.downtrend.xyaxis"),
         ]),
         IconGroup(items: [
             (.topics, "list.bullet.rectangle"),
@@ -243,6 +246,7 @@ private struct CompactSidebarView: View {
         switch item {
         case .dashboard: l10n["sidebar.dashboard"]
         case .trends: l10n["sidebar.trends"]
+        case .lag: l10n["sidebar.lag"]
         case .topics: l10n["sidebar.topics"]
         case .messages: l10n["sidebar.messages"]
         case .consumerGroups: l10n["sidebar.groups"]
@@ -273,6 +277,8 @@ struct SidebarView: View {
                     .tag(SidebarItem.dashboard)
                 Label(l10n["sidebar.trends"], systemImage: "chart.xyaxis.line")
                     .tag(SidebarItem.trends)
+                Label(l10n["sidebar.lag"], systemImage: "chart.line.downtrend.xyaxis")
+                    .tag(SidebarItem.lag)
             }
 
             Section(l10n["sidebar.section.browse"]) {

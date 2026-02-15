@@ -366,6 +366,7 @@ nonisolated enum AppearanceMode: String, CaseIterable, Identifiable, Sendable {
 nonisolated enum SidebarItem: String, Hashable, Sendable {
     case dashboard
     case trends
+    case lag
     case topics
     case messages
     case consumerGroups

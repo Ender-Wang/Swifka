@@ -1,26 +1,44 @@
 import SwiftUI
 
-struct TrendsView: View {
+struct LagView: View {
     @Environment(AppState.self) private var appState
+
+    /// Reverse lookup: "topic:partition" → owner info from all consumer group member assignments.
+    private var partitionOwnerMap: [String: PartitionOwner] {
+        var map: [String: PartitionOwner] = [:]
+        for group in appState.consumerGroups {
+            for member in group.members {
+                for assignment in member.assignments {
+                    for partition in assignment.partitions {
+                        map["\(assignment.topic):\(partition)"] = PartitionOwner(
+                            clientId: member.clientId,
+                            memberId: member.memberId,
+                        )
+                    }
+                }
+            }
+        }
+        return map
+    }
 
     var body: some View {
         let l10n = appState.l10n
         if !appState.connectionStatus.isConnected {
             ContentUnavailableView(
-                l10n["trends.not.connected"],
-                systemImage: "chart.xyaxis.line",
-                description: Text(l10n["trends.not.connected.description"]),
+                l10n["lag.not.connected"],
+                systemImage: "chart.line.downtrend.xyaxis",
+                description: Text(l10n["lag.not.connected.description"]),
             )
         } else {
-            trendsContent
-                .navigationTitle(l10n["trends.title"])
+            lagContent
+                .navigationTitle(l10n["lag.title"])
                 .onAppear {
                     // Manual mode: default to History and lock there
-                    if !appState.refreshManager.isAutoRefresh, appState.trendsMode == .live {
-                        appState.trendsMode = .history
+                    if !appState.refreshManager.isAutoRefresh, appState.lagMode == .live {
+                        appState.lagMode = .history
                     }
                 }
-                .onChange(of: appState.trendsMode) { _, newMode in
+                .onChange(of: appState.lagMode) { _, newMode in
                     handleModeChange(newMode)
                 }
         }
@@ -28,12 +46,12 @@ struct TrendsView: View {
 
     // MARK: - Content
 
-    private var trendsContent: some View {
+    private var lagContent: some View {
         VStack(spacing: 0) {
-            trendsToolbar
+            lagToolbar
             Divider()
 
-            switch appState.trendsMode {
+            switch appState.lagMode {
             case .live:
                 liveContent
             case .history:
@@ -45,7 +63,7 @@ struct TrendsView: View {
     // MARK: - Toolbar
 
     @ViewBuilder
-    private var trendsToolbar: some View {
+    private var lagToolbar: some View {
         @Bindable var state = appState
         let l10n = appState.l10n
         let isAutoRefresh = appState.refreshManager.isAutoRefresh
@@ -53,7 +71,7 @@ struct TrendsView: View {
         HStack {
             // Hide mode toggle in manual mode (locked to History)
             if isAutoRefresh {
-                Picker(l10n["trends.mode"], selection: $state.trendsMode) {
+                Picker(l10n["trends.mode"], selection: $state.lagMode) {
                     Text(l10n["trends.mode.live"]).tag(TrendsMode.live)
                     Text(l10n["trends.mode.history"]).tag(TrendsMode.history)
                 }
@@ -64,19 +82,19 @@ struct TrendsView: View {
             Spacer()
 
             // History: date filter in middle
-            if case .history = appState.trendsMode {
-                historyDateFilter
+            if case .history = appState.lagMode {
+                lagHistoryDateFilter
 
                 Spacer()
             }
 
             // Time Window picker — always right-aligned
-            switch appState.trendsMode {
+            switch appState.lagMode {
             case .live:
                 if isAutoRefresh {
                     Picker(l10n["trends.time.window"], selection: Binding(
-                        get: { appState.effectiveTimeWindow },
-                        set: { appState.trendTimeWindow = $0 },
+                        get: { appState.effectiveLagTimeWindow },
+                        set: { appState.lagTimeWindow = $0 },
                     )) {
                         ForEach(ChartTimeWindow.allCases) { window in
                             Text(window.rawValue).tag(window)
@@ -86,7 +104,7 @@ struct TrendsView: View {
                     .frame(maxWidth: 240)
                 }
             case .history:
-                historyVisibleWindowPicker
+                lagHistoryVisibleWindowPicker
             }
         }
         .padding(.horizontal)
@@ -103,15 +121,15 @@ struct TrendsView: View {
 
         if !appState.refreshManager.isAutoRefresh {
             ContentUnavailableView(
-                l10n["trends.manual.mode"],
-                systemImage: "chart.xyaxis.line",
-                description: Text(l10n["trends.manual.mode.description"]),
+                l10n["lag.manual.mode"],
+                systemImage: "chart.line.downtrend.xyaxis",
+                description: Text(l10n["lag.manual.mode.description"]),
             )
         } else if !store.hasEnoughData {
             ContentUnavailableView(
-                l10n["trends.not.enough.data"],
-                systemImage: "chart.xyaxis.line",
-                description: Text(l10n["trends.not.enough.data.description"]),
+                l10n["lag.not.enough.data"],
+                systemImage: "chart.line.downtrend.xyaxis",
+                description: Text(l10n["lag.not.enough.data.description"]),
             )
         } else {
             let tickInterval: TimeInterval = if case let .interval(seconds) = appState.refreshManager.mode {
@@ -121,15 +139,16 @@ struct TrendsView: View {
             }
             TimelineView(.periodic(from: .now, by: tickInterval)) { timeline in
                 let now = timeline.date
-                let timeDomain = now.addingTimeInterval(-appState.effectiveTimeWindow.seconds) ... now
+                let timeDomain = now.addingTimeInterval(-appState.effectiveLagTimeWindow.seconds) ... now
                 let mode = TrendRenderingMode.live(timeDomain: timeDomain)
 
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 20) {
-                        chartStack(
+                        lagChartStack(
                             store: store,
                             renderingMode: mode,
-                            selectedTopics: $state.trendSelectedTopics,
+                            selectedTopics: $state.lagSelectedTopics,
+                            selectedGroups: $state.lagSelectedGroups,
                         )
                     }
                     .padding()
@@ -137,10 +156,13 @@ struct TrendsView: View {
                 .transaction { $0.animation = nil }
             }
             .onAppear {
-                if appState.trendSelectedTopics.isEmpty,
+                if appState.lagSelectedTopics.isEmpty,
                    let first = store.knownTopics.first(where: { !$0.hasPrefix("__") })
                 {
-                    appState.trendSelectedTopics.append(first)
+                    appState.lagSelectedTopics.append(first)
+                }
+                if appState.lagSelectedGroups.isEmpty, let first = store.knownGroups.first {
+                    appState.lagSelectedGroups.append(first)
                 }
             }
         }
@@ -151,19 +173,17 @@ struct TrendsView: View {
     @ViewBuilder
     private var historyContent: some View {
         let l10n = appState.l10n
-        let history = appState.historyState
+        let history = appState.lagHistoryState
         @Bindable var historyBindable = history
 
         if history.isLoading, !history.store.hasEnoughData {
-            // Only show full-screen spinner when there's no previous data.
-            // If the store already has data, keep showing charts while loading updates in background.
             ProgressView(l10n["common.loading"])
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if !history.isLoading, !history.store.hasEnoughData {
             ContentUnavailableView(
-                l10n["trends.history.no.data"],
+                l10n["lag.history.no.data"],
                 systemImage: "clock.arrow.circlepath",
-                description: Text(l10n["trends.history.no.data.description"]),
+                description: Text(l10n["lag.history.no.data.description"]),
             )
         } else {
             let mode = TrendRenderingMode.history(
@@ -172,10 +192,11 @@ struct TrendsView: View {
 
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 20) {
-                    chartStack(
+                    lagChartStack(
                         store: history.store,
                         renderingMode: mode,
                         selectedTopics: $historyBindable.selectedTopics,
+                        selectedGroups: $historyBindable.selectedGroups,
                     )
                 }
                 .padding()
@@ -186,8 +207,8 @@ struct TrendsView: View {
     // MARK: - History Controls
 
     @ViewBuilder
-    private var historyDateFilter: some View {
-        let history = appState.historyState
+    private var lagHistoryDateFilter: some View {
+        let history = appState.lagHistoryState
         @Bindable var historyBindable = history
         let l10n = appState.l10n
 
@@ -225,9 +246,9 @@ struct TrendsView: View {
     }
 
     @ViewBuilder
-    private var historyVisibleWindowPicker: some View {
+    private var lagHistoryVisibleWindowPicker: some View {
         let l10n = appState.l10n
-        @Bindable var historyBindable = appState.historyState
+        @Bindable var historyBindable = appState.lagHistoryState
 
         Picker(l10n["trends.time.window"], selection: $historyBindable.visibleWindowSeconds) {
             Text("1m").tag(TimeInterval(60))
@@ -241,41 +262,59 @@ struct TrendsView: View {
         .frame(maxWidth: 320)
     }
 
-    // MARK: - Shared Chart Stack
+    // MARK: - Lag Chart Stack
 
     @ViewBuilder
-    private func chartStack(
+    private func lagChartStack(
         store: MetricStore,
         renderingMode: TrendRenderingMode,
         selectedTopics: Binding<[String]>,
+        selectedGroups: Binding<[String]>,
     ) -> some View {
         let l10n = appState.l10n
 
-        // Row 1: Cluster throughput + Ping latency
-        HStack(spacing: 16) {
-            ClusterThroughputChart(store: store, l10n: l10n, renderingMode: renderingMode)
-            PingLatencyChart(store: store, l10n: l10n, renderingMode: renderingMode)
-                .frame(maxWidth: 300)
+        // Row 1: Consumer Group Lag + Topic Lag side by side
+        HStack(alignment: .top, spacing: 16) {
+            ConsumerGroupLagChart(
+                store: store,
+                l10n: l10n,
+                renderingMode: renderingMode,
+                selectedGroups: selectedGroups,
+            )
+
+            TopicLagChart(
+                store: store,
+                l10n: l10n,
+                renderingMode: renderingMode,
+                selectedTopics: selectedTopics,
+            )
         }
 
-        // Row 2: Per-topic throughput
-        TopicThroughputChart(
+        // Row 2: Partition Lag (full width)
+        PartitionLagChart(
             store: store,
             l10n: l10n,
             renderingMode: renderingMode,
             selectedTopics: selectedTopics,
+            partitionOwnerMap: partitionOwnerMap,
         )
 
-        // Row 3: ISR health
-        ISRHealthChart(store: store, l10n: l10n, renderingMode: renderingMode)
+        // Row 3: Consumer Member Lag (full width)
+        ConsumerMemberLagChart(
+            store: store,
+            l10n: l10n,
+            renderingMode: renderingMode,
+            selectedGroups: selectedGroups,
+            consumerGroups: appState.consumerGroups,
+        )
     }
 
     // MARK: - Mode Change
 
     private func handleModeChange(_ newMode: TrendsMode) {
         guard newMode == .history else { return }
-        let history = appState.historyState
-        history.enterHistoryMode(timeWindow: appState.effectiveTimeWindow)
+        let history = appState.lagHistoryState
+        history.enterHistoryMode(timeWindow: appState.effectiveLagTimeWindow)
         Task.detached {
             await history.loadData(
                 database: appState.metricDatabase,

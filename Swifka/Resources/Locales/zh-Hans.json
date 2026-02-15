@@ -8,6 +8,7 @@
 
   "sidebar.dashboard": "仪表盘",
   "sidebar.trends": "趋势",
+  "sidebar.lag": "延迟",
   "sidebar.topics": "Topics",
   "sidebar.messages": "消息",
   "sidebar.groups": "消费者组",
@@ -73,6 +74,16 @@
   "trends.history.apply": "应用",
   "trends.history.no.data": "无历史数据",
   "trends.history.no.data.description": "所选时间范围内未找到指标快照，请尝试扩大日期范围。",
+
+  "lag.title": "延迟",
+  "lag.not.connected": "未连接",
+  "lag.not.connected.description": "连接到集群以查看延迟。",
+  "lag.not.enough.data": "正在收集数据…",
+  "lag.not.enough.data.description": "至少需要两次刷新后才能显示延迟图表。",
+  "lag.manual.mode": "手动刷新模式",
+  "lag.manual.mode.description": "实时图表需要自动刷新。请在设置中切换到自动刷新间隔以启用实时延迟图表。",
+  "lag.history.no.data": "无历史数据",
+  "lag.history.no.data.description": "所选时间范围内未找到指标快照，请尝试扩大日期范围。",
 
   "topics.title": "Topics",
   "topics.search": "搜索 Topic…",

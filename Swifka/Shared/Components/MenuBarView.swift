@@ -59,6 +59,9 @@ struct MenuBarView: View {
             MenuBarItem(icon: "chart.xyaxis.line", label: l10n["sidebar.trends"], shortcut: "⇧⌘ E", keyEquivalent: "e", keyModifiers: [.command, .shift]) {
                 navigateTo(.trends)
             }
+            MenuBarItem(icon: "chart.line.downtrend.xyaxis", label: l10n["sidebar.lag"], shortcut: "⇧⌘ L", keyEquivalent: "l", keyModifiers: [.command, .shift]) {
+                navigateTo(.lag)
+            }
             MenuBarItem(icon: "list.bullet.rectangle", label: l10n["sidebar.topics"], shortcut: "⇧⌘ T", keyEquivalent: "t", keyModifiers: [.command, .shift]) {
                 navigateTo(.topics)
             }

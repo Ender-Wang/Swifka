@@ -8,6 +8,7 @@
 
   "sidebar.dashboard": "Dashboard",
   "sidebar.trends": "Trends",
+  "sidebar.lag": "Lag",
   "sidebar.topics": "Topics",
   "sidebar.messages": "Messages",
   "sidebar.groups": "Consumer Groups",
@@ -73,6 +74,16 @@
   "trends.history.apply": "Apply",
   "trends.history.no.data": "No Historical Data",
   "trends.history.no.data.description": "No metric snapshots found for the selected time range. Try expanding the date range.",
+
+  "lag.title": "Lag",
+  "lag.not.connected": "Not Connected",
+  "lag.not.connected.description": "Connect to a cluster to view lag.",
+  "lag.not.enough.data": "Collecting Data…",
+  "lag.not.enough.data.description": "Lag charts will appear after at least two refresh cycles.",
+  "lag.manual.mode": "Manual Refresh Mode",
+  "lag.manual.mode.description": "Live charts require auto-refresh. Switch to an auto-refresh interval in Settings to enable live lag charts.",
+  "lag.history.no.data": "No Historical Data",
+  "lag.history.no.data.description": "No metric snapshots found for the selected time range. Try expanding the date range.",
 
   "topics.title": "Topics",
   "topics.search": "Search topics…",

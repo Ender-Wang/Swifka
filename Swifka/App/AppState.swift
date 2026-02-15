@@ -36,6 +36,20 @@ final class AppState {
     /// Per-session override for chart time window. nil = use chartTimeWindow setting.
     var trendTimeWindow: ChartTimeWindow?
 
+    // MARK: - Lag page (session-scoped)
+
+    var lagMode: TrendsMode = .live
+    let lagHistoryState = HistoryState()
+    var lagSelectedTopics: [String] = []
+    var lagSelectedGroups: [String] = []
+    /// Per-session override for lag chart time window. nil = use chartTimeWindow setting.
+    var lagTimeWindow: ChartTimeWindow?
+
+    /// Effective lag chart time window: session override if set, else persisted setting.
+    var effectiveLagTimeWindow: ChartTimeWindow {
+        lagTimeWindow ?? chartTimeWindow
+    }
+
     // MARK: - Sort Orders (session-scoped, reset on app restart)
 
     var brokersSortOrder = [KeyPathComparator(\BrokerInfo.id)]
@@ -188,7 +202,9 @@ final class AppState {
         partitionLagDetail = [:]
         expandedTopics = []
         trendsMode = .live
+        lagMode = .live
         historyState.store.clear()
+        lagHistoryState.store.clear()
         metricStore.clear()
         await kafkaService.disconnect()
         await pruneMetrics()
