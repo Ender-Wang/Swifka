@@ -87,6 +87,7 @@ Or download the latest `.dmg` from [Releases](https://github.com/Ender-Wang/Swif
 - [x] Local database storage (SQLite ~~/ SwiftData~~) with configurable retention
 - [x] Historical data browsing with date range filtering and scrollable charts
 - [x] Hover-to-inspect tooltips on trend charts with color markers and value ranking
+- [ ] SQL aggregation + extended time ranges for History mode (1h / 6h / 24h / 7d)
 - [ ] Pagination and virtual lists for large datasets
 
 ⚠️ **Health & Alerts**
@@ -103,9 +104,13 @@ Or download the latest `.dmg` from [Releases](https://github.com/Ender-Wang/Swif
 📊 **Advanced Charts**
 
 - [x] ~~Trends page tab reorganization~~ → Split into Trends (cluster health) + Lag (consumer investigation) pages
+- [ ] Pinch-to-zoom on History charts for time range drill-down
+- [ ] Chart statistics overlay (avg / min / max per series in visible window)
+- [ ] Export chart data as CSV
 
 🎨 **UI & Animations**
 
+- [ ] Animated line drawing for chart transitions
 - [ ] Message flow animations and real-time data change effects
 - [ ] Trends page loading/mode-switch transitions (Live ↔ History)
 - [x] Dark mode optimization
