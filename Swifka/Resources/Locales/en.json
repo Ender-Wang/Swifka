@@ -187,6 +187,8 @@
   "settings.alerts.isr.enabled": "ISR Health Alerts",
   "settings.alerts.min.isr": "Min In-Sync Replicas",
   "settings.alerts.min.isr.description": "Alert when ISR count drops below this value. Typically matches the broker/topic min.insync.replicas setting.",
+  "settings.alerts.desktop": "Desktop Notifications",
+  "settings.alerts.desktop.denied": "Notification permission denied. Enable in System Settings → Notifications → Swifka.",
 
   "settings.display": "Display",
   "settings.display.density": "Row Size",

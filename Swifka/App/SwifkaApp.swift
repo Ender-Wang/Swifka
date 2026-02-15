@@ -1,9 +1,11 @@
 import SwiftUI
+import UserNotifications
 
 @main
 struct SwifkaApp: App {
     @State private var appState = AppState()
     @Environment(\.openWindow) private var openWindow
+    @State private var notificationDelegate = NotificationDelegate()
 
     var body: some Scene {
         WindowGroup(id: "main") {
@@ -15,6 +17,9 @@ struct SwifkaApp: App {
                 )
                 .onChange(of: appState.appearanceMode, initial: true) {
                     NSApp.appearance = appState.appearanceMode.nsAppearance
+                }
+                .onAppear {
+                    UNUserNotificationCenter.current().delegate = notificationDelegate
                 }
         }
         .defaultSize(
@@ -102,5 +107,18 @@ struct SwifkaApp: App {
     private func navigateTo(_ item: SidebarItem) {
         appState.selectedSidebarItem = item
         activateMainWindow()
+    }
+}
+
+// MARK: - Notification Delegate
+
+/// Allows notifications to display as banners even when the app is in the foreground.
+private final class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate {
+    func userNotificationCenter(
+        _: UNUserNotificationCenter,
+        willPresent _: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void,
+    ) {
+        completionHandler([.banner, .sound])
     }
 }

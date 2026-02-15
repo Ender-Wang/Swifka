@@ -89,6 +89,16 @@ struct SettingsView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+
+                Divider()
+
+                Toggle(l10n["settings.alerts.desktop"], isOn: $state.desktopNotificationsEnabled)
+
+                if appState.desktopNotificationsEnabled, !appState.notificationPermissionGranted {
+                    Text(l10n["settings.alerts.desktop.denied"])
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
             }
 
             // Display

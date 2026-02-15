@@ -1,4 +1,5 @@
 import Foundation
+import UserNotifications
 
 @Observable
 final class AppState {
@@ -120,6 +121,18 @@ final class AppState {
         }
     }
 
+    var desktopNotificationsEnabled: Bool = false {
+        didSet {
+            UserDefaults.standard.set(desktopNotificationsEnabled, forKey: "settings.desktopNotifications.enabled")
+            if desktopNotificationsEnabled {
+                requestNotificationPermission()
+            }
+        }
+    }
+
+    /// Tracks the notification permission state for display in Settings.
+    var notificationPermissionGranted: Bool = false
+
     // MARK: - ISR Alerts (session-scoped)
 
     /// Active ISR alert state, nil when all partitions are healthy.
@@ -193,6 +206,10 @@ final class AppState {
         if storedMinISR > 0 {
             minInsyncReplicas = storedMinISR
         }
+        if UserDefaults.standard.object(forKey: "settings.desktopNotifications.enabled") != nil {
+            desktopNotificationsEnabled = UserDefaults.standard.bool(forKey: "settings.desktopNotifications.enabled")
+        }
+        checkNotificationPermission()
         if let raw = UserDefaults.standard.string(forKey: "nav.sidebarItem"),
            let item = SidebarItem(rawValue: raw)
         {
@@ -535,15 +552,66 @@ final class AppState {
             belowMinISRCount: belowMinCount,
         )
 
-        // Reset dismiss flag when severity escalates or affected partitions change
-        if maxSeverity != previousISRSeverity
+        // Reset dismiss flag and send notification when severity escalates or affected partitions change
+        let isNewOrEscalated = maxSeverity != previousISRSeverity
             || activeISRAlertState?.affectedPartitions != newState.affectedPartitions
-        {
+
+        if isNewOrEscalated {
             isrAlertDismissed = false
+            sendISRNotification(state: newState)
         }
 
         activeISRAlertState = newState
         previousISRSeverity = maxSeverity
+    }
+
+    // MARK: - Desktop Notifications
+
+    private func requestNotificationPermission() {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, _ in
+            Task { @MainActor in
+                self.notificationPermissionGranted = granted
+            }
+        }
+    }
+
+    private func checkNotificationPermission() {
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            Task { @MainActor in
+                self.notificationPermissionGranted = settings.authorizationStatus == .authorized
+            }
+        }
+    }
+
+    private func sendISRNotification(state: ISRAlertState) {
+        guard desktopNotificationsEnabled, notificationPermissionGranted else { return }
+
+        let content = UNMutableNotificationContent()
+
+        let severityLabel: String
+        let summary: String
+        switch state.severity {
+        case .warning:
+            severityLabel = l10n["alert.isr.severity.warning"]
+            summary = l10n.t("alert.isr.summary.warning", "\(state.underReplicatedCount)", "\(state.totalPartitions)")
+        case .critical:
+            severityLabel = l10n["alert.isr.severity.critical"]
+            summary = l10n.t("alert.isr.summary.critical", "\(state.criticalCount)", "\(state.totalPartitions)")
+        case .danger:
+            severityLabel = l10n["alert.isr.severity.danger"]
+            summary = l10n.t("alert.isr.summary.danger", "\(state.belowMinISRCount)", "\(state.totalPartitions)")
+        }
+
+        content.title = "Swifka — \(severityLabel)"
+        content.body = summary
+        content.sound = .default
+
+        let request = UNNotificationRequest(
+            identifier: "isr-alert",
+            content: content,
+            trigger: nil,
+        )
+        UNUserNotificationCenter.current().add(request)
     }
 
     private func loadHistoricalMetrics(for clusterId: UUID) async {

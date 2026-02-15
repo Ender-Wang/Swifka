@@ -187,6 +187,8 @@
   "settings.alerts.isr.enabled": "ISR 健康告警",
   "settings.alerts.min.isr": "最小同步副本数",
   "settings.alerts.min.isr.description": "当 ISR 数量低于此值时发出告警。通常应与 Broker/Topic 的 min.insync.replicas 设置一致。",
+  "settings.alerts.desktop": "桌面通知",
+  "settings.alerts.desktop.denied": "通知权限被拒绝。请前往系统设置 → 通知 → Swifka 开启。",
 
   "settings.display": "显示",
   "settings.display.density": "行大小",
