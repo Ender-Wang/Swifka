@@ -79,7 +79,7 @@ Or download the latest `.dmg` from [Releases](https://github.com/Ender-Wang/Swif
 - [x] Cluster health overview with production/consumption throughput
 - [x] Per-topic lag ranking and total lag display
 - [x] Per-partition lag breakdown in consumer group detail panel
-- [x] Swift Charts — lag trends, throughput trends, partition distribution
+- [x] Swift Charts — lag trends, throughput trends
 - [x] Per-consumer member lag chart (aggregate partition lag per consumer instance)
 
 🔧 **Enhancements**
@@ -91,18 +91,23 @@ Or download the latest `.dmg` from [Releases](https://github.com/Ender-Wang/Swif
 
 ⚠️ **Health & Alerts**
 
-- [ ] ISR health monitoring and alerts
-  - [ ] Alert: Under-replicated partitions (ISR < replication factor)
-  - [ ] Alert: Critical ISR level (ISR = 1, single point of failure)
-  - [ ] Alert: ISR below min.insync.replicas (partition at risk)
+- [x] ISR health monitoring and alerts
+  - [x] Alert: Under-replicated partitions (ISR < replication factor)
+  - [x] Alert: Critical ISR level (ISR = 1, single point of failure)
+  - [x] Alert: ISR below min.insync.replicas (partition at risk)
   - [x] ISR history graph (track ISR changes over time)
 - [ ] Desktop notifications (macOS native alerts)
 
 ## Milestone 3: Animations & Polish
 
+📊 **Advanced Charts**
+
+- [x] ~~Trends page tab reorganization~~ → Split into Trends (cluster health) + Lag (consumer investigation) pages
+
 🎨 **UI & Animations**
 
 - [ ] Message flow animations and real-time data change effects
+- [ ] Trends page loading/mode-switch transitions (Live ↔ History)
 - [x] Dark mode optimization
 - [ ] Cluster topology and broker status visualization
 
