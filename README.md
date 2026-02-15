@@ -97,7 +97,7 @@ Or download the latest `.dmg` from [Releases](https://github.com/Ender-Wang/Swif
   - [x] Alert: Critical ISR level (ISR = 1, single point of failure)
   - [x] Alert: ISR below min.insync.replicas (partition at risk)
   - [x] ISR history graph (track ISR changes over time)
-- [ ] Desktop notifications (macOS native alerts)
+- [x] Desktop notifications (macOS native alerts)
 
 ## Milestone 3: Animations & Polish
 
