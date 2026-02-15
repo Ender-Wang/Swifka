@@ -80,6 +80,7 @@ Or download the latest `.dmg` from [Releases](https://github.com/Ender-Wang/Swif
 - [x] Per-topic lag ranking and total lag display
 - [x] Per-partition lag breakdown in consumer group detail panel
 - [x] Swift Charts — lag trends, throughput trends, partition distribution
+- [x] Per-consumer member lag chart (aggregate partition lag per consumer instance)
 
 🔧 **Enhancements**
 
