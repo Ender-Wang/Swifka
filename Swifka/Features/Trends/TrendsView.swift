@@ -81,6 +81,14 @@ struct TrendsView: View {
 
             Spacer()
 
+            // History: date filter in middle
+            if case .history = appState.trendsMode {
+                historyDateFilter
+
+                Spacer()
+            }
+
+            // Time Window picker — always right-aligned
             switch appState.trendsMode {
             case .live:
                 if isAutoRefresh {
@@ -96,10 +104,8 @@ struct TrendsView: View {
                     .frame(maxWidth: 240)
                 }
             case .history:
-                historyTimeRangeControls
+                historyVisibleWindowPicker
             }
-
-            Spacer()
         }
         .padding(.horizontal)
         .padding(.vertical, 8)
@@ -198,10 +204,10 @@ struct TrendsView: View {
         }
     }
 
-    // MARK: - History Time Range Controls
+    // MARK: - History Controls
 
     @ViewBuilder
-    private var historyTimeRangeControls: some View {
+    private var historyDateFilter: some View {
         let history = appState.historyState
         @Bindable var historyBindable = history
         let l10n = appState.l10n
@@ -236,18 +242,24 @@ struct TrendsView: View {
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.small)
-
-            Picker(l10n["trends.time.window"], selection: $historyBindable.visibleWindowSeconds) {
-                Text("1m").tag(TimeInterval(60))
-                Text("5m").tag(TimeInterval(300))
-                Text("15m").tag(TimeInterval(900))
-                Text("30m").tag(TimeInterval(1800))
-                Text("1h").tag(TimeInterval(3600))
-                Text("6h").tag(TimeInterval(21600))
-            }
-            .pickerStyle(.segmented)
-            .frame(maxWidth: 320)
         }
+    }
+
+    @ViewBuilder
+    private var historyVisibleWindowPicker: some View {
+        let l10n = appState.l10n
+        @Bindable var historyBindable = appState.historyState
+
+        Picker(l10n["trends.time.window"], selection: $historyBindable.visibleWindowSeconds) {
+            Text("1m").tag(TimeInterval(60))
+            Text("5m").tag(TimeInterval(300))
+            Text("15m").tag(TimeInterval(900))
+            Text("30m").tag(TimeInterval(1800))
+            Text("1h").tag(TimeInterval(3600))
+            Text("6h").tag(TimeInterval(21600))
+        }
+        .pickerStyle(.segmented)
+        .frame(maxWidth: 320)
     }
 
     // MARK: - Shared Chart Stack
