@@ -720,6 +720,14 @@ struct TopicLagChart: View {
     }
 }
 
+// MARK: - Partition Owner
+
+/// Lightweight owner info for partition chart labels.
+struct PartitionOwner {
+    let clientId: String
+    let memberId: String
+}
+
 // MARK: - Per-Partition Lag
 
 struct PartitionLagChart: View {
@@ -727,6 +735,7 @@ struct PartitionLagChart: View {
     let l10n: L10n
     let renderingMode: TrendRenderingMode
     @Binding var selectedTopics: [String]
+    let partitionOwnerMap: [String: PartitionOwner]
 
     var body: some View {
         let lagTopics = Array(store.knownPartitionsByTopic.keys).sorted().filter { !$0.hasPrefix("__") }
@@ -785,6 +794,7 @@ struct PartitionLagChart: View {
                             renderingMode: renderingMode,
                             topic: topic,
                             partitionKeys: partitionKeys,
+                            partitionOwnerMap: partitionOwnerMap,
                         )
                     }
                 }
@@ -809,19 +819,30 @@ private struct PartitionSubChart: View {
     let renderingMode: TrendRenderingMode
     let topic: String
     let partitionKeys: [String]
+    let partitionOwnerMap: [String: PartitionOwner]
     @State private var hoverLocation: CGPoint?
 
+    /// Legend label: "P0 · clientId · ...last8" when owned, "P0 (no consumer)" when unowned.
     private var labels: [String] {
-        partitionKeys.map { "P" + ($0.split(separator: ":").last.map(String.init) ?? $0) }
+        partitionKeys.map { key in
+            let pNum = "P" + (key.split(separator: ":").last.map(String.init) ?? key)
+            guard let owner = partitionOwnerMap[key] else {
+                return "\(pNum) (no consumer)"
+            }
+            let idSuffix = owner.memberId.count > 8
+                ? "...\(owner.memberId.suffix(8))"
+                : owner.memberId
+            return "\(pNum) · \(owner.clientId) · \(idSuffix)"
+        }
     }
 
     @ViewBuilder
     private func partitionTooltip(_ date: Date) -> some View {
-        let items: [(key: String, label: String, point: LagPoint)] = partitionKeys.compactMap { key in
+        let items: [(key: String, label: String, owner: PartitionOwner?, point: LagPoint)] = partitionKeys.compactMap { key in
             let series = renderingMode.filterData(store.partitionLagSeries(for: key), by: \.timestamp)
             guard let point = nearest(series, to: date, by: \.timestamp) else { return nil }
-            let label = "P" + (key.split(separator: ":").last.map(String.init) ?? key)
-            return (key: key, label: label, point: point)
+            let pNum = "P" + (key.split(separator: ":").last.map(String.init) ?? key)
+            return (key: key, label: pNum, owner: partitionOwnerMap[key], point: point)
         }
         .sorted { $0.point.totalLag > $1.point.totalLag }
         if let first = items.first {
@@ -830,8 +851,14 @@ private struct PartitionSubChart: View {
                     let colorIndex = partitionKeys.firstIndex(of: item.key) ?? 0
                     HStack(spacing: 4) {
                         Circle().fill(seriesColors[colorIndex % seriesColors.count]).frame(width: 8, height: 8)
-                        Text("\(item.label): \(item.point.totalLag)")
-                            .font(.caption2)
+                        if let owner = item.owner {
+                            Text("\(item.label) (\(owner.clientId) · \(owner.memberId)): \(item.point.totalLag)")
+                                .font(.caption2)
+                        } else {
+                            Text("\(item.label) (no consumer): \(item.point.totalLag)")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
             }

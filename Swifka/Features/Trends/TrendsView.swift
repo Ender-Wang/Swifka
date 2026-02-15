@@ -3,6 +3,24 @@ import SwiftUI
 struct TrendsView: View {
     @Environment(AppState.self) private var appState
 
+    /// Reverse lookup: "topic:partition" → owner info from all consumer group member assignments.
+    private var partitionOwnerMap: [String: PartitionOwner] {
+        var map: [String: PartitionOwner] = [:]
+        for group in appState.consumerGroups {
+            for member in group.members {
+                for assignment in member.assignments {
+                    for partition in assignment.partitions {
+                        map["\(assignment.topic):\(partition)"] = PartitionOwner(
+                            clientId: member.clientId,
+                            memberId: member.memberId,
+                        )
+                    }
+                }
+            }
+        }
+        return map
+    }
+
     var body: some View {
         let l10n = appState.l10n
         if !appState.connectionStatus.isConnected {
@@ -280,6 +298,7 @@ struct TrendsView: View {
             l10n: l10n,
             renderingMode: renderingMode,
             selectedTopics: selectedTopics,
+            partitionOwnerMap: partitionOwnerMap,
         )
 
         // Row 6: ISR health

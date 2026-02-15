@@ -77,12 +77,12 @@ actor MetricDatabase {
         ))
 
         // Migration: add topic_lags column
-        try? conn.run(table.addColumn(
+        _ = try? conn.run(table.addColumn(
             SQLite.Expression<String>("topic_lags"), defaultValue: "{}",
         ))
 
         // Migration: add partition_lag_detail column
-        try? conn.run(table.addColumn(
+        _ = try? conn.run(table.addColumn(
             SQLite.Expression<String>("partition_lag_detail"), defaultValue: "{}",
         ))
 
