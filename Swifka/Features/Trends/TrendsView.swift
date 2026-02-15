@@ -301,7 +301,16 @@ struct TrendsView: View {
             partitionOwnerMap: partitionOwnerMap,
         )
 
-        // Row 6: ISR health
+        // Row 6: Per-consumer member lag
+        ConsumerMemberLagChart(
+            store: store,
+            l10n: l10n,
+            renderingMode: renderingMode,
+            selectedGroups: selectedGroups,
+            consumerGroups: appState.consumerGroups,
+        )
+
+        // Row 7: ISR health
         ISRHealthChart(store: store, l10n: l10n, renderingMode: renderingMode)
     }
 

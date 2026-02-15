@@ -58,6 +58,8 @@
   "trends.topic.lag": "Topic Lag",
   "trends.partition.lag": "Partition Lag",
   "trends.partition.lag.select": "Select a topic to view partition lag.",
+  "trends.consumer.member.lag": "Consumer Member Lag",
+  "trends.consumer.member.lag.select": "Select a consumer group to view member lag.",
   "trends.ping.latency": "Ping Latency",
   "trends.isr.health": "ISR Health",
   "trends.messages.per.second": "msg/s",

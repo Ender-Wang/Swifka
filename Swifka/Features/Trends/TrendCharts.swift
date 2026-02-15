@@ -921,6 +921,278 @@ private struct PartitionSubChart: View {
     }
 }
 
+// MARK: - Per-Consumer Member Lag
+
+struct ConsumerMemberLagChart: View {
+    let store: MetricStore
+    let l10n: L10n
+    let renderingMode: TrendRenderingMode
+    @Binding var selectedGroups: [String]
+    let consumerGroups: [ConsumerGroupInfo]
+
+    var body: some View {
+        // Use store.knownGroups for stable chip list (not consumerGroups which updates every refresh)
+        let groupNames = store.knownGroups
+
+        TrendCard(title: l10n["trends.consumer.member.lag"]) {
+            if groupNames.isEmpty {
+                ContentUnavailableView {
+                    Label(l10n["trends.consumer.member.lag"], systemImage: "person.2")
+                } description: {
+                    Text(l10n["trends.not.enough.data.description"])
+                }
+                .frame(height: 200)
+            } else {
+                let allSelected = groupNames.allSatisfy { selectedGroups.contains($0) }
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(groupNames, id: \.self) { group in
+                            Toggle(group, isOn: Binding(
+                                get: { selectedGroups.contains(group) },
+                                set: { on in
+                                    if on { selectedGroups.append(group) }
+                                    else { selectedGroups.removeAll { $0 == group } }
+                                },
+                            ))
+                            .toggleStyle(ChipToggleStyle())
+                        }
+
+                        Divider().frame(height: 16)
+
+                        Button {
+                            if allSelected {
+                                selectedGroups.removeAll { groupNames.contains($0) }
+                            } else {
+                                for group in groupNames where !selectedGroups.contains(group) {
+                                    selectedGroups.append(group)
+                                }
+                            }
+                        } label: {
+                            Image(systemName: allSelected ? "checklist.unchecked" : "checklist.checked")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
+                // Resolve live member data only for selected groups
+                let activeGroups = selectedGroups.compactMap { name in
+                    consumerGroups.first { $0.name == name }
+                }
+
+                ForEach(activeGroups) { group in
+                    if !group.members.isEmpty {
+                        MemberSubChart(
+                            store: store,
+                            l10n: l10n,
+                            renderingMode: renderingMode,
+                            group: group,
+                        )
+                    }
+                }
+
+                if activeGroups.isEmpty {
+                    Text(l10n["trends.consumer.member.lag.select"])
+                        .foregroundStyle(.secondary)
+                        .frame(height: 200)
+                        .frame(maxWidth: .infinity)
+                }
+            }
+        }
+    }
+}
+
+/// Isolated sub-chart for a single consumer group's per-member lag.
+/// Each instance owns its own `@State hoverLocation`, so hovering on one
+/// group's chart does not invalidate other groups' charts.
+private struct MemberSubChart: View {
+    let store: MetricStore
+    let l10n: L10n
+    let renderingMode: TrendRenderingMode
+    let group: ConsumerGroupInfo
+    @State private var hoverLocation: CGPoint?
+
+    /// Partition keys per member, sorted.
+    private var memberPartitionKeys: [(member: GroupMemberInfo, keys: [String])] {
+        group.members.map { member in
+            var keys: [String] = []
+            for assignment in member.assignments {
+                for partition in assignment.partitions {
+                    keys.append("\(assignment.topic):\(partition)")
+                }
+            }
+            keys.sort()
+            return (member: member, keys: keys)
+        }
+    }
+
+    /// Aggregate lag series per member, computed from partition lag data.
+    private var memberLagSeries: [(memberId: String, series: [LagPoint])] {
+        memberPartitionKeys.map { item in
+            // Collect all lag points across this member's partitions, grouped by timestamp
+            var lagByTimestamp: [(Date, Int64, Int)] = []
+            var timestampMap: [Date: (total: Int64, segment: Int)] = [:]
+
+            for key in item.keys {
+                for point in store.partitionLagSeries(for: key) {
+                    if let existing = timestampMap[point.timestamp] {
+                        timestampMap[point.timestamp] = (existing.total + point.totalLag, point.segment)
+                    } else {
+                        timestampMap[point.timestamp] = (point.totalLag, point.segment)
+                    }
+                }
+            }
+
+            lagByTimestamp = timestampMap.map { ($0.key, $0.value.total, $0.value.segment) }
+                .sorted { $0.0 < $1.0 }
+
+            let points = lagByTimestamp.map { ts, lag, seg in
+                LagPoint(timestamp: ts, group: item.member.memberId, totalLag: lag, segment: seg)
+            }
+
+            return (memberId: item.member.memberId, series: points)
+        }
+    }
+
+    /// Build legend labels. If all clientIds are unique within the group, use clientId + partitions.
+    /// Otherwise add memberId suffix for disambiguation.
+    private var labels: [String] {
+        let items = memberPartitionKeys
+        let clientIdCounts = Dictionary(grouping: items.map(\.member.clientId), by: { $0 }).mapValues(\.count)
+        let needsDisambiguation = clientIdCounts.values.contains { $0 > 1 }
+
+        return items.map { item in
+            let partitionDesc = compactPartitionLabel(item.keys)
+            if needsDisambiguation {
+                let idSuffix = item.member.memberId.count > 8
+                    ? "...\(item.member.memberId.suffix(8))"
+                    : item.member.memberId
+                return "\(item.member.clientId) · \(idSuffix) · \(partitionDesc)"
+            } else {
+                return "\(item.member.clientId) · \(partitionDesc)"
+            }
+        }
+    }
+
+    /// Compact partition description: "orders:P0,P1 · payments:P0" or "P0,P1,P2" if single topic.
+    private func compactPartitionLabel(_ keys: [String]) -> String {
+        // Group by topic
+        var byTopic: [String: [String]] = [:]
+        for key in keys {
+            if let colonIdx = key.lastIndex(of: ":") {
+                let topic = String(key[key.startIndex ..< colonIdx])
+                let pNum = "P" + String(key[key.index(after: colonIdx)...])
+                byTopic[topic, default: []].append(pNum)
+            }
+        }
+
+        if byTopic.count == 1, let (_, partitions) = byTopic.first {
+            let list = partitions.joined(separator: ",")
+            if partitions.count > 6 {
+                return partitions.prefix(3).joined(separator: ",") + "…+\(partitions.count - 3)"
+            }
+            return list
+        }
+
+        // Multiple topics — show topic:partitions
+        return byTopic.sorted(by: { $0.key < $1.key }).map { topic, partitions in
+            let list = partitions.count > 4
+                ? partitions.prefix(2).joined(separator: ",") + "…+\(partitions.count - 2)"
+                : partitions.joined(separator: ",")
+            return "\(topic):\(list)"
+        }.joined(separator: " · ")
+    }
+
+    @ViewBuilder
+    private func memberTooltip(_ date: Date) -> some View {
+        let items = memberPartitionKeys
+        let allSeries = memberLagSeries
+        let clientIdCounts = Dictionary(grouping: items.map(\.member.clientId), by: { $0 }).mapValues(\.count)
+        let needsDisambiguation = clientIdCounts.values.contains { $0 > 1 }
+        let labels = labels
+
+        let hoverItems: [(idx: Int, label: String, member: GroupMemberInfo, point: LagPoint)] = items.indices.compactMap { idx in
+            let series = renderingMode.filterData(allSeries[idx].series, by: \.timestamp)
+            guard let point = nearest(series, to: date, by: \.timestamp) else { return nil }
+            return (idx: idx, label: labels[idx], member: items[idx].member, point: point)
+        }
+        .sorted { $0.point.totalLag > $1.point.totalLag }
+
+        if let first = hoverItems.first {
+            ChartTooltip(date: first.point.timestamp) {
+                ForEach(hoverItems, id: \.idx) { item in
+                    let colorIndex = item.idx
+                    HStack(spacing: 4) {
+                        Circle().fill(seriesColors[colorIndex % seriesColors.count]).frame(width: 8, height: 8)
+                        if needsDisambiguation {
+                            Text("\(item.member.clientId) · \(item.member.memberId): \(item.point.totalLag)")
+                                .font(.caption2)
+                        } else {
+                            Text("\(item.member.clientId): \(item.point.totalLag)")
+                                .font(.caption2)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    var body: some View {
+        let labels = labels
+        let allSeries = memberLagSeries
+        let colorRange = Array(seriesColors.prefix(max(labels.count, 1)))
+
+        VStack(alignment: .leading, spacing: 4) {
+            Text(group.name)
+                .font(.caption.bold())
+                .foregroundStyle(.secondary)
+
+            let chart = Chart {
+                ForEach(labels.indices, id: \.self) { idx in
+                    let label = labels[idx]
+                    let series = renderingMode.filterData(allSeries[idx].series, by: \.timestamp)
+                    ForEach(series) { point in
+                        LineMark(
+                            x: .value("Time", point.timestamp),
+                            y: .value("Lag", point.totalLag),
+                            series: .value("Series", "\(label)-\(point.segment)"),
+                        )
+                        .foregroundStyle(by: .value("Member", label))
+                        .interpolationMethod(.catmullRom)
+                    }
+                }
+            }
+            .chartYAxisLabel(l10n["trends.lag.messages"])
+            .chartXAxis {
+                AxisMarks(values: .automatic(desiredCount: 5)) {
+                    AxisValueLabel(format: .dateTime.hour().minute().second())
+                    AxisGridLine()
+                }
+            }
+            .chartForegroundStyleScale(domain: labels, range: colorRange)
+            .chartLegend(position: .top, alignment: .leading)
+            .frame(height: 200)
+
+            switch renderingMode {
+            case let .live(timeDomain):
+                chart.chartXScale(domain: timeDomain)
+                    .drawingGroup()
+                    .hoverOverlay(hoverLocation: $hoverLocation) { date in
+                        memberTooltip(date)
+                    }
+            case let .history(visibleSeconds):
+                chart.chartScrollableAxes(.horizontal)
+                    .chartXVisibleDomain(length: visibleSeconds)
+                    .hoverOverlay(hoverLocation: $hoverLocation) { date in
+                        memberTooltip(date)
+                    }
+            }
+        }
+    }
+}
+
 // MARK: - ISR Health
 
 struct ISRHealthChart: View {
