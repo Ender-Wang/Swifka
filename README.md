@@ -104,11 +104,11 @@ Or download the latest `.dmg` from [Releases](https://github.com/Ender-Wang/Swif
 📊 **Advanced Charts**
 
 - [x] ~~Trends page tab reorganization~~ → Split into Trends (cluster health) + Lag (consumer investigation) pages
-- [ ] ~~Pinch-to-zoom on History charts for time range drill-down~~ — visible window picker (1m–7d) provides equivalent zoom
-- [ ] ~~Chart statistics overlay (avg / min / max per series in visible window)~~ — superseded by global Mean/Min/Max aggregation mode
-- [ ] ~~Timeline gap compression~~ — deferred; data smoothing is a better alternative
-- [ ] Data smoothing for large time windows (reduce visual noise at 6h+ ranges)
-- [ ] Export chart data as CSV
+- [x] ~~Pinch-to-zoom on History charts for time range drill-down~~ — visible window picker (1m–7d) provides equivalent zoom
+- [x] ~~Chart statistics overlay (avg / min / max per series in visible window)~~ — superseded by global Mean/Min/Max aggregation mode
+- [x] ~~Timeline gap compression~~ — deferred; data smoothing is a better alternative
+- [x] ~~Data smoothing for large time windows~~ — covered by Mean/Min/Max SQL downsampling
+- [x] ~~Export chart data as CSV~~ → replaced with Excel (.xlsx) export with per-series sheets
 
 🎨 **UI & Animations**
 
@@ -117,7 +117,7 @@ Or download the latest `.dmg` from [Releases](https://github.com/Ender-Wang/Swif
 - [ ] Trends page loading/mode-switch transitions (Live ↔ History)
 - [x] Dark mode optimization
 - [ ] Cluster topology and broker status visualization
-  - [ ] ~~Partition distribution visualization~~ — Topics page partition table already shows leader/replicas/ISR
+  - [x] ~~Partition distribution visualization~~ — Topics page partition table already shows leader/replicas/ISR
 
 🔧 **Enhancements**
 
@@ -151,6 +151,7 @@ Or download the latest `.dmg` from [Releases](https://github.com/Ender-Wang/Swif
   - [ ] Custom deserializers (plugin system)
 - [x] JSON pretty-printing with syntax highlighting
 - [ ] Message search/filter
+  - [ ] Search by key, value, or timestamp
   - [ ] Time range filter
   - [ ] Keyword search
   - [ ] Regex search within JSON
