@@ -169,6 +169,7 @@ struct LagView: View {
                             renderingMode: mode,
                             selectedTopics: $state.lagSelectedTopics,
                             selectedGroups: $state.lagSelectedGroups,
+                            historyRange: nil,
                         )
                     }
                     .padding()
@@ -217,6 +218,7 @@ struct LagView: View {
                         renderingMode: mode,
                         selectedTopics: $historyBindable.selectedTopics,
                         selectedGroups: $historyBindable.selectedGroups,
+                        historyRange: (from: history.rangeFrom, to: history.rangeTo),
                     )
                 }
                 .padding()
@@ -317,42 +319,42 @@ struct LagView: View {
         renderingMode: TrendRenderingMode,
         selectedTopics: Binding<[String]>,
         selectedGroups: Binding<[String]>,
+        historyRange: (from: Date, to: Date)?,
     ) -> some View {
         let l10n = appState.l10n
+        let clusterName = appState.configStore.selectedCluster?.name ?? "Unknown"
+        let database = appState.metricDatabase
+        let clusterId = appState.configStore.selectedCluster?.id
 
         // Row 1: Consumer Group Lag + Topic Lag side by side
         HStack(alignment: .top, spacing: 16) {
             ConsumerGroupLagChart(
-                store: store,
-                l10n: l10n,
-                renderingMode: renderingMode,
+                store: store, l10n: l10n, renderingMode: renderingMode,
                 selectedGroups: selectedGroups,
+                clusterName: clusterName, database: database, clusterId: clusterId, historyRange: historyRange,
             )
 
             TopicLagChart(
-                store: store,
-                l10n: l10n,
-                renderingMode: renderingMode,
+                store: store, l10n: l10n, renderingMode: renderingMode,
                 selectedTopics: selectedTopics,
+                clusterName: clusterName, database: database, clusterId: clusterId, historyRange: historyRange,
             )
         }
 
         // Row 2: Partition Lag (full width)
         PartitionLagChart(
-            store: store,
-            l10n: l10n,
-            renderingMode: renderingMode,
+            store: store, l10n: l10n, renderingMode: renderingMode,
             selectedTopics: selectedTopics,
             partitionOwnerMap: partitionOwnerMap,
+            clusterName: clusterName, database: database, clusterId: clusterId, historyRange: historyRange,
         )
 
         // Row 3: Consumer Member Lag (full width)
         ConsumerMemberLagChart(
-            store: store,
-            l10n: l10n,
-            renderingMode: renderingMode,
+            store: store, l10n: l10n, renderingMode: renderingMode,
             selectedGroups: selectedGroups,
             consumerGroups: appState.consumerGroups,
+            clusterName: clusterName, database: database, clusterId: clusterId, historyRange: historyRange,
         )
     }
 

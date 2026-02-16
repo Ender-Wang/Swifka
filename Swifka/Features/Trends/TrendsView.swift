@@ -150,6 +150,7 @@ struct TrendsView: View {
                             store: store,
                             renderingMode: mode,
                             selectedTopics: $state.trendSelectedTopics,
+                            historyRange: nil,
                         )
                     }
                     .padding()
@@ -196,6 +197,7 @@ struct TrendsView: View {
                         store: history.store,
                         renderingMode: mode,
                         selectedTopics: $historyBindable.selectedTopics,
+                        historyRange: (from: history.rangeFrom, to: history.rangeTo),
                     )
                 }
                 .padding()
@@ -295,26 +297,38 @@ struct TrendsView: View {
         store: MetricStore,
         renderingMode: TrendRenderingMode,
         selectedTopics: Binding<[String]>,
+        historyRange: (from: Date, to: Date)?,
     ) -> some View {
         let l10n = appState.l10n
+        let clusterName = appState.configStore.selectedCluster?.name ?? "Unknown"
+        let database = appState.metricDatabase
+        let clusterId = appState.configStore.selectedCluster?.id
 
         // Row 1: Cluster throughput + Ping latency
         HStack(spacing: 16) {
-            ClusterThroughputChart(store: store, l10n: l10n, renderingMode: renderingMode)
-            PingLatencyChart(store: store, l10n: l10n, renderingMode: renderingMode)
-                .frame(maxWidth: 300)
+            ClusterThroughputChart(
+                store: store, l10n: l10n, renderingMode: renderingMode,
+                clusterName: clusterName, database: database, clusterId: clusterId, historyRange: historyRange,
+            )
+            PingLatencyChart(
+                store: store, l10n: l10n, renderingMode: renderingMode,
+                clusterName: clusterName, database: database, clusterId: clusterId, historyRange: historyRange,
+            )
+            .frame(maxWidth: 300)
         }
 
         // Row 2: Per-topic throughput
         TopicThroughputChart(
-            store: store,
-            l10n: l10n,
-            renderingMode: renderingMode,
+            store: store, l10n: l10n, renderingMode: renderingMode,
             selectedTopics: selectedTopics,
+            clusterName: clusterName, database: database, clusterId: clusterId, historyRange: historyRange,
         )
 
         // Row 3: ISR health
-        ISRHealthChart(store: store, l10n: l10n, renderingMode: renderingMode)
+        ISRHealthChart(
+            store: store, l10n: l10n, renderingMode: renderingMode,
+            clusterName: clusterName, database: database, clusterId: clusterId, historyRange: historyRange,
+        )
     }
 
     // MARK: - Mode Change

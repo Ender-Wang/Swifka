@@ -225,6 +225,8 @@
   "common.close": "Close",
   "common.dismiss": "Dismiss",
   "common.loading": "Loading…",
+  "common.export.xlsx": "Export as Excel",
+  "common.export.xlsx.exporting": "Exporting…",
   "common.error": "Error",
   "common.ok": "OK",
   "common.comingSoon": "Coming Soon",

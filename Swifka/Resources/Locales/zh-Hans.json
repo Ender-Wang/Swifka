@@ -225,6 +225,8 @@
   "common.close": "关闭",
   "common.dismiss": "关闭",
   "common.loading": "加载中…",
+  "common.export.xlsx": "导出为 Excel",
+  "common.export.xlsx.exporting": "正在导出…",
   "common.error": "错误",
   "common.ok": "确定",
   "common.comingSoon": "即将推出",

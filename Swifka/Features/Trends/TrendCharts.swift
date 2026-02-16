@@ -5,14 +5,27 @@ import SwiftUI
 
 struct TrendCard<Content: View> {
     let title: String
+    let onExport: (() -> Void)?
     @ViewBuilder let content: () -> Content
+
+    init(title: String, onExport: (() -> Void)? = nil, @ViewBuilder content: @escaping () -> Content) {
+        self.title = title
+        self.onExport = onExport
+        self.content = content
+    }
 }
 
 extension TrendCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.system(size: 16, weight: .medium, design: .rounded))
+            HStack {
+                Text(title)
+                    .font(.system(size: 16, weight: .medium, design: .rounded))
+                Spacer()
+                if let onExport {
+                    ExportButton(action: onExport)
+                }
+            }
             content()
         }
         .padding()
@@ -21,6 +34,30 @@ extension TrendCard: View {
             RoundedRectangle(cornerRadius: 12)
                 .strokeBorder(.quaternary),
         )
+    }
+}
+
+// MARK: - Export Button
+
+private struct ExportButton: View {
+    let action: () -> Void
+    @State private var isHovered = false
+    @Environment(AppState.self) private var appState
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "square.and.arrow.up")
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+                .padding(4)
+                .background(
+                    isHovered ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.clear),
+                    in: RoundedRectangle(cornerRadius: 4),
+                )
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
+        .help(appState.l10n["common.export.xlsx"])
     }
 }
 
@@ -156,12 +193,41 @@ struct ClusterThroughputChart: View {
     let store: MetricStore
     let l10n: L10n
     let renderingMode: TrendRenderingMode
+    let clusterName: String
+    let database: MetricDatabase?
+    let clusterId: UUID?
+    let historyRange: (from: Date, to: Date)?
     @State private var hoverLocation: CGPoint?
 
     var body: some View {
         let data = renderingMode.filterData(store.clusterThroughput, by: \.timestamp)
 
-        TrendCard(title: "\(l10n["trends.cluster.throughput"]) (\(l10n["trends.messages.per.second"]))") {
+        TrendCard(
+            title: "\(l10n["trends.cluster.throughput"]) (\(l10n["trends.messages.per.second"]))",
+            onExport: {
+                Task {
+                    let exportData: [ThroughputPoint]
+                    if case .history = renderingMode, let db = database, let cid = clusterId, let range = historyRange {
+                        let raw = try await db.loadSnapshots(clusterId: cid, from: range.from, to: range.to)
+                        let temp = MetricStore(capacity: .max)
+                        temp.loadHistorical(raw)
+                        exportData = temp.clusterThroughput
+                    } else {
+                        exportData = store.clusterThroughput
+                    }
+                    let fmt = ChartExporter.iso8601Formatter()
+                    let sorted = exportData.sorted { $0.timestamp < $1.timestamp }
+                    let sheets = [XLSXWriter.Sheet(
+                        name: "ClusterThroughput",
+                        headers: ["Timestamp", "MessagesPerSecond"],
+                        rows: sorted.map { [fmt.string(from: $0.timestamp), String(format: "%.2f", $0.messagesPerSecond)] },
+                    )]
+                    let xlsxData = XLSXWriter.build(sheets: sheets)
+                    let filename = ChartExporter.xlsxFilename(clusterName: clusterName, chartType: .clusterThroughput, dataPoints: exportData.map(\.timestamp))
+                    ChartExporter.saveXLSX(data: xlsxData, defaultFilename: filename)
+                }
+            },
+        ) {
             let chart = Chart {
                 ForEach(data) { point in
                     LineMark(
@@ -238,12 +304,41 @@ struct PingLatencyChart: View {
     let store: MetricStore
     let l10n: L10n
     let renderingMode: TrendRenderingMode
+    let clusterName: String
+    let database: MetricDatabase?
+    let clusterId: UUID?
+    let historyRange: (from: Date, to: Date)?
     @State private var hoverLocation: CGPoint?
 
     var body: some View {
         let data = renderingMode.filterData(store.pingHistory, by: \.timestamp)
 
-        TrendCard(title: "\(l10n["trends.ping.latency"]) (ms)") {
+        TrendCard(
+            title: "\(l10n["trends.ping.latency"]) (ms)",
+            onExport: {
+                Task {
+                    let exportData: [PingPoint]
+                    if case .history = renderingMode, let db = database, let cid = clusterId, let range = historyRange {
+                        let raw = try await db.loadSnapshots(clusterId: cid, from: range.from, to: range.to)
+                        let temp = MetricStore(capacity: .max)
+                        temp.loadHistorical(raw)
+                        exportData = temp.pingHistory
+                    } else {
+                        exportData = store.pingHistory
+                    }
+                    let fmt = ChartExporter.iso8601Formatter()
+                    let sorted = exportData.sorted { $0.timestamp < $1.timestamp }
+                    let sheets = [XLSXWriter.Sheet(
+                        name: "PingLatency",
+                        headers: ["Timestamp", "Milliseconds"],
+                        rows: sorted.map { [fmt.string(from: $0.timestamp), "\($0.ms)"] },
+                    )]
+                    let xlsxData = XLSXWriter.build(sheets: sheets)
+                    let filename = ChartExporter.xlsxFilename(clusterName: clusterName, chartType: .pingLatency, dataPoints: exportData.map(\.timestamp))
+                    ChartExporter.saveXLSX(data: xlsxData, defaultFilename: filename)
+                }
+            },
+        ) {
             let chart = Chart {
                 ForEach(data) { point in
                     LineMark(
@@ -314,6 +409,10 @@ struct TopicThroughputChart: View {
     let l10n: L10n
     let renderingMode: TrendRenderingMode
     @Binding var selectedTopics: [String]
+    let clusterName: String
+    let database: MetricDatabase?
+    let clusterId: UUID?
+    let historyRange: (from: Date, to: Date)?
     @State private var hoverLocation: CGPoint?
 
     /// Switch to log scale when selected topics span >20× difference in peak throughput.
@@ -354,7 +453,38 @@ struct TopicThroughputChart: View {
     var body: some View {
         let logScale = useLogScale
 
-        TrendCard(title: "\(l10n["trends.topic.throughput"]) (\(l10n["trends.messages.per.second"]))") {
+        TrendCard(
+            title: "\(l10n["trends.topic.throughput"]) (\(l10n["trends.messages.per.second"]))",
+            onExport: {
+                let topics = selectedTopics
+                Task {
+                    let sourceStore: MetricStore
+                    if case .history = renderingMode, let db = database, let cid = clusterId, let range = historyRange {
+                        let raw = try await db.loadSnapshots(clusterId: cid, from: range.from, to: range.to)
+                        let temp = MetricStore(capacity: .max)
+                        temp.loadHistorical(raw)
+                        sourceStore = temp
+                    } else {
+                        sourceStore = store
+                    }
+                    let fmt = ChartExporter.iso8601Formatter()
+                    var allDates: [Date] = []
+                    let sheets: [XLSXWriter.Sheet] = topics.map { topic in
+                        let series = sourceStore.throughputSeries(for: topic)
+                            .sorted { $0.timestamp < $1.timestamp }
+                        allDates.append(contentsOf: series.map(\.timestamp))
+                        return XLSXWriter.Sheet(
+                            name: topic,
+                            headers: ["Timestamp", "MessagesPerSecond"],
+                            rows: series.map { [fmt.string(from: $0.timestamp), String(format: "%.2f", $0.messagesPerSecond)] },
+                        )
+                    }
+                    let xlsxData = XLSXWriter.build(sheets: sheets)
+                    let filename = ChartExporter.xlsxFilename(clusterName: clusterName, chartType: .topicThroughput, dataPoints: allDates)
+                    ChartExporter.saveXLSX(data: xlsxData, defaultFilename: filename)
+                }
+            },
+        ) {
             let userTopics = store.knownTopics.filter { !$0.hasPrefix("__") }
             let allSelected = userTopics.allSatisfy { selectedTopics.contains($0) }
 
@@ -458,6 +588,10 @@ struct ConsumerGroupLagChart: View {
     let l10n: L10n
     let renderingMode: TrendRenderingMode
     @Binding var selectedGroups: [String]
+    let clusterName: String
+    let database: MetricDatabase?
+    let clusterId: UUID?
+    let historyRange: (from: Date, to: Date)?
     @State private var hoverLocation: CGPoint?
 
     /// Switch to log scale when selected groups span >20× difference in peak lag.
@@ -498,7 +632,38 @@ struct ConsumerGroupLagChart: View {
     var body: some View {
         let logScale = useLogScale
 
-        TrendCard(title: "\(l10n["trends.consumer.lag"]) (\(l10n["trends.lag.messages"]))") {
+        TrendCard(
+            title: "\(l10n["trends.consumer.lag"]) (\(l10n["trends.lag.messages"]))",
+            onExport: {
+                let groups = selectedGroups
+                Task {
+                    let sourceStore: MetricStore
+                    if case .history = renderingMode, let db = database, let cid = clusterId, let range = historyRange {
+                        let raw = try await db.loadSnapshots(clusterId: cid, from: range.from, to: range.to)
+                        let temp = MetricStore(capacity: .max)
+                        temp.loadHistorical(raw)
+                        sourceStore = temp
+                    } else {
+                        sourceStore = store
+                    }
+                    let fmt = ChartExporter.iso8601Formatter()
+                    var allDates: [Date] = []
+                    let sheets: [XLSXWriter.Sheet] = groups.map { group in
+                        let series = sourceStore.lagSeries(for: group)
+                            .sorted { $0.timestamp < $1.timestamp }
+                        allDates.append(contentsOf: series.map(\.timestamp))
+                        return XLSXWriter.Sheet(
+                            name: group,
+                            headers: ["Timestamp", "Lag"],
+                            rows: series.map { [fmt.string(from: $0.timestamp), "\($0.totalLag)"] },
+                        )
+                    }
+                    let xlsxData = XLSXWriter.build(sheets: sheets)
+                    let filename = ChartExporter.xlsxFilename(clusterName: clusterName, chartType: .consumerGroupLag, dataPoints: allDates)
+                    ChartExporter.saveXLSX(data: xlsxData, defaultFilename: filename)
+                }
+            },
+        ) {
             if store.knownGroups.isEmpty {
                 ContentUnavailableView {
                     Label(l10n["trends.consumer.lag"], systemImage: "person.3")
@@ -610,6 +775,10 @@ struct TopicLagChart: View {
     let l10n: L10n
     let renderingMode: TrendRenderingMode
     @Binding var selectedTopics: [String]
+    let clusterName: String
+    let database: MetricDatabase?
+    let clusterId: UUID?
+    let historyRange: (from: Date, to: Date)?
     @State private var hoverLocation: CGPoint?
 
     /// Switch to log scale when selected topics span >20× difference in peak lag.
@@ -654,7 +823,38 @@ struct TopicLagChart: View {
         let logScale = useLogScale
         let lagTopics = store.knownLagTopics.filter { !$0.hasPrefix("__") }
 
-        TrendCard(title: "\(l10n["trends.topic.lag"]) (\(l10n["trends.lag.messages"]))") {
+        TrendCard(
+            title: "\(l10n["trends.topic.lag"]) (\(l10n["trends.lag.messages"]))",
+            onExport: {
+                let topics = selectedTopics.filter { lagTopics.contains($0) }
+                Task {
+                    let sourceStore: MetricStore
+                    if case .history = renderingMode, let db = database, let cid = clusterId, let range = historyRange {
+                        let raw = try await db.loadSnapshots(clusterId: cid, from: range.from, to: range.to)
+                        let temp = MetricStore(capacity: .max)
+                        temp.loadHistorical(raw)
+                        sourceStore = temp
+                    } else {
+                        sourceStore = store
+                    }
+                    let fmt = ChartExporter.iso8601Formatter()
+                    var allDates: [Date] = []
+                    let sheets: [XLSXWriter.Sheet] = topics.map { topic in
+                        let series = sourceStore.topicLagSeries(for: topic)
+                            .sorted { $0.timestamp < $1.timestamp }
+                        allDates.append(contentsOf: series.map(\.timestamp))
+                        return XLSXWriter.Sheet(
+                            name: topic,
+                            headers: ["Timestamp", "Lag"],
+                            rows: series.map { [fmt.string(from: $0.timestamp), "\($0.totalLag)"] },
+                        )
+                    }
+                    let xlsxData = XLSXWriter.build(sheets: sheets)
+                    let filename = ChartExporter.xlsxFilename(clusterName: clusterName, chartType: .topicLag, dataPoints: allDates)
+                    ChartExporter.saveXLSX(data: xlsxData, defaultFilename: filename)
+                }
+            },
+        ) {
             if lagTopics.isEmpty {
                 ContentUnavailableView {
                     Label(l10n["trends.topic.lag"], systemImage: "chart.line.downtrend.xyaxis")
@@ -779,11 +979,50 @@ struct PartitionLagChart: View {
     let renderingMode: TrendRenderingMode
     @Binding var selectedTopics: [String]
     let partitionOwnerMap: [String: PartitionOwner]
+    let clusterName: String
+    let database: MetricDatabase?
+    let clusterId: UUID?
+    let historyRange: (from: Date, to: Date)?
 
     var body: some View {
         let lagTopics = Array(store.knownPartitionsByTopic.keys).sorted().filter { !$0.hasPrefix("__") }
 
-        TrendCard(title: "\(l10n["trends.partition.lag"]) (\(l10n["trends.lag.messages"]))") {
+        TrendCard(
+            title: "\(l10n["trends.partition.lag"]) (\(l10n["trends.lag.messages"]))",
+            onExport: {
+                let topics = selectedTopics.filter { lagTopics.contains($0) }
+                Task {
+                    let sourceStore: MetricStore
+                    if case .history = renderingMode, let db = database, let cid = clusterId, let range = historyRange {
+                        let raw = try await db.loadSnapshots(clusterId: cid, from: range.from, to: range.to)
+                        let temp = MetricStore(capacity: .max)
+                        temp.loadHistorical(raw)
+                        sourceStore = temp
+                    } else {
+                        sourceStore = store
+                    }
+                    let fmt = ChartExporter.iso8601Formatter()
+                    var allDates: [Date] = []
+                    let sheets: [XLSXWriter.Sheet] = topics.flatMap { topic -> [XLSXWriter.Sheet] in
+                        let partitionKeys = sourceStore.knownPartitionsByTopic[topic] ?? []
+                        return partitionKeys.map { key in
+                            let series = sourceStore.partitionLagSeries(for: key)
+                                .sorted { $0.timestamp < $1.timestamp }
+                            allDates.append(contentsOf: series.map(\.timestamp))
+                            let pNum = key.split(separator: ":").last.map(String.init) ?? "?"
+                            return XLSXWriter.Sheet(
+                                name: "\(topic) P\(pNum)",
+                                headers: ["Timestamp", "Lag"],
+                                rows: series.map { [fmt.string(from: $0.timestamp), "\($0.totalLag)"] },
+                            )
+                        }
+                    }
+                    let xlsxData = XLSXWriter.build(sheets: sheets)
+                    let filename = ChartExporter.xlsxFilename(clusterName: clusterName, chartType: .partitionLag, dataPoints: allDates)
+                    ChartExporter.saveXLSX(data: xlsxData, defaultFilename: filename)
+                }
+            },
+        ) {
             if lagTopics.isEmpty {
                 ContentUnavailableView {
                     Label(l10n["trends.partition.lag"], systemImage: "chart.bar.xaxis")
@@ -981,12 +1220,50 @@ struct ConsumerMemberLagChart: View {
     let renderingMode: TrendRenderingMode
     @Binding var selectedGroups: [String]
     let consumerGroups: [ConsumerGroupInfo]
+    let clusterName: String
+    let database: MetricDatabase?
+    let clusterId: UUID?
+    let historyRange: (from: Date, to: Date)?
 
     var body: some View {
         // Use store.knownGroups for stable chip list (not consumerGroups which updates every refresh)
         let groupNames = store.knownGroups
 
-        TrendCard(title: "\(l10n["trends.consumer.member.lag"]) (\(l10n["trends.lag.messages"]))") {
+        TrendCard(
+            title: "\(l10n["trends.consumer.member.lag"]) (\(l10n["trends.lag.messages"]))",
+            onExport: {
+                let activeGroups = selectedGroups.compactMap { name in
+                    consumerGroups.first { $0.name == name }
+                }
+                Task {
+                    let sourceStore: MetricStore
+                    if case .history = renderingMode, let db = database, let cid = clusterId, let range = historyRange {
+                        let raw = try await db.loadSnapshots(clusterId: cid, from: range.from, to: range.to)
+                        let temp = MetricStore(capacity: .max)
+                        temp.loadHistorical(raw)
+                        sourceStore = temp
+                    } else {
+                        sourceStore = store
+                    }
+                    let fmt = ChartExporter.iso8601Formatter()
+                    var allDates: [Date] = []
+                    let sheets: [XLSXWriter.Sheet] = activeGroups.flatMap { group -> [XLSXWriter.Sheet] in
+                        aggregateMemberLag(group: group, store: sourceStore).map { member in
+                            let sorted = member.series.sorted { $0.timestamp < $1.timestamp }
+                            allDates.append(contentsOf: sorted.map(\.timestamp))
+                            return XLSXWriter.Sheet(
+                                name: "\(group.name) - \(member.clientId)",
+                                headers: ["Timestamp", "Lag"],
+                                rows: sorted.map { [fmt.string(from: $0.timestamp), "\($0.totalLag)"] },
+                            )
+                        }
+                    }
+                    let xlsxData = XLSXWriter.build(sheets: sheets)
+                    let filename = ChartExporter.xlsxFilename(clusterName: clusterName, chartType: .consumerMemberLag, dataPoints: allDates)
+                    ChartExporter.saveXLSX(data: xlsxData, defaultFilename: filename)
+                }
+            },
+        ) {
             if groupNames.isEmpty {
                 ContentUnavailableView {
                     Label(l10n["trends.consumer.member.lag"], systemImage: "person.2")
@@ -1056,6 +1333,44 @@ struct ConsumerMemberLagChart: View {
     }
 }
 
+// MARK: - Member Lag Aggregation
+
+/// Aggregate partition lag into per-member time series for a consumer group.
+/// Shared between `MemberSubChart` (rendering) and `ConsumerMemberLagChart` (CSV export).
+func aggregateMemberLag(
+    group: ConsumerGroupInfo,
+    store: MetricStore,
+) -> [(clientId: String, memberId: String, series: [LagPoint])] {
+    group.members.map { member in
+        var keys: [String] = []
+        for assignment in member.assignments {
+            for partition in assignment.partitions {
+                keys.append("\(assignment.topic):\(partition)")
+            }
+        }
+        keys.sort()
+
+        var timestampMap: [Date: (total: Int64, segment: Int)] = [:]
+        for key in keys {
+            for point in store.partitionLagSeries(for: key) {
+                if let existing = timestampMap[point.timestamp] {
+                    timestampMap[point.timestamp] = (existing.total + point.totalLag, point.segment)
+                } else {
+                    timestampMap[point.timestamp] = (point.totalLag, point.segment)
+                }
+            }
+        }
+
+        let points = timestampMap.map { ($0.key, $0.value.total, $0.value.segment) }
+            .sorted { $0.0 < $1.0 }
+            .map { ts, lag, seg in
+                LagPoint(timestamp: ts, group: member.memberId, totalLag: lag, segment: seg)
+            }
+
+        return (clientId: member.clientId, memberId: member.memberId, series: points)
+    }
+}
+
 /// Isolated sub-chart for a single consumer group's per-member lag.
 /// Each instance owns its own `@State hoverLocation`, so hovering on one
 /// group's chart does not invalidate other groups' charts.
@@ -1080,32 +1395,9 @@ private struct MemberSubChart: View {
         }
     }
 
-    /// Aggregate lag series per member, computed from partition lag data.
+    /// Aggregate lag series per member, computed via shared helper.
     private var memberLagSeries: [(memberId: String, series: [LagPoint])] {
-        memberPartitionKeys.map { item in
-            // Collect all lag points across this member's partitions, grouped by timestamp
-            var lagByTimestamp: [(Date, Int64, Int)] = []
-            var timestampMap: [Date: (total: Int64, segment: Int)] = [:]
-
-            for key in item.keys {
-                for point in store.partitionLagSeries(for: key) {
-                    if let existing = timestampMap[point.timestamp] {
-                        timestampMap[point.timestamp] = (existing.total + point.totalLag, point.segment)
-                    } else {
-                        timestampMap[point.timestamp] = (point.totalLag, point.segment)
-                    }
-                }
-            }
-
-            lagByTimestamp = timestampMap.map { ($0.key, $0.value.total, $0.value.segment) }
-                .sorted { $0.0 < $1.0 }
-
-            let points = lagByTimestamp.map { ts, lag, seg in
-                LagPoint(timestamp: ts, group: item.member.memberId, totalLag: lag, segment: seg)
-            }
-
-            return (memberId: item.member.memberId, series: points)
-        }
+        aggregateMemberLag(group: group, store: store).map { (memberId: $0.memberId, series: $0.series) }
     }
 
     /// Build legend labels. If all clientIds are unique within the group, use clientId + partitions.
@@ -1260,12 +1552,41 @@ struct ISRHealthChart: View {
     let store: MetricStore
     let l10n: L10n
     let renderingMode: TrendRenderingMode
+    let clusterName: String
+    let database: MetricDatabase?
+    let clusterId: UUID?
+    let historyRange: (from: Date, to: Date)?
     @State private var hoverLocation: CGPoint?
 
     var body: some View {
         let data = renderingMode.filterData(store.isrHealthSeries, by: \.timestamp)
 
-        TrendCard(title: "\(l10n["trends.isr.health"]) (%)") {
+        TrendCard(
+            title: "\(l10n["trends.isr.health"]) (%)",
+            onExport: {
+                Task {
+                    let exportData: [ISRHealthPoint]
+                    if case .history = renderingMode, let db = database, let cid = clusterId, let range = historyRange {
+                        let raw = try await db.loadSnapshots(clusterId: cid, from: range.from, to: range.to)
+                        let temp = MetricStore(capacity: .max)
+                        temp.loadHistorical(raw)
+                        exportData = temp.isrHealthSeries
+                    } else {
+                        exportData = store.isrHealthSeries
+                    }
+                    let fmt = ChartExporter.iso8601Formatter()
+                    let sorted = exportData.sorted { $0.timestamp < $1.timestamp }
+                    let sheets = [XLSXWriter.Sheet(
+                        name: "ISRHealth",
+                        headers: ["Timestamp", "HealthPercent"],
+                        rows: sorted.map { [fmt.string(from: $0.timestamp), String(format: "%.2f", $0.healthyRatio * 100)] },
+                    )]
+                    let xlsxData = XLSXWriter.build(sheets: sheets)
+                    let filename = ChartExporter.xlsxFilename(clusterName: clusterName, chartType: .isrHealth, dataPoints: exportData.map(\.timestamp))
+                    ChartExporter.saveXLSX(data: xlsxData, defaultFilename: filename)
+                }
+            },
+        ) {
             let chart = Chart {
                 ForEach(data) { point in
                     AreaMark(
