@@ -349,7 +349,6 @@ private struct SidebarFooterView: View {
                     Text("\(ping)ms")
                         .font(.caption.monospacedDigit())
                         .foregroundStyle(.secondary)
-                        .contentTransition(.numericText())
                 }
 
                 ProgressView()
@@ -457,8 +456,6 @@ private struct CompactSidebarFooterView: View {
                 Text("\(ping)ms")
                     .font(.system(size: 9).monospacedDigit().bold())
                     .foregroundStyle(.green)
-                    .contentTransition(.numericText())
-                    .animation(.default, value: ping)
             }
 
             CompactMetricIcon(icon: "server.rack", count: appState.brokers.count, color: .blue, connected: connected)
