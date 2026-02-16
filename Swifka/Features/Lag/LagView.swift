@@ -248,18 +248,50 @@ struct LagView: View {
     @ViewBuilder
     private var lagHistoryVisibleWindowPicker: some View {
         let l10n = appState.l10n
-        @Bindable var historyBindable = appState.lagHistoryState
+        let history = appState.lagHistoryState
+        @Bindable var historyBindable = history
 
-        Picker(l10n["trends.time.window"], selection: $historyBindable.visibleWindowSeconds) {
-            Text("1m").tag(TimeInterval(60))
-            Text("5m").tag(TimeInterval(300))
-            Text("15m").tag(TimeInterval(900))
-            Text("30m").tag(TimeInterval(1800))
-            Text("1h").tag(TimeInterval(3600))
-            Text("6h").tag(TimeInterval(21600))
+        HStack(spacing: 12) {
+            Picker(l10n["trends.time.window"], selection: $historyBindable.visibleWindowSeconds) {
+                Text("1m").tag(TimeInterval(60))
+                Text("5m").tag(TimeInterval(300))
+                Text("15m").tag(TimeInterval(900))
+                Text("30m").tag(TimeInterval(1800))
+                Text("1h").tag(TimeInterval(3600))
+                Text("6h").tag(TimeInterval(21600))
+                Text("24h").tag(TimeInterval(86400))
+                Text("7d").tag(TimeInterval(604_800))
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .fixedSize()
+
+            Picker(l10n["trends.aggregation"], selection: $historyBindable.aggregationMode) {
+                Text(l10n["trends.aggregation.mean"]).tag(AggregationMode.mean)
+                Text(l10n["trends.aggregation.min"]).tag(AggregationMode.min)
+                Text(l10n["trends.aggregation.max"]).tag(AggregationMode.max)
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .fixedSize()
         }
-        .pickerStyle(.segmented)
-        .frame(maxWidth: 320)
+        .onChange(of: history.visibleWindowSeconds) {
+            history.expandRangeIfNeeded()
+            Task {
+                await history.loadData(
+                    database: appState.metricDatabase,
+                    clusterId: appState.configStore.selectedCluster?.id,
+                )
+            }
+        }
+        .onChange(of: history.aggregationMode) {
+            Task {
+                await history.loadData(
+                    database: appState.metricDatabase,
+                    clusterId: appState.configStore.selectedCluster?.id,
+                )
+            }
+        }
     }
 
     // MARK: - Lag Chart Stack

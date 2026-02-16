@@ -26,6 +26,9 @@ final class HistoryState {
     /// Visible window duration for scrollable charts (seconds).
     var visibleWindowSeconds: TimeInterval = 300
 
+    /// Aggregation mode for downsampled data (Mean / Min / Max).
+    var aggregationMode: AggregationMode = .mean
+
     /// Set default time range when entering History mode.
     func enterHistoryMode(timeWindow: ChartTimeWindow) {
         let now = Date()
@@ -33,7 +36,16 @@ final class HistoryState {
         rangeFrom = now.addingTimeInterval(-timeWindow.seconds)
     }
 
+    /// Expand date range to cover the visible window if needed.
+    func expandRangeIfNeeded() {
+        let currentRange = rangeTo.timeIntervalSince(rangeFrom)
+        if currentRange < visibleWindowSeconds {
+            rangeFrom = rangeTo.addingTimeInterval(-visibleWindowSeconds)
+        }
+    }
+
     /// Load data from the database for the current time range.
+    /// Automatically chooses raw or downsampled query based on range span.
     func loadData(database: MetricDatabase?, clusterId: UUID?) async {
         guard let database, let clusterId else { return }
         isLoading = true
@@ -43,11 +55,23 @@ final class HistoryState {
                 minTimestamp = bounds.min
             }
 
-            let snapshots = try await database.loadSnapshots(
-                clusterId: clusterId,
-                from: rangeFrom,
-                to: rangeTo,
-            )
+            let rangeSeconds = rangeTo.timeIntervalSince(rangeFrom)
+            let snapshots: [MetricSnapshot] = if let bucket = MetricDatabase.bucketSeconds(forRangeSeconds: rangeSeconds) {
+                try await database.loadDownsampledSnapshots(
+                    clusterId: clusterId,
+                    from: rangeFrom,
+                    to: rangeTo,
+                    bucketSeconds: bucket,
+                    mode: aggregationMode,
+                )
+            } else {
+                try await database.loadSnapshots(
+                    clusterId: clusterId,
+                    from: rangeFrom,
+                    to: rangeTo,
+                )
+            }
+
             store.loadHistorical(snapshots)
 
             // Auto-select first topic/group if empty

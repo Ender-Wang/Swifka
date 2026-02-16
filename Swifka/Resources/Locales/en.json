@@ -74,6 +74,10 @@
   "trends.history.apply": "Apply",
   "trends.history.no.data": "No Historical Data",
   "trends.history.no.data.description": "No metric snapshots found for the selected time range. Try expanding the date range.",
+  "trends.aggregation": "Aggregation",
+  "trends.aggregation.mean": "Mean",
+  "trends.aggregation.min": "Min",
+  "trends.aggregation.max": "Max",
 
   "lag.title": "Lag",
   "lag.not.connected": "Not Connected",
@@ -128,6 +132,7 @@
   "messages.empty.description": "Select a topic and click Fetch to browse messages.",
   "messages.detail": "Message Detail",
   "messages.select.topic": "Select a topic to browse messages.",
+  "messages.page.info": "{0} of {1} messages",
 
   "groups.title": "Consumer Groups",
   "groups.name": "Group Name",

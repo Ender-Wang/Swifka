@@ -74,6 +74,10 @@
   "trends.history.apply": "应用",
   "trends.history.no.data": "无历史数据",
   "trends.history.no.data.description": "所选时间范围内未找到指标快照，请尝试扩大日期范围。",
+  "trends.aggregation": "聚合",
+  "trends.aggregation.mean": "均值",
+  "trends.aggregation.min": "最小值",
+  "trends.aggregation.max": "最大值",
 
   "lag.title": "延迟",
   "lag.not.connected": "未连接",
@@ -128,6 +132,7 @@
   "messages.empty.description": "选择一个 Topic 并点击拉取以浏览消息。",
   "messages.detail": "消息详情",
   "messages.select.topic": "选择一个 Topic 以浏览消息。",
+  "messages.page.info": "第 {0} 条，共 {1} 条",
 
   "groups.title": "消费者组",
   "groups.name": "组名",

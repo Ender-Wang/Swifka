@@ -172,6 +172,139 @@ actor MetricDatabase {
         return results
     }
 
+    // MARK: - Downsampled Query
+
+    /// Returns the appropriate bucket size in seconds for a given time range,
+    /// or nil if the range is small enough for raw data.
+    static func bucketSeconds(forRangeSeconds range: TimeInterval) -> Int? {
+        switch range {
+        case ...1800: nil // ≤30m: raw data
+        case ...3600: 10 // ≤1h: 10s buckets (~360 points)
+        case ...21600: 60 // ≤6h: 1-min buckets (~360 points)
+        case ...86400: 300 // ≤24h: 5-min buckets (~288 points)
+        case ...604_800: 1800 // ≤7d: 30-min buckets (~336 points)
+        default: 3600 // >7d: 1h buckets
+        }
+    }
+
+    /// Loads downsampled snapshots using SQL GROUP BY time buckets.
+    /// Scalar columns use AVG/MIN/MAX based on mode. JSON columns come from the
+    /// last row per bucket (representative row via MAX(rowid)).
+    func loadDownsampledSnapshots(
+        clusterId: UUID,
+        from startDate: Date,
+        to endDate: Date,
+        bucketSeconds: Int,
+        mode: AggregationMode,
+    ) throws -> [MetricSnapshot] {
+        let aggFn = switch mode {
+        case .mean: "AVG"
+        case .min: "MIN"
+        case .max: "MAX"
+        }
+
+        // CTE groups by time bucket, computes aggregate scalars + representative row ID
+        let sql = """
+        WITH bucket_agg AS (
+            SELECT
+                CAST(timestamp / \(bucketSeconds) AS INTEGER) AS bucket_id,
+                MAX(rowid) AS rep_rowid,
+                CAST(timestamp / \(bucketSeconds) AS INTEGER) * \(bucketSeconds) AS bucket_ts,
+                CAST(\(aggFn)(total_high_watermark) AS INTEGER) AS agg_hwm,
+                CAST(\(aggFn)(total_lag) AS INTEGER) AS agg_lag,
+                CAST(\(aggFn)(under_replicated_partitions) AS INTEGER) AS agg_urp,
+                MAX(total_partitions) AS agg_parts,
+                MAX(broker_count) AS agg_brokers,
+                CAST(\(aggFn)(ping_ms) AS INTEGER) AS agg_ping
+            FROM metric_snapshots
+            WHERE cluster_id = ? AND timestamp >= ? AND timestamp <= ?
+            GROUP BY bucket_id
+        )
+        SELECT
+            m.id,
+            ba.bucket_ts,
+            m.topic_watermarks,
+            m.consumer_group_lags,
+            m.topic_lags,
+            m.partition_lag_detail,
+            ba.agg_hwm,
+            ba.agg_lag,
+            ba.agg_urp,
+            ba.agg_parts,
+            ba.agg_brokers,
+            ba.agg_ping
+        FROM bucket_agg ba
+        JOIN metric_snapshots m ON m.rowid = ba.rep_rowid
+        ORDER BY ba.bucket_ts ASC
+        """
+
+        let stmt = try db.prepare(
+            sql,
+            clusterId.uuidString,
+            startDate.timeIntervalSince1970,
+            endDate.timeIntervalSince1970,
+        )
+
+        var results: [MetricSnapshot] = []
+        let decoder = JSONDecoder()
+
+        // Column indices:
+        // 0: id, 1: bucket_ts, 2: topic_watermarks, 3: consumer_group_lags,
+        // 4: topic_lags, 5: partition_lag_detail, 6: agg_hwm, 7: agg_lag,
+        // 8: agg_urp, 9: agg_parts, 10: agg_brokers, 11: agg_ping
+        for row in stmt {
+            guard let idStr = row[0] as? String,
+                  let bucketTs = row[1] as? Double ?? (row[1] as? Int64).map(Double.init),
+                  let watermarksStr = row[2] as? String,
+                  let lagsStr = row[3] as? String,
+                  let topicLagsStr = row[4] as? String,
+                  let partLagStr = row[5] as? String
+            else { continue }
+
+            let watermarks = try decoder.decode(
+                [String: Int64].self,
+                from: watermarksStr.data(using: .utf8)!,
+            )
+            let lags = try decoder.decode(
+                [String: Int64].self,
+                from: lagsStr.data(using: .utf8)!,
+            )
+            let topicLags = try decoder.decode(
+                [String: Int64].self,
+                from: topicLagsStr.data(using: .utf8)!,
+            )
+            let partitionLagDetail = try decoder.decode(
+                [String: Int64].self,
+                from: partLagStr.data(using: .utf8)!,
+            )
+
+            let aggHwm = (row[6] as? Int64) ?? 0
+            let aggLag = (row[7] as? Int64) ?? 0
+            let aggUrp = (row[8] as? Int64) ?? 0
+            let aggParts = (row[9] as? Int64) ?? 0
+            let aggBrokers = (row[10] as? Int64) ?? 0
+            let aggPing = row[11] as? Int64
+
+            results.append(MetricSnapshot(
+                id: UUID(uuidString: idStr) ?? UUID(),
+                timestamp: Date(timeIntervalSince1970: bucketTs),
+                granularity: TimeInterval(bucketSeconds),
+                topicWatermarks: watermarks,
+                consumerGroupLags: lags,
+                topicLags: topicLags,
+                partitionLagDetail: partitionLagDetail,
+                totalHighWatermark: aggHwm,
+                totalLag: aggLag,
+                underReplicatedPartitions: Int(aggUrp),
+                totalPartitions: Int(aggParts),
+                brokerCount: Int(aggBrokers),
+                pingMs: aggPing.map { Int($0) },
+            ))
+        }
+
+        return results
+    }
+
     // MARK: - Row Decoding
 
     private func decodeSnapshot(row: Row, decoder: JSONDecoder) throws -> MetricSnapshot {

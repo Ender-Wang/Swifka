@@ -117,6 +117,19 @@ nonisolated struct ISRHealthPoint: Sendable, Identifiable {
     }
 }
 
+// MARK: - Aggregation Mode
+
+/// Aggregation mode for downsampled History data.
+nonisolated enum AggregationMode: String, CaseIterable, Identifiable, Sendable {
+    case mean
+    case min
+    case max
+
+    var id: String {
+        rawValue
+    }
+}
+
 // MARK: - Trends Mode
 
 nonisolated enum TrendsMode: String, CaseIterable, Identifiable, Sendable {
