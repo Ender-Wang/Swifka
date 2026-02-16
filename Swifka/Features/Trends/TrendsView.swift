@@ -245,14 +245,16 @@ struct TrendsView: View {
             .labelsHidden()
             .fixedSize()
 
-            Picker(l10n["trends.aggregation"], selection: $historyBindable.aggregationMode) {
-                Text(l10n["trends.aggregation.mean"]).tag(AggregationMode.mean)
-                Text(l10n["trends.aggregation.min"]).tag(AggregationMode.min)
-                Text(l10n["trends.aggregation.max"]).tag(AggregationMode.max)
+            if history.visibleWindowSeconds > 1800 {
+                Picker(l10n["trends.aggregation"], selection: $historyBindable.aggregationMode) {
+                    Text(l10n["trends.aggregation.mean"]).tag(AggregationMode.mean)
+                    Text(l10n["trends.aggregation.min"]).tag(AggregationMode.min)
+                    Text(l10n["trends.aggregation.max"]).tag(AggregationMode.max)
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .fixedSize()
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .fixedSize()
         }
         .onChange(of: history.visibleWindowSeconds) {
             history.expandRangeIfNeeded()
