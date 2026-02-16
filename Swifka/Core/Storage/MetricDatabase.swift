@@ -188,8 +188,8 @@ actor MetricDatabase {
     }
 
     /// Loads downsampled snapshots using SQL GROUP BY time buckets.
-    /// Scalar columns use AVG/MIN/MAX based on mode. JSON columns come from the
-    /// last row per bucket (representative row via MAX(rowid)).
+    /// Scalar columns use AVG/MIN/MAX based on mode. JSON dict columns are
+    /// aggregated in Swift (per-key AVG/MIN/MAX across all rows in a bucket).
     func loadDownsampledSnapshots(
         clusterId: UUID,
         from startDate: Date,
@@ -203,39 +203,24 @@ actor MetricDatabase {
         case .max: "MAX"
         }
 
-        // CTE groups by time bucket, computes aggregate scalars + representative row ID
+        // Load all rows with bucket assignment + scalar aggregates via window functions
         let sql = """
-        WITH bucket_agg AS (
-            SELECT
-                CAST(timestamp / \(bucketSeconds) AS INTEGER) AS bucket_id,
-                MAX(rowid) AS rep_rowid,
-                CAST(timestamp / \(bucketSeconds) AS INTEGER) * \(bucketSeconds) AS bucket_ts,
-                CAST(\(aggFn)(total_high_watermark) AS INTEGER) AS agg_hwm,
-                CAST(\(aggFn)(total_lag) AS INTEGER) AS agg_lag,
-                CAST(\(aggFn)(under_replicated_partitions) AS INTEGER) AS agg_urp,
-                MAX(total_partitions) AS agg_parts,
-                MAX(broker_count) AS agg_brokers,
-                CAST(\(aggFn)(ping_ms) AS INTEGER) AS agg_ping
-            FROM metric_snapshots
-            WHERE cluster_id = ? AND timestamp >= ? AND timestamp <= ?
-            GROUP BY bucket_id
-        )
         SELECT
             m.id,
-            ba.bucket_ts,
+            CAST(m.timestamp / \(bucketSeconds) AS INTEGER) * \(bucketSeconds) AS bucket_ts,
             m.topic_watermarks,
             m.consumer_group_lags,
             m.topic_lags,
             m.partition_lag_detail,
-            ba.agg_hwm,
-            ba.agg_lag,
-            ba.agg_urp,
-            ba.agg_parts,
-            ba.agg_brokers,
-            ba.agg_ping
-        FROM bucket_agg ba
-        JOIN metric_snapshots m ON m.rowid = ba.rep_rowid
-        ORDER BY ba.bucket_ts ASC
+            CAST(\(aggFn)(m.total_high_watermark) OVER (PARTITION BY CAST(m.timestamp / \(bucketSeconds) AS INTEGER)) AS INTEGER) AS agg_hwm,
+            CAST(\(aggFn)(m.total_lag) OVER (PARTITION BY CAST(m.timestamp / \(bucketSeconds) AS INTEGER)) AS INTEGER) AS agg_lag,
+            CAST(\(aggFn)(m.under_replicated_partitions) OVER (PARTITION BY CAST(m.timestamp / \(bucketSeconds) AS INTEGER)) AS INTEGER) AS agg_urp,
+            MAX(m.total_partitions) OVER (PARTITION BY CAST(m.timestamp / \(bucketSeconds) AS INTEGER)) AS agg_parts,
+            MAX(m.broker_count) OVER (PARTITION BY CAST(m.timestamp / \(bucketSeconds) AS INTEGER)) AS agg_brokers,
+            CAST(\(aggFn)(m.ping_ms) OVER (PARTITION BY CAST(m.timestamp / \(bucketSeconds) AS INTEGER)) AS INTEGER) AS agg_ping
+        FROM metric_snapshots m
+        WHERE m.cluster_id = ? AND m.timestamp >= ? AND m.timestamp <= ?
+        ORDER BY bucket_ts ASC, m.timestamp ASC
         """
 
         let stmt = try db.prepare(
@@ -245,13 +230,26 @@ actor MetricDatabase {
             endDate.timeIntervalSince1970,
         )
 
-        var results: [MetricSnapshot] = []
         let decoder = JSONDecoder()
 
-        // Column indices:
-        // 0: id, 1: bucket_ts, 2: topic_watermarks, 3: consumer_group_lags,
-        // 4: topic_lags, 5: partition_lag_detail, 6: agg_hwm, 7: agg_lag,
-        // 8: agg_urp, 9: agg_parts, 10: agg_brokers, 11: agg_ping
+        // Collect rows per bucket for JSON aggregation
+        struct BucketRow {
+            let id: UUID
+            let watermarks: [String: Int64]
+            let lags: [String: Int64]
+            let topicLags: [String: Int64]
+            let partitionLagDetail: [String: Int64]
+            let aggHwm: Int64
+            let aggLag: Int64
+            let aggUrp: Int64
+            let aggParts: Int64
+            let aggBrokers: Int64
+            let aggPing: Int64?
+        }
+
+        var buckets: [(ts: Double, rows: [BucketRow])] = []
+        var currentBucketTs: Double = -1
+
         for row in stmt {
             guard let idStr = row[0] as? String,
                   let bucketTs = row[1] as? Double ?? (row[1] as? Int64).map(Double.init),
@@ -261,48 +259,76 @@ actor MetricDatabase {
                   let partLagStr = row[5] as? String
             else { continue }
 
-            let watermarks = try decoder.decode(
-                [String: Int64].self,
-                from: watermarksStr.data(using: .utf8)!,
-            )
-            let lags = try decoder.decode(
-                [String: Int64].self,
-                from: lagsStr.data(using: .utf8)!,
-            )
-            let topicLags = try decoder.decode(
-                [String: Int64].self,
-                from: topicLagsStr.data(using: .utf8)!,
-            )
-            let partitionLagDetail = try decoder.decode(
-                [String: Int64].self,
-                from: partLagStr.data(using: .utf8)!,
-            )
-
-            let aggHwm = (row[6] as? Int64) ?? 0
-            let aggLag = (row[7] as? Int64) ?? 0
-            let aggUrp = (row[8] as? Int64) ?? 0
-            let aggParts = (row[9] as? Int64) ?? 0
-            let aggBrokers = (row[10] as? Int64) ?? 0
-            let aggPing = row[11] as? Int64
-
-            results.append(MetricSnapshot(
+            let bucketRow = BucketRow(
                 id: UUID(uuidString: idStr) ?? UUID(),
-                timestamp: Date(timeIntervalSince1970: bucketTs),
-                granularity: TimeInterval(bucketSeconds),
-                topicWatermarks: watermarks,
-                consumerGroupLags: lags,
-                topicLags: topicLags,
-                partitionLagDetail: partitionLagDetail,
-                totalHighWatermark: aggHwm,
-                totalLag: aggLag,
-                underReplicatedPartitions: Int(aggUrp),
-                totalPartitions: Int(aggParts),
-                brokerCount: Int(aggBrokers),
-                pingMs: aggPing.map { Int($0) },
-            ))
+                watermarks: (try? decoder.decode([String: Int64].self, from: watermarksStr.data(using: .utf8)!)) ?? [:],
+                lags: (try? decoder.decode([String: Int64].self, from: lagsStr.data(using: .utf8)!)) ?? [:],
+                topicLags: (try? decoder.decode([String: Int64].self, from: topicLagsStr.data(using: .utf8)!)) ?? [:],
+                partitionLagDetail: (try? decoder.decode([String: Int64].self, from: partLagStr.data(using: .utf8)!)) ?? [:],
+                aggHwm: (row[6] as? Int64) ?? 0,
+                aggLag: (row[7] as? Int64) ?? 0,
+                aggUrp: (row[8] as? Int64) ?? 0,
+                aggParts: (row[9] as? Int64) ?? 0,
+                aggBrokers: (row[10] as? Int64) ?? 0,
+                aggPing: row[11] as? Int64,
+            )
+
+            if bucketTs != currentBucketTs {
+                buckets.append((ts: bucketTs, rows: [bucketRow]))
+                currentBucketTs = bucketTs
+            } else {
+                buckets[buckets.count - 1].rows.append(bucketRow)
+            }
         }
 
-        return results
+        // Aggregate JSON dicts per bucket
+        return buckets.map { bucket in
+            let rows = bucket.rows
+            let first = rows[0]
+
+            return MetricSnapshot(
+                id: first.id,
+                timestamp: Date(timeIntervalSince1970: bucket.ts),
+                granularity: TimeInterval(bucketSeconds),
+                topicWatermarks: aggregateDict(rows.map(\.watermarks), mode: mode),
+                consumerGroupLags: aggregateDict(rows.map(\.lags), mode: mode),
+                topicLags: aggregateDict(rows.map(\.topicLags), mode: mode),
+                partitionLagDetail: aggregateDict(rows.map(\.partitionLagDetail), mode: mode),
+                totalHighWatermark: first.aggHwm,
+                totalLag: first.aggLag,
+                underReplicatedPartitions: Int(first.aggUrp),
+                totalPartitions: Int(first.aggParts),
+                brokerCount: Int(first.aggBrokers),
+                pingMs: first.aggPing.map { Int($0) },
+            )
+        }
+    }
+
+    /// Aggregate an array of `[String: Int64]` dicts per key using the given mode.
+    private func aggregateDict(_ dicts: [[String: Int64]], mode: AggregationMode) -> [String: Int64] {
+        guard !dicts.isEmpty else { return [:] }
+        if dicts.count == 1 { return dicts[0] }
+
+        // Collect all keys
+        var allKeys = Set<String>()
+        for d in dicts {
+            allKeys.formUnion(d.keys)
+        }
+
+        var result: [String: Int64] = [:]
+        for key in allKeys {
+            let values = dicts.compactMap { $0[key] }
+            guard !values.isEmpty else { continue }
+            switch mode {
+            case .mean:
+                result[key] = values.reduce(0, +) / Int64(values.count)
+            case .min:
+                result[key] = values.min()!
+            case .max:
+                result[key] = values.max()!
+            }
+        }
+        return result
     }
 
     // MARK: - Row Decoding
