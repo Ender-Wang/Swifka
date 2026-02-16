@@ -106,6 +106,8 @@ Or download the latest `.dmg` from [Releases](https://github.com/Ender-Wang/Swif
 - [x] ~~Trends page tab reorganization~~ → Split into Trends (cluster health) + Lag (consumer investigation) pages
 - [ ] ~~Pinch-to-zoom on History charts for time range drill-down~~ — visible window picker (1m–7d) provides equivalent zoom
 - [ ] ~~Chart statistics overlay (avg / min / max per series in visible window)~~ — superseded by global Mean/Min/Max aggregation mode
+- [ ] ~~Timeline gap compression~~ — deferred; data smoothing is a better alternative
+- [ ] Data smoothing for large time windows (reduce visual noise at 6h+ ranges)
 - [ ] Export chart data as CSV
 
 🎨 **UI & Animations**
