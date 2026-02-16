@@ -87,8 +87,8 @@ Or download the latest `.dmg` from [Releases](https://github.com/Ender-Wang/Swif
 - [x] Local database storage (SQLite ~~/ SwiftData~~) with configurable retention
 - [x] Historical data browsing with date range filtering and scrollable charts
 - [x] Hover-to-inspect tooltips on trend charts with color markers and value ranking
-- [ ] SQL aggregation + extended time ranges for History mode (1h / 6h / 24h / 7d)
-- [ ] Pagination and virtual lists for large datasets
+- [x] SQL aggregation + extended time ranges for History mode (1h / 6h / 24h / 7d)
+- [x] Paginated message browsing (500 per page)
 
 ⚠️ **Health & Alerts**
 
@@ -104,8 +104,8 @@ Or download the latest `.dmg` from [Releases](https://github.com/Ender-Wang/Swif
 📊 **Advanced Charts**
 
 - [x] ~~Trends page tab reorganization~~ → Split into Trends (cluster health) + Lag (consumer investigation) pages
-- [ ] Pinch-to-zoom on History charts for time range drill-down
-- [ ] Chart statistics overlay (avg / min / max per series in visible window)
+- [ ] ~~Pinch-to-zoom on History charts for time range drill-down~~ — visible window picker (1m–7d) provides equivalent zoom
+- [ ] ~~Chart statistics overlay (avg / min / max per series in visible window)~~ — superseded by global Mean/Min/Max aggregation mode
 - [ ] Export chart data as CSV
 
 🎨 **UI & Animations**
@@ -115,6 +115,7 @@ Or download the latest `.dmg` from [Releases](https://github.com/Ender-Wang/Swif
 - [ ] Trends page loading/mode-switch transitions (Live ↔ History)
 - [x] Dark mode optimization
 - [ ] Cluster topology and broker status visualization
+  - [ ] ~~Partition distribution visualization~~ — Topics page partition table already shows leader/replicas/ISR
 
 🔧 **Enhancements**
 
@@ -131,8 +132,8 @@ Or download the latest `.dmg` from [Releases](https://github.com/Ender-Wang/Swif
 ✨ **Features**
 
 - [ ] Send test messages, create/delete topics, reset offsets (all opt-in)
-- [ ] Docker API integration for local dev environments
-- [ ] Failure simulation and recovery monitoring
+- [ ] ~~Docker API integration for local dev environments~~ — users manage Docker externally
+- [ ] ~~Failure simulation and recovery monitoring~~ — chaos engineering out of scope for a monitoring tool
 
 ⚙️ **Settings & Infrastructure**
 
