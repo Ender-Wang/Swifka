@@ -2,6 +2,8 @@ import SwiftUI
 
 struct TrendsView: View {
     @Environment(AppState.self) private var appState
+    @State private var toolbarContentWidth: CGFloat = 0
+    @State private var toolbarOverflow = false
 
     var body: some View {
         let l10n = appState.l10n
@@ -50,27 +52,46 @@ struct TrendsView: View {
         let l10n = appState.l10n
         let isAutoRefresh = appState.refreshManager.isAutoRefresh
 
-        HStack {
-            // Hide mode toggle in manual mode (locked to History)
-            if isAutoRefresh {
-                Picker(l10n["trends.mode"], selection: $state.trendsMode) {
-                    Text(l10n["trends.mode.live"]).tag(TrendsMode.live)
-                    Text(l10n["trends.mode.history"]).tag(TrendsMode.history)
+        HStack(spacing: 12) {
+            // Scrollable left section: mode picker + date filter
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    if isAutoRefresh {
+                        Picker(l10n["trends.mode"], selection: $state.trendsMode) {
+                            Text(l10n["trends.mode.live"]).tag(TrendsMode.live)
+                            Text(l10n["trends.mode.history"]).tag(TrendsMode.history)
+                        }
+                        .pickerStyle(.segmented)
+                        .fixedSize()
+                    }
+
+                    if case .history = appState.trendsMode {
+                        historyDateFilter
+                    }
                 }
-                .pickerStyle(.segmented)
-                .frame(maxWidth: 160)
+                .onGeometryChange(for: CGFloat.self) { proxy in
+                    proxy.size.width
+                } action: { contentWidth in
+                    toolbarContentWidth = contentWidth
+                }
+            }
+            .onGeometryChange(for: CGFloat.self) { proxy in
+                proxy.size.width
+            } action: { viewportWidth in
+                toolbarOverflow = toolbarContentWidth > viewportWidth
+            }
+            .overlay(alignment: .trailing) {
+                LinearGradient(
+                    colors: [.clear, Color(nsColor: .windowBackgroundColor)],
+                    startPoint: .leading,
+                    endPoint: .trailing,
+                )
+                .frame(width: 40)
+                .allowsHitTesting(false)
+                .opacity(toolbarOverflow ? 1 : 0)
             }
 
-            Spacer()
-
-            // History: date filter in middle
-            if case .history = appState.trendsMode {
-                historyDateFilter
-
-                Spacer()
-            }
-
-            // Time Window picker — always right-aligned
+            // Pinned right: time window + aggregation pickers
             switch appState.trendsMode {
             case .live:
                 if isAutoRefresh {
@@ -82,8 +103,7 @@ struct TrendsView: View {
                             Text(window.rawValue).tag(window)
                         }
                     }
-                    .pickerStyle(.segmented)
-                    .frame(maxWidth: 240)
+                    .fixedSize()
                 }
             case .history:
                 historyVisibleWindowPicker
@@ -222,6 +242,7 @@ struct TrendsView: View {
             .buttonStyle(.borderedProminent)
             .controlSize(.small)
         }
+        .fixedSize()
     }
 
     @ViewBuilder
@@ -241,8 +262,6 @@ struct TrendsView: View {
                 Text("24h").tag(TimeInterval(86400))
                 Text("7d").tag(TimeInterval(604_800))
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
             .fixedSize()
 
             if history.visibleWindowSeconds > 1800 {
@@ -251,8 +270,6 @@ struct TrendsView: View {
                     Text(l10n["trends.aggregation.min"]).tag(AggregationMode.min)
                     Text(l10n["trends.aggregation.max"]).tag(AggregationMode.max)
                 }
-                .pickerStyle(.segmented)
-                .labelsHidden()
                 .fixedSize()
             }
         }
