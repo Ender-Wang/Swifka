@@ -309,7 +309,9 @@ struct TrendsView: View {
     private func handleModeChange(_ newMode: TrendsMode) {
         guard newMode == .history else { return }
         let history = appState.historyState
-        history.enterHistoryMode(timeWindow: appState.effectiveTimeWindow)
+        if !history.store.hasEnoughData {
+            history.enterHistoryMode(timeWindow: appState.effectiveTimeWindow)
+        }
         Task.detached {
             await history.loadData(
                 database: appState.metricDatabase,

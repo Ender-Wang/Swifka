@@ -348,7 +348,9 @@ struct LagView: View {
     private func handleModeChange(_ newMode: TrendsMode) {
         guard newMode == .history else { return }
         let history = appState.lagHistoryState
-        history.enterHistoryMode(timeWindow: appState.effectiveLagTimeWindow)
+        if !history.store.hasEnoughData {
+            history.enterHistoryMode(timeWindow: appState.effectiveLagTimeWindow)
+        }
         Task.detached {
             await history.loadData(
                 database: appState.metricDatabase,
