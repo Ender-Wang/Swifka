@@ -8,10 +8,10 @@ final class HistoryState {
     /// Earliest timestamp available in the database for the current cluster.
     var minTimestamp: Date?
 
-    /// User-selected start of the time range.
+    /// User-selected start of the time range (live editing via DatePicker).
     var rangeFrom = Date().addingTimeInterval(-300)
 
-    /// User-selected end of the time range.
+    /// User-selected end of the time range (live editing via DatePicker).
     var rangeTo = Date()
 
     /// Whether a database query is in progress.
@@ -29,11 +29,54 @@ final class HistoryState {
     /// Aggregation mode for downsampled data (Mean / Min / Max).
     var aggregationMode: AggregationMode = .mean
 
+    /// The total range (seconds) of the last applied date filter.
+    /// Time Window constraints use this so they don't change while editing dates.
+    var appliedRangeSeconds: TimeInterval = 300
+
+    /// Standard time window options (seconds) for the picker.
+    static let timeWindowOptions: [(label: String, seconds: TimeInterval)] = [
+        ("1m", 60), ("5m", 300), ("15m", 900), ("30m", 1800),
+        ("1h", 3600), ("2h", 7200), ("3h", 10800), ("4h", 14400), ("5h", 18000),
+        ("6h", 21600), ("12h", 43200), ("24h", 86400), ("2d", 172_800),
+        ("3d", 259_200), ("5d", 432_000), ("7d", 604_800),
+    ]
+
+    /// Total date range in seconds (live, from DatePicker bindings).
+    var totalRangeSeconds: TimeInterval {
+        rangeTo.timeIntervalSince(rangeFrom)
+    }
+
+    /// Minimum visible window based on the applied range and Metal texture limits.
+    var minVisibleWindowSeconds: TimeInterval {
+        appliedRangeSeconds / Constants.maxChartScrollRatio
+    }
+
+    /// Maximum visible window — smallest standard option >= applied range.
+    var maxVisibleWindowSeconds: TimeInterval {
+        Self.timeWindowOptions.first(where: { $0.seconds >= appliedRangeSeconds })?.seconds
+            ?? appliedRangeSeconds
+    }
+
+    /// Valid time window options for the applied date range.
+    var validTimeWindowOptions: [(label: String, seconds: TimeInterval)] {
+        let minWindow = minVisibleWindowSeconds
+        let maxWindow = maxVisibleWindowSeconds
+        return Self.timeWindowOptions.filter { $0.seconds >= minWindow && $0.seconds <= maxWindow }
+    }
+
     /// Set default time range when entering History mode.
     func enterHistoryMode(timeWindow: ChartTimeWindow) {
         let now = Date()
         rangeTo = now
         rangeFrom = now.addingTimeInterval(-timeWindow.seconds)
+        applyRange()
+    }
+
+    /// Commit the current date range and clamp the visible window.
+    /// Called when Apply is pressed or on first entry.
+    func applyRange() {
+        appliedRangeSeconds = totalRangeSeconds
+        clampVisibleWindow()
     }
 
     /// Expand date range to cover the visible window if needed.
@@ -41,6 +84,19 @@ final class HistoryState {
         let currentRange = rangeTo.timeIntervalSince(rangeFrom)
         if currentRange < visibleWindowSeconds {
             rangeFrom = rangeTo.addingTimeInterval(-visibleWindowSeconds)
+        }
+    }
+
+    /// Ensure visibleWindowSeconds is within [min, max] for the applied range.
+    /// Snaps to the nearest valid standard option.
+    func clampVisibleWindow() {
+        let minWindow = minVisibleWindowSeconds
+        let maxWindow = maxVisibleWindowSeconds
+        if visibleWindowSeconds < minWindow {
+            visibleWindowSeconds = Self.timeWindowOptions
+                .first(where: { $0.seconds >= minWindow })?.seconds ?? minWindow
+        } else if visibleWindowSeconds > maxWindow {
+            visibleWindowSeconds = maxWindow
         }
     }
 

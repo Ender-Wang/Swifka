@@ -19,6 +19,11 @@ nonisolated enum Constants {
     static let metricStoreCapacity = 300
     static let metricsDatabaseFileName = "metrics.sqlite3"
 
+    /// Max ratio of total data range to visible window in scrollable charts.
+    /// Exceeding this causes Metal texture allocation failures (width > 16384px).
+    /// At 8×, a 1200pt-wide chart produces ~9600px content — well under the limit.
+    static let maxChartScrollRatio: Double = 8.0
+
     /// Multiplier for gap detection: break chart lines when actual gap > granularity × this factor.
     /// At 2×, a single slow refresh still connects; two missed refreshes cause a break.
     /// When both points are manual (granularity=0), any positive gap > 0 → always breaks.

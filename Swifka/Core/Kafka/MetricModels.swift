@@ -7,6 +7,15 @@ nonisolated enum ChartTimeWindow: String, CaseIterable, Identifiable, Sendable {
     case fiveMinutes = "5m"
     case fifteenMinutes = "15m"
     case thirtyMinutes = "30m"
+    case oneHour = "1h"
+    case twoHours = "2h"
+    case fiveHours = "5h"
+    case sevenHours = "7h"
+    case twelveHours = "12h"
+    case oneDay = "1d"
+    case threeDays = "3d"
+    case fiveDays = "5d"
+    case sevenDays = "7d"
 
     var id: String {
         rawValue
@@ -18,6 +27,15 @@ nonisolated enum ChartTimeWindow: String, CaseIterable, Identifiable, Sendable {
         case .fiveMinutes: 300
         case .fifteenMinutes: 900
         case .thirtyMinutes: 1800
+        case .oneHour: 3600
+        case .twoHours: 7200
+        case .fiveHours: 18000
+        case .sevenHours: 25200
+        case .twelveHours: 43200
+        case .oneDay: 86400
+        case .threeDays: 259_200
+        case .fiveDays: 432_000
+        case .sevenDays: 604_800
         }
     }
 }

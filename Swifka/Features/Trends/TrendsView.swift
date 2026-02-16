@@ -232,6 +232,7 @@ struct TrendsView: View {
             .labelsHidden()
 
             Button(l10n["trends.history.apply"]) {
+                history.applyRange()
                 Task {
                     await history.loadData(
                         database: appState.metricDatabase,
@@ -253,14 +254,9 @@ struct TrendsView: View {
 
         HStack(spacing: 12) {
             Picker(l10n["trends.time.window"], selection: $historyBindable.visibleWindowSeconds) {
-                Text("1m").tag(TimeInterval(60))
-                Text("5m").tag(TimeInterval(300))
-                Text("15m").tag(TimeInterval(900))
-                Text("30m").tag(TimeInterval(1800))
-                Text("1h").tag(TimeInterval(3600))
-                Text("6h").tag(TimeInterval(21600))
-                Text("24h").tag(TimeInterval(86400))
-                Text("7d").tag(TimeInterval(604_800))
+                ForEach(history.validTimeWindowOptions, id: \.seconds) { option in
+                    Text(option.label).tag(option.seconds)
+                }
             }
             .fixedSize()
 

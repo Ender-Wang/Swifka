@@ -76,15 +76,23 @@ actor MetricDatabase {
             ifNotExists: true,
         ))
 
-        // Migration: add topic_lags column
-        _ = try? conn.run(table.addColumn(
-            SQLite.Expression<String>("topic_lags"), defaultValue: "{}",
-        ))
+        // Migrations: add columns if they don't already exist
+        let existingColumns = try Set(
+            conn.prepare("PRAGMA table_info(metric_snapshots)")
+                .map { row in row[1] as! String },
+        )
 
-        // Migration: add partition_lag_detail column
-        _ = try? conn.run(table.addColumn(
-            SQLite.Expression<String>("partition_lag_detail"), defaultValue: "{}",
-        ))
+        if !existingColumns.contains("topic_lags") {
+            try conn.run(table.addColumn(
+                SQLite.Expression<String>("topic_lags"), defaultValue: "{}",
+            ))
+        }
+
+        if !existingColumns.contains("partition_lag_detail") {
+            try conn.run(table.addColumn(
+                SQLite.Expression<String>("partition_lag_detail"), defaultValue: "{}",
+            ))
+        }
 
         return conn
     }
