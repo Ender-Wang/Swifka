@@ -161,7 +161,7 @@ struct ClusterThroughputChart: View {
     var body: some View {
         let data = renderingMode.filterData(store.clusterThroughput, by: \.timestamp)
 
-        TrendCard(title: l10n["trends.cluster.throughput"]) {
+        TrendCard(title: "\(l10n["trends.cluster.throughput"]) (\(l10n["trends.messages.per.second"]))") {
             let chart = Chart {
                 ForEach(data) { point in
                     LineMark(
@@ -180,7 +180,16 @@ struct ClusterThroughputChart: View {
                     .interpolationMethod(.catmullRom)
                 }
             }
-            .chartYAxisLabel(l10n["trends.messages.per.second"])
+            .chartYAxis {
+                AxisMarks { value in
+                    AxisValueLabel {
+                        if let v = value.as(Double.self) {
+                            Text(v, format: .number.notation(.compactName))
+                        }
+                    }
+                    AxisGridLine()
+                }
+            }
             .chartXAxis {
                 AxisMarks(values: .automatic(desiredCount: 5)) {
                     AxisValueLabel(format: .dateTime.hour().minute().second())
@@ -192,7 +201,6 @@ struct ClusterThroughputChart: View {
             switch renderingMode {
             case let .live(timeDomain):
                 chart.chartXScale(domain: timeDomain)
-                    .drawingGroup()
                     .hoverOverlay(hoverLocation: $hoverLocation) { date in
                         if let p = nearest(data, to: date, by: \.timestamp) {
                             ChartTooltip(date: p.timestamp) {
@@ -235,7 +243,7 @@ struct PingLatencyChart: View {
     var body: some View {
         let data = renderingMode.filterData(store.pingHistory, by: \.timestamp)
 
-        TrendCard(title: l10n["trends.ping.latency"]) {
+        TrendCard(title: "\(l10n["trends.ping.latency"]) (ms)") {
             let chart = Chart {
                 ForEach(data) { point in
                     LineMark(
@@ -247,7 +255,16 @@ struct PingLatencyChart: View {
                     .interpolationMethod(.catmullRom)
                 }
             }
-            .chartYAxisLabel("ms")
+            .chartYAxis {
+                AxisMarks { value in
+                    AxisValueLabel {
+                        if let v = value.as(Int.self) {
+                            Text(v, format: .number.notation(.compactName))
+                        }
+                    }
+                    AxisGridLine()
+                }
+            }
             .chartXAxis {
                 AxisMarks(values: .automatic(desiredCount: 5)) {
                     AxisValueLabel(format: .dateTime.hour().minute().second())
@@ -259,7 +276,6 @@ struct PingLatencyChart: View {
             switch renderingMode {
             case let .live(timeDomain):
                 chart.chartXScale(domain: timeDomain)
-                    .drawingGroup()
                     .hoverOverlay(hoverLocation: $hoverLocation) { date in
                         if let p = nearest(data, to: date, by: \.timestamp) {
                             ChartTooltip(date: p.timestamp) {
@@ -338,7 +354,7 @@ struct TopicThroughputChart: View {
     var body: some View {
         let logScale = useLogScale
 
-        TrendCard(title: l10n["trends.topic.throughput"]) {
+        TrendCard(title: "\(l10n["trends.topic.throughput"]) (\(l10n["trends.messages.per.second"]))") {
             let userTopics = store.knownTopics.filter { !$0.hasPrefix("__") }
             let allSelected = userTopics.allSatisfy { selectedTopics.contains($0) }
 
@@ -388,7 +404,16 @@ struct TopicThroughputChart: View {
                     }
                 }
             }
-            .chartYAxisLabel(l10n["trends.messages.per.second"])
+            .chartYAxis {
+                AxisMarks { value in
+                    AxisValueLabel {
+                        if let v = value.as(Double.self) {
+                            Text(v, format: .number.notation(.compactName))
+                        }
+                    }
+                    AxisGridLine()
+                }
+            }
             .chartXAxis {
                 AxisMarks(values: .automatic(desiredCount: 5)) {
                     AxisValueLabel(format: .dateTime.hour().minute().second())
@@ -473,7 +498,7 @@ struct ConsumerGroupLagChart: View {
     var body: some View {
         let logScale = useLogScale
 
-        TrendCard(title: l10n["trends.consumer.lag"]) {
+        TrendCard(title: "\(l10n["trends.consumer.lag"]) (\(l10n["trends.lag.messages"]))") {
             if store.knownGroups.isEmpty {
                 ContentUnavailableView {
                     Label(l10n["trends.consumer.lag"], systemImage: "person.3")
@@ -530,7 +555,16 @@ struct ConsumerGroupLagChart: View {
                         }
                     }
                 }
-                .chartYAxisLabel(l10n["trends.lag.messages"])
+                .chartYAxis {
+                    AxisMarks { value in
+                        AxisValueLabel {
+                            if let v = value.as(Int.self) {
+                                Text(v, format: .number.notation(.compactName))
+                            }
+                        }
+                        AxisGridLine()
+                    }
+                }
                 .chartXAxis {
                     AxisMarks(values: .automatic(desiredCount: 5)) {
                         AxisValueLabel(format: .dateTime.hour().minute().second())
@@ -620,7 +654,7 @@ struct TopicLagChart: View {
         let logScale = useLogScale
         let lagTopics = store.knownLagTopics.filter { !$0.hasPrefix("__") }
 
-        TrendCard(title: l10n["trends.topic.lag"]) {
+        TrendCard(title: "\(l10n["trends.topic.lag"]) (\(l10n["trends.lag.messages"]))") {
             if lagTopics.isEmpty {
                 ContentUnavailableView {
                     Label(l10n["trends.topic.lag"], systemImage: "chart.line.downtrend.xyaxis")
@@ -681,7 +715,16 @@ struct TopicLagChart: View {
                         }
                     }
                 }
-                .chartYAxisLabel(l10n["trends.lag.messages"])
+                .chartYAxis {
+                    AxisMarks { value in
+                        AxisValueLabel {
+                            if let v = value.as(Int.self) {
+                                Text(v, format: .number.notation(.compactName))
+                            }
+                        }
+                        AxisGridLine()
+                    }
+                }
                 .chartXAxis {
                     AxisMarks(values: .automatic(desiredCount: 5)) {
                         AxisValueLabel(format: .dateTime.hour().minute().second())
@@ -740,7 +783,7 @@ struct PartitionLagChart: View {
     var body: some View {
         let lagTopics = Array(store.knownPartitionsByTopic.keys).sorted().filter { !$0.hasPrefix("__") }
 
-        TrendCard(title: l10n["trends.partition.lag"]) {
+        TrendCard(title: "\(l10n["trends.partition.lag"]) (\(l10n["trends.lag.messages"]))") {
             if lagTopics.isEmpty {
                 ContentUnavailableView {
                     Label(l10n["trends.partition.lag"], systemImage: "chart.bar.xaxis")
@@ -892,7 +935,16 @@ private struct PartitionSubChart: View {
                     }
                 }
             }
-            .chartYAxisLabel(l10n["trends.lag.messages"])
+            .chartYAxis {
+                AxisMarks { value in
+                    AxisValueLabel {
+                        if let v = value.as(Int.self) {
+                            Text(v, format: .number.notation(.compactName))
+                        }
+                    }
+                    AxisGridLine()
+                }
+            }
             .chartXAxis {
                 AxisMarks(values: .automatic(desiredCount: 5)) {
                     AxisValueLabel(format: .dateTime.hour().minute().second())
@@ -934,7 +986,7 @@ struct ConsumerMemberLagChart: View {
         // Use store.knownGroups for stable chip list (not consumerGroups which updates every refresh)
         let groupNames = store.knownGroups
 
-        TrendCard(title: l10n["trends.consumer.member.lag"]) {
+        TrendCard(title: "\(l10n["trends.consumer.member.lag"]) (\(l10n["trends.lag.messages"]))") {
             if groupNames.isEmpty {
                 ContentUnavailableView {
                     Label(l10n["trends.consumer.member.lag"], systemImage: "person.2")
@@ -1164,7 +1216,16 @@ private struct MemberSubChart: View {
                     }
                 }
             }
-            .chartYAxisLabel(l10n["trends.lag.messages"])
+            .chartYAxis {
+                AxisMarks { value in
+                    AxisValueLabel {
+                        if let v = value.as(Int.self) {
+                            Text(v, format: .number.notation(.compactName))
+                        }
+                    }
+                    AxisGridLine()
+                }
+            }
             .chartXAxis {
                 AxisMarks(values: .automatic(desiredCount: 5)) {
                     AxisValueLabel(format: .dateTime.hour().minute().second())
@@ -1204,7 +1265,7 @@ struct ISRHealthChart: View {
     var body: some View {
         let data = renderingMode.filterData(store.isrHealthSeries, by: \.timestamp)
 
-        TrendCard(title: l10n["trends.isr.health"]) {
+        TrendCard(title: "\(l10n["trends.isr.health"]) (%)") {
             let chart = Chart {
                 ForEach(data) { point in
                     AreaMark(
@@ -1225,7 +1286,16 @@ struct ISRHealthChart: View {
                 }
             }
             .chartYScale(domain: 0 ... 100)
-            .chartYAxisLabel("%")
+            .chartYAxis {
+                AxisMarks { value in
+                    AxisValueLabel {
+                        if let v = value.as(Int.self) {
+                            Text(v, format: .number.notation(.compactName))
+                        }
+                    }
+                    AxisGridLine()
+                }
+            }
             .chartXAxis {
                 AxisMarks(values: .automatic(desiredCount: 5)) {
                     AxisValueLabel(format: .dateTime.hour().minute().second())
@@ -1237,7 +1307,6 @@ struct ISRHealthChart: View {
             switch renderingMode {
             case let .live(timeDomain):
                 chart.chartXScale(domain: timeDomain)
-                    .drawingGroup()
                     .hoverOverlay(hoverLocation: $hoverLocation) { date in
                         if let p = nearest(data, to: date, by: \.timestamp) {
                             ChartTooltip(date: p.timestamp) {
