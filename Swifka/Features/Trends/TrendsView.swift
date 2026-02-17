@@ -35,12 +35,17 @@ struct TrendsView: View {
             trendsToolbar
             Divider()
 
-            switch appState.trendsMode {
-            case .live:
-                liveContent
-            case .history:
-                historyContent
+            Group {
+                switch appState.trendsMode {
+                case .live:
+                    liveContent
+                        .transition(.opacity)
+                case .history:
+                    historyContent
+                        .transition(.opacity)
+                }
             }
+            .animation(.easeInOut(duration: 0.3), value: appState.trendsMode)
         }
     }
 
@@ -163,6 +168,8 @@ struct TrendsView: View {
                 {
                     appState.trendSelectedTopics.append(first)
                 }
+                // Pre-fetch history data in background so first switch is instant
+                prefetchHistoryData()
             }
         }
     }
@@ -340,6 +347,19 @@ struct TrendsView: View {
             history.enterHistoryMode(timeWindow: appState.effectiveTimeWindow)
         }
         Task.detached {
+            await history.loadData(
+                database: appState.metricDatabase,
+                clusterId: appState.configStore.selectedCluster?.id,
+            )
+        }
+    }
+
+    /// Pre-fetch history data in background so the first Live → History switch is instant.
+    private func prefetchHistoryData() {
+        let history = appState.historyState
+        guard !history.store.hasEnoughData else { return }
+        history.enterHistoryMode(timeWindow: appState.effectiveTimeWindow)
+        Task.detached(priority: .low) {
             await history.loadData(
                 database: appState.metricDatabase,
                 clusterId: appState.configStore.selectedCluster?.id,

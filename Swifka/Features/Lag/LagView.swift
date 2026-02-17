@@ -53,12 +53,17 @@ struct LagView: View {
             lagToolbar
             Divider()
 
-            switch appState.lagMode {
-            case .live:
-                liveContent
-            case .history:
-                historyContent
+            Group {
+                switch appState.lagMode {
+                case .live:
+                    liveContent
+                        .transition(.opacity)
+                case .history:
+                    historyContent
+                        .transition(.opacity)
+                }
             }
+            .animation(.easeInOut(duration: 0.3), value: appState.lagMode)
         }
     }
 
@@ -185,6 +190,8 @@ struct LagView: View {
                 if appState.lagSelectedGroups.isEmpty, let first = store.knownGroups.first {
                     appState.lagSelectedGroups.append(first)
                 }
+                // Pre-fetch history data in background so first switch is instant
+                prefetchHistoryData()
             }
         }
     }
@@ -367,6 +374,19 @@ struct LagView: View {
             history.enterHistoryMode(timeWindow: appState.effectiveLagTimeWindow)
         }
         Task.detached {
+            await history.loadData(
+                database: appState.metricDatabase,
+                clusterId: appState.configStore.selectedCluster?.id,
+            )
+        }
+    }
+
+    /// Pre-fetch history data in background so the first Live → History switch is instant.
+    private func prefetchHistoryData() {
+        let history = appState.lagHistoryState
+        guard !history.store.hasEnoughData else { return }
+        history.enterHistoryMode(timeWindow: appState.effectiveLagTimeWindow)
+        Task.detached(priority: .low) {
             await history.loadData(
                 database: appState.metricDatabase,
                 clusterId: appState.configStore.selectedCluster?.id,
