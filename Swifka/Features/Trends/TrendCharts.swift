@@ -1,6 +1,154 @@
 import Charts
 import SwiftUI
 
+// MARK: - Chart Reveal Animation
+
+private struct ChartRevealModifier: ViewModifier {
+    let trigger: Int
+    let delay: Double
+
+    @State private var progress: CGFloat = 0
+    @State private var hasAppeared = false
+
+    func body(content: Content) -> some View {
+        content
+            .chartPlotStyle { plotArea in
+                plotArea.mask(alignment: .leading) {
+                    GeometryReader { geo in
+                        Rectangle()
+                            .frame(width: progress >= 1 ? nil : geo.size.width * progress)
+                    }
+                }
+            }
+            .onAppear {
+                guard !hasAppeared else { return }
+                hasAppeared = true
+                animateReveal()
+            }
+            .onChange(of: trigger) {
+                animateReveal()
+            }
+    }
+
+    private func animateReveal() {
+        progress = 0
+        let start = CACurrentMediaTime()
+        let animDelay = delay
+        Timer.scheduledTimer(withTimeInterval: 1.0 / 60, repeats: true) { timer in
+            let elapsed = CACurrentMediaTime() - start
+            guard elapsed >= animDelay else { return }
+            let t = min((elapsed - animDelay) / 0.6, 1.0)
+            progress = t // linear
+            if t >= 1 { timer.invalidate() }
+        }
+    }
+}
+
+extension View {
+    func chartReveal(trigger: Int, delay: Double = 0) -> some View {
+        modifier(ChartRevealModifier(trigger: trigger, delay: delay))
+    }
+}
+
+// MARK: - Per-Series Reveal Animation
+
+@Observable
+private final class SeriesRevealState {
+    var progress: [String: CGFloat] = [:]
+    var fadeOpacity: [String: CGFloat] = [:]
+    @ObservationIgnored private var timers: [String: Timer] = [:]
+    @ObservationIgnored private var fadeTimers: [String: Timer] = [:]
+    @ObservationIgnored private var generation = 0
+
+    func ensureRevealed(_ keys: [String]) {
+        let gen = generation
+        for key in keys where progress[key] == nil {
+            // Cancel any ongoing fade-out for this key (re-added)
+            fadeTimers[key]?.invalidate()
+            fadeTimers.removeValue(forKey: key)
+            fadeOpacity.removeValue(forKey: key)
+
+            progress[key] = 0
+            let start = CACurrentMediaTime()
+            timers[key] = Timer.scheduledTimer(withTimeInterval: 1.0 / 60, repeats: true) { [weak self] timer in
+                MainActor.assumeIsolated {
+                    guard let self else { timer.invalidate(); return }
+                    guard self.generation == gen else { timer.invalidate(); return }
+                    let t = min((CACurrentMediaTime() - start) / 0.6, 1.0)
+                    self.progress[key] = CGFloat(t)
+                    if t >= 1 {
+                        timer.invalidate()
+                        self.timers.removeValue(forKey: key)
+                    }
+                }
+            }
+        }
+    }
+
+    func reset() {
+        generation += 1
+        for timer in timers.values {
+            timer.invalidate()
+        }
+        timers.removeAll()
+        for timer in fadeTimers.values {
+            timer.invalidate()
+        }
+        fadeTimers.removeAll()
+        progress.removeAll()
+        fadeOpacity.removeAll()
+    }
+
+    func clip<T>(_ data: [T], for key: String) -> [T] {
+        guard let p = progress[key] else { return [] }
+        guard p < 1, !data.isEmpty else { return data }
+        return Array(data.prefix(max(1, Int(ceil(Double(data.count) * Double(p))))))
+    }
+
+    /// Returns selected series + any actively fading series.
+    /// Automatically starts fade-out for series removed from selection.
+    func displayedSeries(selected: [String]) -> [String] {
+        let selectedSet = Set(selected)
+        // Auto-start fade for series no longer selected
+        for key in progress.keys where !selectedSet.contains(key) && fadeOpacity[key] == nil {
+            timers[key]?.invalidate()
+            timers.removeValue(forKey: key)
+            progress[key] = 1.0
+            startFadeOut(key)
+        }
+        var result = selected
+        for key in fadeOpacity.keys where !selectedSet.contains(key) {
+            result.append(key)
+        }
+        return result
+    }
+
+    /// Per-series fade opacity (1.0 for normal, fading to 0 on removal).
+    func opacity(for key: String) -> Double {
+        guard progress[key] != nil else { return 0 }
+        return Double(fadeOpacity[key] ?? 1.0)
+    }
+
+    private func startFadeOut(_ key: String) {
+        fadeTimers[key]?.invalidate()
+        fadeOpacity[key] = 1.0
+        let start = CACurrentMediaTime()
+        fadeTimers[key] = Timer.scheduledTimer(withTimeInterval: 1.0 / 60, repeats: true) { [weak self] timer in
+            MainActor.assumeIsolated {
+                guard let self else { timer.invalidate(); return }
+                let t = min((CACurrentMediaTime() - start) / 0.3, 1.0)
+                self.fadeOpacity[key] = 1.0 - CGFloat(t)
+                if t >= 1 {
+                    timer.invalidate()
+                    self.fadeTimers.removeValue(forKey: key)
+                    self.fadeOpacity.removeValue(forKey: key)
+                    self.progress.removeValue(forKey: key)
+                }
+            }
+        }
+    }
+}
+
 // MARK: - Shared Card Wrapper
 
 struct TrendCard<Content: View> {
@@ -278,6 +426,7 @@ struct ClusterThroughputChart: View {
                             }
                         }
                     }
+                    .chartReveal(trigger: store.dataEpoch)
             case let .history(visibleSeconds):
                 chart
                     .chartScrollableAxes(.horizontal)
@@ -293,6 +442,7 @@ struct ClusterThroughputChart: View {
                             }
                         }
                     }
+                    .chartReveal(trigger: store.dataEpoch)
             }
         }
     }
@@ -382,6 +532,7 @@ struct PingLatencyChart: View {
                             }
                         }
                     }
+                    .chartReveal(trigger: store.dataEpoch)
             case let .history(visibleSeconds):
                 chart
                     .chartScrollableAxes(.horizontal)
@@ -397,6 +548,7 @@ struct PingLatencyChart: View {
                             }
                         }
                     }
+                    .chartReveal(trigger: store.dataEpoch)
             }
         }
     }
@@ -414,6 +566,7 @@ struct TopicThroughputChart: View {
     let clusterId: UUID?
     let historyRange: (from: Date, to: Date)?
     @State private var hoverLocation: CGPoint?
+    @State private var reveal = SeriesRevealState()
 
     /// Switch to log scale when selected topics span >20× difference in peak throughput.
     private var useLogScale: Bool {
@@ -518,10 +671,14 @@ struct TopicThroughputChart: View {
                 }
             }
 
+            let displayed = reveal.displayedSeries(selected: selectedTopics)
             let chart = Chart {
-                ForEach(selectedTopics, id: \.self) { topic in
-                    let series = renderingMode.filterData(
-                        store.throughputSeries(for: topic), by: \.timestamp,
+                ForEach(displayed, id: \.self) { topic in
+                    let series = reveal.clip(
+                        renderingMode.filterData(
+                            store.throughputSeries(for: topic), by: \.timestamp,
+                        ),
+                        for: topic,
                     )
                     ForEach(series) { point in
                         LineMark(
@@ -531,6 +688,7 @@ struct TopicThroughputChart: View {
                         )
                         .foregroundStyle(by: .value("Topic", topic))
                         .interpolationMethod(.catmullRom)
+                        .opacity(reveal.opacity(for: topic))
                     }
                 }
             }
@@ -550,9 +708,17 @@ struct TopicThroughputChart: View {
                     AxisGridLine()
                 }
             }
-            .chartForegroundStyleScale(domain: selectedTopics, range: Array(seriesColors.prefix(max(selectedTopics.count, 1))))
+            .chartForegroundStyleScale(domain: displayed, range: Array(seriesColors.prefix(max(displayed.count, 1))))
             .chartLegend(position: .top, alignment: .leading)
             .frame(height: 250)
+            .onAppear { reveal.ensureRevealed(selectedTopics) }
+            .onChange(of: selectedTopics) { _, newValue in
+                reveal.ensureRevealed(newValue)
+            }
+            .onChange(of: store.dataEpoch) {
+                reveal.reset()
+                reveal.ensureRevealed(selectedTopics)
+            }
 
             switch renderingMode {
             case let .live(timeDomain):
@@ -593,6 +759,7 @@ struct ConsumerGroupLagChart: View {
     let clusterId: UUID?
     let historyRange: (from: Date, to: Date)?
     @State private var hoverLocation: CGPoint?
+    @State private var reveal = SeriesRevealState()
 
     /// Switch to log scale when selected groups span >20× difference in peak lag.
     private var useLogScale: Bool {
@@ -704,10 +871,14 @@ struct ConsumerGroupLagChart: View {
                     }
                 }
 
+                let displayed = reveal.displayedSeries(selected: selectedGroups)
                 let chart = Chart {
-                    ForEach(selectedGroups, id: \.self) { group in
-                        let series = renderingMode.filterData(
-                            store.lagSeries(for: group), by: \.timestamp,
+                    ForEach(displayed, id: \.self) { group in
+                        let series = reveal.clip(
+                            renderingMode.filterData(
+                                store.lagSeries(for: group), by: \.timestamp,
+                            ),
+                            for: group,
                         )
                         ForEach(series) { point in
                             LineMark(
@@ -717,6 +888,7 @@ struct ConsumerGroupLagChart: View {
                             )
                             .foregroundStyle(by: .value("Group", group))
                             .interpolationMethod(.catmullRom)
+                            .opacity(reveal.opacity(for: group))
                         }
                     }
                 }
@@ -736,9 +908,17 @@ struct ConsumerGroupLagChart: View {
                         AxisGridLine()
                     }
                 }
-                .chartForegroundStyleScale(domain: selectedGroups, range: Array(seriesColors.prefix(max(selectedGroups.count, 1))))
+                .chartForegroundStyleScale(domain: displayed, range: Array(seriesColors.prefix(max(displayed.count, 1))))
                 .chartLegend(position: .top, alignment: .leading)
                 .frame(height: 250)
+                .onAppear { reveal.ensureRevealed(selectedGroups) }
+                .onChange(of: selectedGroups) { _, newValue in
+                    reveal.ensureRevealed(newValue)
+                }
+                .onChange(of: store.dataEpoch) {
+                    reveal.reset()
+                    reveal.ensureRevealed(selectedGroups)
+                }
 
                 switch renderingMode {
                 case let .live(timeDomain):
@@ -780,6 +960,7 @@ struct TopicLagChart: View {
     let clusterId: UUID?
     let historyRange: (from: Date, to: Date)?
     @State private var hoverLocation: CGPoint?
+    @State private var reveal = SeriesRevealState()
 
     /// Switch to log scale when selected topics span >20× difference in peak lag.
     private var useLogScale: Bool {
@@ -898,11 +1079,15 @@ struct TopicLagChart: View {
                 }
 
                 let activeSeries = selectedTopics.filter { lagTopics.contains($0) }
+                let displayed = reveal.displayedSeries(selected: activeSeries)
 
                 let chart = Chart {
-                    ForEach(activeSeries, id: \.self) { topic in
-                        let series = renderingMode.filterData(
-                            store.topicLagSeries(for: topic), by: \.timestamp,
+                    ForEach(displayed, id: \.self) { topic in
+                        let series = reveal.clip(
+                            renderingMode.filterData(
+                                store.topicLagSeries(for: topic), by: \.timestamp,
+                            ),
+                            for: topic,
                         )
                         ForEach(series) { point in
                             LineMark(
@@ -912,6 +1097,7 @@ struct TopicLagChart: View {
                             )
                             .foregroundStyle(by: .value("Topic", topic))
                             .interpolationMethod(.catmullRom)
+                            .opacity(reveal.opacity(for: topic))
                         }
                     }
                 }
@@ -931,9 +1117,18 @@ struct TopicLagChart: View {
                         AxisGridLine()
                     }
                 }
-                .chartForegroundStyleScale(domain: activeSeries, range: Array(seriesColors.prefix(max(activeSeries.count, 1))))
+                .chartForegroundStyleScale(domain: displayed, range: Array(seriesColors.prefix(max(displayed.count, 1))))
                 .chartLegend(position: .top, alignment: .leading)
                 .frame(height: 250)
+                .onAppear { reveal.ensureRevealed(activeSeries) }
+                .onChange(of: selectedTopics) { _, newValue in
+                    let newActive = newValue.filter { lagTopics.contains($0) }
+                    reveal.ensureRevealed(newActive)
+                }
+                .onChange(of: store.dataEpoch) {
+                    reveal.reset()
+                    reveal.ensureRevealed(activeSeries)
+                }
 
                 switch renderingMode {
                 case let .live(timeDomain):
@@ -1067,7 +1262,7 @@ struct PartitionLagChart: View {
 
                 // Each topic gets its own isolated sub-chart with independent hover state
                 let activeTopics = selectedTopics.filter { lagTopics.contains($0) }
-                ForEach(activeTopics, id: \.self) { topic in
+                ForEach(Array(activeTopics.enumerated()), id: \.element) { index, topic in
                     let partitionKeys = store.knownPartitionsByTopic[topic] ?? []
                     if !partitionKeys.isEmpty {
                         PartitionSubChart(
@@ -1077,6 +1272,7 @@ struct PartitionLagChart: View {
                             topic: topic,
                             partitionKeys: partitionKeys,
                             partitionOwnerMap: partitionOwnerMap,
+                            revealDelay: Double(index) * 0.08,
                         )
                     }
                 }
@@ -1102,6 +1298,7 @@ private struct PartitionSubChart: View {
     let topic: String
     let partitionKeys: [String]
     let partitionOwnerMap: [String: PartitionOwner]
+    let revealDelay: Double
     @State private var hoverLocation: CGPoint?
 
     /// Legend label: "P0 · clientId · ...last8" when owned, "P0 (no consumer)" when unowned.
@@ -1201,12 +1398,14 @@ private struct PartitionSubChart: View {
                     .hoverOverlay(hoverLocation: $hoverLocation) { date in
                         partitionTooltip(date)
                     }
+                    .chartReveal(trigger: store.dataEpoch, delay: revealDelay)
             case let .history(visibleSeconds):
                 chart.chartScrollableAxes(.horizontal)
                     .chartXVisibleDomain(length: visibleSeconds)
                     .hoverOverlay(hoverLocation: $hoverLocation) { date in
                         partitionTooltip(date)
                     }
+                    .chartReveal(trigger: store.dataEpoch, delay: revealDelay)
             }
         }
     }
@@ -1311,13 +1510,14 @@ struct ConsumerMemberLagChart: View {
                     consumerGroups.first { $0.name == name }
                 }
 
-                ForEach(activeGroups) { group in
+                ForEach(Array(activeGroups.enumerated()), id: \.element.id) { index, group in
                     if !group.members.isEmpty {
                         MemberSubChart(
                             store: store,
                             l10n: l10n,
                             renderingMode: renderingMode,
                             group: group,
+                            revealDelay: Double(index) * 0.08,
                         )
                     }
                 }
@@ -1379,6 +1579,7 @@ private struct MemberSubChart: View {
     let l10n: L10n
     let renderingMode: TrendRenderingMode
     let group: ConsumerGroupInfo
+    let revealDelay: Double
     @State private var hoverLocation: CGPoint?
 
     /// Partition keys per member, sorted.
@@ -1535,12 +1736,14 @@ private struct MemberSubChart: View {
                     .hoverOverlay(hoverLocation: $hoverLocation) { date in
                         memberTooltip(date)
                     }
+                    .chartReveal(trigger: store.dataEpoch, delay: revealDelay)
             case let .history(visibleSeconds):
                 chart.chartScrollableAxes(.horizontal)
                     .chartXVisibleDomain(length: visibleSeconds)
                     .hoverOverlay(hoverLocation: $hoverLocation) { date in
                         memberTooltip(date)
                     }
+                    .chartReveal(trigger: store.dataEpoch, delay: revealDelay)
             }
         }
     }
@@ -1639,6 +1842,7 @@ struct ISRHealthChart: View {
                             }
                         }
                     }
+                    .chartReveal(trigger: store.dataEpoch)
             case let .history(visibleSeconds):
                 chart
                     .chartScrollableAxes(.horizontal)
@@ -1654,6 +1858,7 @@ struct ISRHealthChart: View {
                             }
                         }
                     }
+                    .chartReveal(trigger: store.dataEpoch)
             }
         }
     }
