@@ -70,6 +70,19 @@ nonisolated struct BrokerInfo: Identifiable, Hashable, Sendable {
     let port: Int32
 }
 
+/// Statistics for a broker derived from partition metadata.
+nonisolated struct BrokerStats: Identifiable, Hashable, Sendable {
+    let id: Int32
+    let host: String
+    let port: Int32
+    let leaderCount: Int
+    let replicaCount: Int
+
+    var hostPort: String {
+        "\(host):\(port)"
+    }
+}
+
 // MARK: - Topic Info
 
 nonisolated struct TopicInfo: Identifiable, Hashable, Sendable {

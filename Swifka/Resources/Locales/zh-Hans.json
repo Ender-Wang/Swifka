@@ -157,9 +157,12 @@
   "groups.member.assignments": "分区",
 
   "brokers.title": "Brokers",
-  "brokers.id": "Broker ID",
-  "brokers.host": "主机",
-  "brokers.port": "端口",
+  "brokers.broker": "Broker",
+  "brokers.broker.id": "Broker",
+  "brokers.host.port": "地址",
+  "brokers.leader.distribution": "Leader 分布",
+  "brokers.leader.count": "Leader 数量",
+  "brokers.replica.count": "副本数",
   "brokers.empty": "暂无 Broker",
   "brokers.empty.description": "该集群中没有找到 Broker。",
 

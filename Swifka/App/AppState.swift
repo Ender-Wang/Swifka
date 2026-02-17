@@ -14,6 +14,32 @@ final class AppState {
     var brokers: [BrokerInfo] = []
     var topics: [TopicInfo] = []
     var consumerGroups: [ConsumerGroupInfo] = []
+
+    /// Broker statistics derived from partition metadata (leader count, replica count).
+    var brokerStats: [BrokerStats] {
+        var leaderCounts: [Int32: Int] = [:]
+        var replicaCounts: [Int32: Int] = [:]
+
+        for topic in topics where !topic.isInternal {
+            for partition in topic.partitions {
+                leaderCounts[partition.leader, default: 0] += 1
+                for replica in partition.replicas {
+                    replicaCounts[replica, default: 0] += 1
+                }
+            }
+        }
+
+        return brokers.map { broker in
+            BrokerStats(
+                id: broker.id,
+                host: broker.host,
+                port: broker.port,
+                leaderCount: leaderCounts[broker.id] ?? 0,
+                replicaCount: replicaCounts[broker.id] ?? 0,
+            )
+        }.sorted { $0.id < $1.id }
+    }
+
     var consumerGroupLags: [String: Int64] = [:]
     var topicLags: [String: Int64] = [:]
     /// Per-partition lag breakdown for each consumer group (group name → partitions).
