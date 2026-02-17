@@ -105,29 +105,33 @@ struct ContentView: View {
                         Label(l10n["cluster.add"], systemImage: "plus")
                     }
                     .help(l10n["cluster.add"])
+                    .keyboardShortcut("n", modifiers: .command)
                 }
 
-                // Connection controls
-                if appState.connectionStatus.isConnected {
-                    Button {
-                        Task { await appState.disconnect() }
-                    } label: {
-                        Label(l10n["connection.disconnect"], systemImage: "power")
-                            .foregroundStyle(.green)
-                    }
-                    .help(l10n["connection.disconnect"])
-                } else if appState.configStore.selectedCluster != nil {
-                    Button {
-                        Task { await appState.connect() }
-                    } label: {
-                        Label(l10n["connection.connect"], systemImage: "power")
-                            .foregroundStyle(.red)
-                    }
-                    .help(l10n["connection.connect"])
-                } else {
-                    Label(l10n["connection.connect"], systemImage: "power")
-                        .foregroundStyle(.gray)
+                // Connection controls (rightmost - only show here when NOT on Clusters page)
+                // On Clusters page, power button is added in ClustersView toolbar to ensure rightmost position
+                if appState.selectedSidebarItem != .clusters {
+                    if appState.connectionStatus.isConnected {
+                        Button {
+                            Task { await appState.disconnect() }
+                        } label: {
+                            Label(l10n["connection.disconnect"], systemImage: "power")
+                                .foregroundStyle(.green)
+                        }
+                        .help(l10n["connection.disconnect"])
+                    } else if appState.configStore.selectedCluster != nil {
+                        Button {
+                            Task { await appState.connect() }
+                        } label: {
+                            Label(l10n["connection.connect"], systemImage: "power")
+                                .foregroundStyle(.red)
+                        }
                         .help(l10n["connection.connect"])
+                    } else {
+                        Label(l10n["connection.connect"], systemImage: "power")
+                            .foregroundStyle(.gray)
+                            .help(l10n["connection.connect"])
+                    }
                 }
             }
         }

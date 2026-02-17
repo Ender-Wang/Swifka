@@ -28,6 +28,32 @@ final class ConnectionViewModel {
         }
     }
 
+    func cloneCluster(_ cluster: ClusterConfig, in appState: AppState) {
+        let suffix = appState.l10n["cluster.clone.suffix"]
+        let cloned = ClusterConfig(
+            id: UUID(),
+            name: "\(cluster.name)\(suffix)",
+            host: cluster.host,
+            port: cluster.port,
+            authType: cluster.authType,
+            saslMechanism: cluster.saslMechanism,
+            saslUsername: cluster.saslUsername,
+            useTLS: cluster.useTLS,
+            isPinned: false,
+            lastConnectedAt: nil,
+            sortOrder: 0,
+        )
+
+        appState.configStore.addCluster(cloned)
+
+        // Clone password if SASL
+        if cluster.authType == .sasl,
+           let password = KeychainManager.loadPassword(for: cluster.id)
+        {
+            try? KeychainManager.save(password: password, for: cloned.id)
+        }
+    }
+
     func deleteCluster(_ id: UUID, from appState: AppState) async {
         if appState.configStore.selectedClusterId == id,
            appState.connectionStatus.isConnected

@@ -265,6 +265,7 @@ final class AppState {
                 : nil
             try await kafkaService.connect(config: cluster, password: password)
             connectionStatus = .connected
+            // Don't update lastConnectedAt here - only update on disconnect
             await loadHistoricalMetrics(for: cluster.id)
             await refreshAll()
             refreshManager.restart()
@@ -275,6 +276,11 @@ final class AppState {
     }
 
     func disconnect() async {
+        // Update lastConnectedAt timestamp if we were connected
+        if connectionStatus.isConnected, let clusterId = configStore.selectedClusterId {
+            configStore.updateLastConnected(for: clusterId)
+        }
+
         refreshManager.stop()
         connectionStatus = .disconnected
         isLoading = false
@@ -343,6 +349,10 @@ final class AppState {
             // Circuit breaker: stop auto-refresh after 3 consecutive failures
             // to avoid hammering librdkafka while brokers are down
             if consecutiveRefreshErrors >= 3 {
+                // Update lastConnectedAt since connection is failing
+                if let clusterId = configStore.selectedClusterId {
+                    configStore.updateLastConnected(for: clusterId)
+                }
                 refreshManager.stop()
                 connectionStatus = .error(error.localizedDescription)
                 isLoading = false

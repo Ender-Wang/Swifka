@@ -13,7 +13,8 @@ struct ClusterFormView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var name: String = ""
-    @State private var bootstrapServers: String = ""
+    @State private var host: String = ""
+    @State private var port: String = ""
     @State private var authType: AuthType = .none
     @State private var saslMechanism: SASLMechanism = .plain
     @State private var saslUsername: String = ""
@@ -40,7 +41,8 @@ struct ClusterFormView: View {
             Form {
                 Section {
                     TextField(l10n["cluster.name"], text: $name)
-                    TextField(l10n["cluster.brokers"], text: $bootstrapServers, prompt: Text(l10n["cluster.brokers.placeholder"]))
+                    TextField(l10n["cluster.host"], text: $host, prompt: Text("localhost"))
+                    TextField(l10n["cluster.port"], text: $port, prompt: Text("9092"))
                 }
 
                 Section {
@@ -82,7 +84,7 @@ struct ClusterFormView: View {
                 Button(l10n["connection.test"]) {
                     testConnection()
                 }
-                .disabled(name.isEmpty || bootstrapServers.isEmpty || isTesting)
+                .disabled(name.isEmpty || host.isEmpty || port.isEmpty || isTesting)
 
                 Spacer()
 
@@ -95,7 +97,7 @@ struct ClusterFormView: View {
                     saveCluster()
                 }
                 .keyboardShortcut(.defaultAction)
-                .disabled(name.isEmpty || bootstrapServers.isEmpty)
+                .disabled(name.isEmpty || host.isEmpty || port.isEmpty)
             }
             .padding()
         }
@@ -103,7 +105,8 @@ struct ClusterFormView: View {
         .onAppear {
             if case let .edit(cluster) = mode {
                 name = cluster.name
-                bootstrapServers = cluster.bootstrapServers
+                host = cluster.host
+                port = String(cluster.port)
                 authType = cluster.authType
                 saslMechanism = cluster.saslMechanism ?? .plain
                 saslUsername = cluster.saslUsername ?? ""
@@ -117,11 +120,13 @@ struct ClusterFormView: View {
 
     private func saveCluster() {
         let existingId: UUID? = if case let .edit(cluster) = mode { cluster.id } else { nil }
+        guard let portNum = Int(port), portNum > 0, portNum <= 65535 else { return }
 
         let cluster = ClusterConfig(
             id: existingId ?? UUID(),
             name: name,
-            bootstrapServers: bootstrapServers,
+            host: host,
+            port: portNum,
             authType: authType,
             saslMechanism: authType == .sasl ? saslMechanism : nil,
             saslUsername: authType == .sasl ? saslUsername : nil,
@@ -137,9 +142,16 @@ struct ClusterFormView: View {
         isTesting = true
         testResult = nil
 
+        guard let portNum = Int(port), portNum > 0, portNum <= 65535 else {
+            testResult = .failure("Invalid port number")
+            isTesting = false
+            return
+        }
+
         let config = ClusterConfig(
             name: name,
-            bootstrapServers: bootstrapServers,
+            host: host,
+            port: portNum,
             authType: authType,
             saslMechanism: authType == .sasl ? saslMechanism : nil,
             saslUsername: authType == .sasl ? saslUsername : nil,

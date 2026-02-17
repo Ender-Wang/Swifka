@@ -58,6 +58,20 @@ final class ConfigStore {
         save()
     }
 
+    func togglePin(for clusterId: UUID) {
+        if let index = clusters.firstIndex(where: { $0.id == clusterId }) {
+            clusters[index].isPinned.toggle()
+            save()
+        }
+    }
+
+    func updateLastConnected(for clusterId: UUID) {
+        if let index = clusters.firstIndex(where: { $0.id == clusterId }) {
+            clusters[index].lastConnectedAt = Date()
+            save()
+        }
+    }
+
     // MARK: - Persistence
 
     func save() {
@@ -101,11 +115,62 @@ final class ConfigStore {
         return try? encoder.encode(clusters)
     }
 
+    static func exportClusters(_ clusters: [ClusterConfig]) -> Data? {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.outputFormatting = .prettyPrinted
+        return try? encoder.encode(clusters)
+    }
+
+    func importSelectedClusters(_ selectedClusters: [ClusterConfig]) throws {
+        // Assign new UUIDs to avoid conflicts with existing clusters
+        let withNewIds = selectedClusters.map { cluster in
+            ClusterConfig(
+                id: UUID(), // Generate new UUID
+                name: cluster.name,
+                host: cluster.host,
+                port: cluster.port,
+                authType: cluster.authType,
+                saslMechanism: cluster.saslMechanism,
+                saslUsername: cluster.saslUsername,
+                useTLS: cluster.useTLS,
+                createdAt: Date(), // Reset creation time
+                updatedAt: Date(),
+                isPinned: false, // Don't import pin status
+                lastConnectedAt: nil, // Reset last connected
+                sortOrder: 0,
+            )
+        }
+
+        clusters.append(contentsOf: withNewIds)
+        save()
+    }
+
     func importConfig(from data: Data) throws {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         let imported = try decoder.decode([ClusterConfig].self, from: data)
-        clusters.append(contentsOf: imported)
+
+        // Assign new UUIDs to avoid conflicts with existing clusters
+        let withNewIds = imported.map { cluster in
+            ClusterConfig(
+                id: UUID(), // Generate new UUID
+                name: cluster.name,
+                host: cluster.host,
+                port: cluster.port,
+                authType: cluster.authType,
+                saslMechanism: cluster.saslMechanism,
+                saslUsername: cluster.saslUsername,
+                useTLS: cluster.useTLS,
+                createdAt: Date(), // Reset creation time
+                updatedAt: Date(),
+                isPinned: false, // Don't import pin status
+                lastConnectedAt: nil, // Reset last connected
+                sortOrder: 0,
+            )
+        }
+
+        clusters.append(contentsOf: withNewIds)
         save()
     }
 }

@@ -6,7 +6,8 @@ import SwiftUI
 nonisolated struct ClusterConfig: Codable, Identifiable, Hashable, Sendable {
     var id: UUID
     var name: String
-    var bootstrapServers: String
+    var host: String
+    var port: Int
     var authType: AuthType
     var saslMechanism: SASLMechanism?
     var saslUsername: String?
@@ -14,26 +15,103 @@ nonisolated struct ClusterConfig: Codable, Identifiable, Hashable, Sendable {
     var createdAt: Date
     var updatedAt: Date
 
+    // Cluster manager enhancements
+    var isPinned: Bool = false
+    var lastConnectedAt: Date? = nil
+    var sortOrder: Int = 0
+
+    /// Computed property for compatibility
+    var bootstrapServers: String {
+        "\(host):\(port)"
+    }
+
     init(
         id: UUID = UUID(),
         name: String,
-        bootstrapServers: String,
+        host: String,
+        port: Int,
         authType: AuthType = .none,
         saslMechanism: SASLMechanism? = nil,
         saslUsername: String? = nil,
         useTLS: Bool = false,
         createdAt: Date = Date(),
         updatedAt: Date = Date(),
+        isPinned: Bool = false,
+        lastConnectedAt: Date? = nil,
+        sortOrder: Int = 0,
     ) {
         self.id = id
         self.name = name
-        self.bootstrapServers = bootstrapServers
+        self.host = host
+        self.port = port
         self.authType = authType
         self.saslMechanism = saslMechanism
         self.saslUsername = saslUsername
         self.useTLS = useTLS
         self.createdAt = createdAt
         self.updatedAt = updatedAt
+        self.isPinned = isPinned
+        self.lastConnectedAt = lastConnectedAt
+        self.sortOrder = sortOrder
+    }
+
+    /// Custom decoding to handle migration from old bootstrapServers format
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+
+        // Try new format first (host + port)
+        if let host = try? container.decode(String.self, forKey: .host),
+           let port = try? container.decode(Int.self, forKey: .port)
+        {
+            self.host = host
+            self.port = port
+        } else {
+            // Fall back to old format (bootstrapServers)
+            let bootstrapServers = try container.decode(String.self, forKey: .bootstrapServers)
+            let parts = bootstrapServers.split(separator: ":")
+            if parts.count == 2, let portNum = Int(parts[1]) {
+                host = String(parts[0])
+                port = portNum
+            } else {
+                host = bootstrapServers
+                port = 9092
+            }
+        }
+
+        authType = try container.decode(AuthType.self, forKey: .authType)
+        saslMechanism = try container.decodeIfPresent(SASLMechanism.self, forKey: .saslMechanism)
+        saslUsername = try container.decodeIfPresent(String.self, forKey: .saslUsername)
+        useTLS = try container.decode(Bool.self, forKey: .useTLS)
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        updatedAt = try container.decode(Date.self, forKey: .updatedAt)
+        isPinned = try container.decodeIfPresent(Bool.self, forKey: .isPinned) ?? false
+        lastConnectedAt = try container.decodeIfPresent(Date.self, forKey: .lastConnectedAt)
+        sortOrder = try container.decodeIfPresent(Int.self, forKey: .sortOrder) ?? 0
+    }
+
+    /// Custom encoding to use new host + port format
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(name, forKey: .name)
+        try container.encode(host, forKey: .host)
+        try container.encode(port, forKey: .port)
+        try container.encode(authType, forKey: .authType)
+        try container.encodeIfPresent(saslMechanism, forKey: .saslMechanism)
+        try container.encodeIfPresent(saslUsername, forKey: .saslUsername)
+        try container.encode(useTLS, forKey: .useTLS)
+        try container.encode(createdAt, forKey: .createdAt)
+        try container.encode(updatedAt, forKey: .updatedAt)
+        try container.encode(isPinned, forKey: .isPinned)
+        try container.encodeIfPresent(lastConnectedAt, forKey: .lastConnectedAt)
+        try container.encode(sortOrder, forKey: .sortOrder)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, host, port, bootstrapServers, authType, saslMechanism, saslUsername, useTLS
+        case createdAt, updatedAt, isPinned, lastConnectedAt, sortOrder
     }
 }
 
