@@ -121,12 +121,14 @@ Or download the latest `.dmg` from [Releases](https://github.com/Ender-Wang/Swif
 🔧 **Enhancements**
 
 - [x] Menu bar resident mode + keyboard shortcuts
-- [ ] Connection manager improvements
-  - [ ] Quick connection switcher (keyboard shortcut / menu bar)
-  - [ ] Recent connections history
-  - [ ] Favorite/pin frequently used clusters
-  - [ ] Duplicate/clone connection configs
-  - [ ] Connection groups/folders for organization
+- [x] Cluster manager enhancements
+  - [x] Pin favorite clusters to top
+  - [x] Clone/duplicate cluster configs (with password copy)
+  - [x] Export/import clusters with selective backup (timestamped files)
+  - [x] Multiple sort modes (manual, name, last connected, created, modified)
+  - [x] Drag-to-reorder and drag-to-pin/unpin
+  - [x] Track last connected timestamp for each cluster
+  - [x] Keyboard navigation (↑↓ arrows, Enter to connect, shortcuts for test/edit/delete/clone)
 
 ## Milestone 4: Write Operations & Experiments
 
