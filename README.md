@@ -112,7 +112,7 @@ Or download the latest `.dmg` from [Releases](https://github.com/Ender-Wang/Swif
 
 🎨 **UI & Animations**
 
-- [ ] Animated line drawing for chart transitions
+- [x] Animated line drawing for chart transitions
 - [ ] Message flow animations and real-time data change effects
 - [ ] Trends page loading/mode-switch transitions (Live ↔ History)
 - [x] Dark mode optimization
