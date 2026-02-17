@@ -113,11 +113,10 @@ Or download the latest `.dmg` from [Releases](https://github.com/Ender-Wang/Swif
 🎨 **UI & Animations**
 
 - [x] Animated line drawing for chart transitions
-- [ ] Message flow animations and real-time data change effects
-- [ ] Trends page loading/mode-switch transitions (Live ↔ History)
+- [x] ~~Message flow animations and real-time data change effects~~ — per-point interpolation conflicts with SwiftUI Charts' y-axis auto-ranging, causing visual glitches; not worth the complexity
+- [x] Trends page loading/mode-switch transitions (Live ↔ History)
 - [x] Dark mode optimization
-- [ ] Cluster topology and broker status visualization
-  - [x] ~~Partition distribution visualization~~ — Topics page partition table already shows leader/replicas/ISR
+- [x] Broker health dashboard (leader distribution chart + stats cards)
 
 🔧 **Enhancements**
 
