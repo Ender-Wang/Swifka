@@ -383,6 +383,7 @@ struct ClusterThroughputChart: View {
                         y: .value("msg/s", point.messagesPerSecond),
                         series: .value("Segment", point.segment),
                     )
+                    .foregroundStyle(.blue)
                     .interpolationMethod(.catmullRom)
 
                     AreaMark(
@@ -390,7 +391,7 @@ struct ClusterThroughputChart: View {
                         y: .value("msg/s", point.messagesPerSecond),
                         series: .value("Segment", point.segment),
                     )
-                    .foregroundStyle(.blue.opacity(0.1))
+                    .foregroundStyle(.blue.opacity(0.2))
                     .interpolationMethod(.catmullRom)
                 }
             }
@@ -498,8 +499,17 @@ struct PingLatencyChart: View {
                     )
                     .foregroundStyle(.green)
                     .interpolationMethod(.catmullRom)
+
+                    AreaMark(
+                        x: .value("Time", point.timestamp),
+                        y: .value("ms", point.ms),
+                        series: .value("Segment", point.segment),
+                    )
+                    .foregroundStyle(.green.opacity(0.2))
+                    .interpolationMethod(.catmullRom)
                 }
             }
+            .chartYScale(domain: .automatic(includesZero: true))
             .chartYAxis {
                 AxisMarks { value in
                     AxisValueLabel {
