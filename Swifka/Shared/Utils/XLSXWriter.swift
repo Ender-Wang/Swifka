@@ -284,7 +284,7 @@ nonisolated enum XLSXWriter {
 
 // MARK: - Data Extensions
 
-private extension Data {
+private nonisolated extension Data {
     mutating func append(uint16 value: UInt16) {
         var v = value.littleEndian
         Swift.withUnsafeBytes(of: &v) { append(contentsOf: $0) }

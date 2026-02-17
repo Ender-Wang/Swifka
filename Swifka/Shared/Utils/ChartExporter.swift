@@ -3,7 +3,7 @@ import Foundation
 import UniformTypeIdentifiers
 
 /// Export utility for chart data — filename generation, NSSavePanel, ISO 8601 formatting.
-nonisolated enum ChartExporter {
+enum ChartExporter {
     enum ChartType: String, Sendable {
         case clusterThroughput = "ClusterThroughput"
         case pingLatency = "PingLatency"
@@ -46,7 +46,6 @@ nonisolated enum ChartExporter {
     // MARK: - Save
 
     /// Present NSSavePanel and write an .xlsx file.
-    @MainActor
     static func saveXLSX(data: Data, defaultFilename: String) {
         let panel = NSSavePanel()
         if let xlsxType = UTType(filenameExtension: "xlsx") {
