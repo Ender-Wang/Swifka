@@ -147,7 +147,7 @@ Or download the latest `.dmg` from [Releases](https://github.com/Ender-Wang/Swif
 
 📊 **Monitoring**
 
-- [ ] Broker liveness monitoring, consumer activity status
+- [x] Broker liveness monitoring, consumer activity status
 
 ## Milestone 5: Write Operations & Experiments
 
