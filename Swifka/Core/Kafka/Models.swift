@@ -274,6 +274,32 @@ nonisolated struct KafkaMessageRecord: Identifiable, Sendable {
         }
         return prettyString
     }
+
+    // MARK: - New Deserializer-based API
+
+    /// Deserialize key using the new protocol-based system
+    @MainActor
+    func deserializeKey(using deserializer: any MessageDeserializer) -> DeserializedContent {
+        deserializer.deserialize(key)
+    }
+
+    /// Deserialize value using the new protocol-based system
+    @MainActor
+    func deserializeValue(using deserializer: any MessageDeserializer) -> DeserializedContent {
+        deserializer.deserialize(value)
+    }
+
+    /// Pretty-format key using the new protocol-based system
+    @MainActor
+    func prettyDeserializeKey(using deserializer: any MessageDeserializer) -> DeserializedContent {
+        deserializer.prettyFormat(key)
+    }
+
+    /// Pretty-format value using the new protocol-based system
+    @MainActor
+    func prettyDeserializeValue(using deserializer: any MessageDeserializer) -> DeserializedContent {
+        deserializer.prettyFormat(value)
+    }
 }
 
 nonisolated enum MessageFormat: String, CaseIterable, Identifiable, Sendable {
@@ -283,6 +309,28 @@ nonisolated enum MessageFormat: String, CaseIterable, Identifiable, Sendable {
 
     var id: String {
         rawValue
+    }
+
+    /// Bridge to new deserializer system
+    @MainActor
+    var deserializer: any MessageDeserializer {
+        switch self {
+        case .utf8:
+            UTF8Deserializer()
+        case .hex:
+            HexDeserializer()
+        case .base64:
+            Base64Deserializer()
+        }
+    }
+
+    /// Get deserializer ID for registry lookup
+    var deserializerID: String {
+        switch self {
+        case .utf8: "utf8"
+        case .hex: "hex"
+        case .base64: "base64"
+        }
     }
 }
 

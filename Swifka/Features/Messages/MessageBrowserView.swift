@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MessageBrowserView: View {
     @Environment(AppState.self) private var appState
+    @State private var deserializerConfigStore = DeserializerConfigStore.shared
     @State private var selectedTopicName: String? = UserDefaults.standard.string(forKey: "messages.selectedTopic")
     @State private var selectedPartition: Int32? = {
         let val = UserDefaults.standard.object(forKey: "messages.selectedPartition")
@@ -17,7 +18,7 @@ struct MessageBrowserView: View {
     @State private var messages: [KafkaMessageRecord] = []
     @State private var isFetching = false
     @State private var fetchError: String?
-    @AppStorage("messages.format") private var messageFormat: MessageFormat = .utf8
+    @State private var messageFormat: MessageFormat = .utf8
     @State private var selectedMessageId: String?
     @State private var detailMessage: KafkaMessageRecord?
     @State private var detailPanelWidth: CGFloat = 320
@@ -125,12 +126,19 @@ struct MessageBrowserView: View {
                 timeRangeFrom = nil
                 timeRangeTo = nil
                 showTimeFilter = false
+                loadFormatForTopic(selectedTopicName) // Restore saved format
                 if selectedTopicName != nil {
                     fetchMessages()
                 } else {
                     messages = []
                     fetchError = nil
                 }
+            }
+            .onChange(of: messageFormat) {
+                saveFormatForTopic(messageFormat) // Save format when changed
+            }
+            .onAppear {
+                loadFormatForTopic(selectedTopicName) // Load format on initial appear
             }
             .onChange(of: selectedPartition) {
                 if let p = selectedPartition {
@@ -1025,6 +1033,38 @@ struct MessageBrowserView: View {
             }
             isFetching = false
         }
+    }
+
+    // MARK: - Per-Topic Format Persistence
+
+    private func loadFormatForTopic(_ topicName: String?) {
+        guard let topicName else {
+            // No topic selected, use default
+            messageFormat = .utf8
+            return
+        }
+
+        // Look up saved format for this topic
+        if let config = deserializerConfigStore.config(for: topicName),
+           let format = MessageFormat.allCases.first(where: { $0.deserializerID == config.valueDeserializerID })
+        {
+            messageFormat = format
+        } else {
+            // No saved config, use default
+            messageFormat = .utf8
+        }
+    }
+
+    private func saveFormatForTopic(_ format: MessageFormat) {
+        guard let topicName = selectedTopicName else { return }
+
+        // Save format for this topic
+        let config = TopicDeserializerConfig(
+            topicName: topicName,
+            keyDeserializerID: format.deserializerID,
+            valueDeserializerID: format.deserializerID,
+        )
+        deserializerConfigStore.setConfig(config)
     }
 }
 
