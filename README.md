@@ -28,7 +28,7 @@ A read-focused, lightweight, native macOS Kafka client for monitoring clusters, 
 # Features
 
 - Connect to any Kafka-compatible cluster (Kafka, Redpanda, etc.)
-- Browse topics, partitions, and messages (UTF-8 / Hex / Base64)
+- Browse topics, partitions, and messages (UTF-8 / Hex / Base64 / Protobuf)
 - Monitor consumer groups and lag in real time
 - View broker stats and cluster metadata
 - All read-only by default — safe to point at production
@@ -134,10 +134,12 @@ Or download the latest `.dmg` from [Releases](https://github.com/Ender-Wang/Swif
 
 ✨ **Features**
 
-- [ ] Message deserialization
-  - [ ] Protobuf decoding (import .proto files)
-  - [ ] Avro deserialization (with schema registry integration)
-  - [ ] Custom deserializers (plugin system)
+- [x] Message deserialization
+  - [x] Extensible deserializer protocol with per-topic format memory
+  - [x] Protobuf decoding (import .proto files, schema-aware field names, nested messages)
+  - [x] ~~Avro deserialization~~ — deferred (future work)
+  - [x] ~~Application-level decryption~~ — deferred (future work)
+  - [x] ~~Custom deserializers (plugin system)~~ — deferred (future work)
 - [x] JSON pretty-printing with syntax highlighting
 - [x] Message search/filter
   - [x] Search by key, value, or both
