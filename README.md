@@ -139,12 +139,11 @@ Or download the latest `.dmg` from [Releases](https://github.com/Ender-Wang/Swif
   - [ ] Avro deserialization (with schema registry integration)
   - [ ] Custom deserializers (plugin system)
 - [x] JSON pretty-printing with syntax highlighting
-- [ ] Message search/filter
-  - [ ] Search by key, value, or timestamp
-  - [ ] Time range filter
-  - [ ] Keyword search
-  - [ ] Regex search within JSON
-  - [ ] JSON path search (e.g., `$.user.email`)
+- [x] Message search/filter
+  - [x] Search by key, value, or both
+  - [x] Time range filter
+  - [x] Keyword and regex search
+  - [x] JSON path search (e.g., `user.email:john@`)
 
 📊 **Monitoring**
 
