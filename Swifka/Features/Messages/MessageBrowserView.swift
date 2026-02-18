@@ -30,10 +30,24 @@ struct MessageBrowserView: View {
     @State private var currentPage = 0
     private let messagesPerPage = 500
 
+    // Search
+    @State private var searchQuery = ""
+    @State private var searchScope: SearchScope = .both
+    @State private var isRegex = false
+    @State private var isCaseSensitive = false
+
+    enum SearchScope: String, CaseIterable, Identifiable {
+        case key, value, both
+        var id: String {
+            rawValue
+        }
+    }
+
     var body: some View {
         let l10n = appState.l10n
 
         VStack(spacing: 0) {
+            searchBar
             controlsBar
 
             if let error = fetchError {
@@ -87,6 +101,7 @@ struct MessageBrowserView: View {
             offsetFromText = ""
             offsetToText = ""
             currentPage = 0
+            searchQuery = ""
             if selectedTopicName != nil {
                 fetchMessages()
             } else {
@@ -132,6 +147,87 @@ struct MessageBrowserView: View {
             }
         }
         .navigationTitle(l10n["messages.title"])
+        .onChange(of: searchQuery) { _, _ in currentPage = 0 }
+        .onChange(of: searchScope) { _, _ in currentPage = 0 }
+        .onChange(of: isRegex) { _, _ in currentPage = 0 }
+        .onChange(of: isCaseSensitive) { _, _ in currentPage = 0 }
+    }
+
+    // MARK: - Search Bar
+
+    @ViewBuilder
+    private var searchBar: some View {
+        let l10n = appState.l10n
+
+        HStack(spacing: 12) {
+            searchTextField(l10n: l10n)
+            searchScopePicker(l10n: l10n)
+            searchOptions(l10n: l10n)
+
+            if !searchQuery.isEmpty {
+                searchResults(l10n: l10n)
+            }
+
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color(nsColor: .controlBackgroundColor))
+    }
+
+    private func searchTextField(l10n: L10n) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+                .font(.system(size: 13))
+
+            TextField(l10n["messages.search.placeholder"], text: $searchQuery)
+                .textFieldStyle(.plain)
+
+            if !searchQuery.isEmpty {
+                Button {
+                    searchQuery = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                        .font(.system(size: 13))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+        .frame(minWidth: 200, idealWidth: 300)
+    }
+
+    private func searchScopePicker(l10n: L10n) -> some View {
+        Picker(l10n["messages.search.scope"], selection: $searchScope) {
+            Text(l10n["messages.search.scope.key"]).tag(SearchScope.key)
+            Text(l10n["messages.search.scope.value"]).tag(SearchScope.value)
+            Text(l10n["messages.search.scope.both"]).tag(SearchScope.both)
+        }
+        .fixedSize()
+    }
+
+    private func searchOptions(l10n: L10n) -> some View {
+        Group {
+            Toggle(isOn: $isRegex) {
+                Text(l10n["messages.search.regex"])
+            }
+            .toggleStyle(.checkbox)
+
+            Toggle(isOn: $isCaseSensitive) {
+                Text(l10n["messages.search.case.sensitive"])
+            }
+            .toggleStyle(.checkbox)
+        }
+    }
+
+    private func searchResults(l10n: L10n) -> some View {
+        Text(l10n.t("messages.search.results", String(filteredMessages.count), String(messages.count)))
+            .font(.caption)
+            .foregroundStyle(.secondary)
     }
 
     // MARK: - Controls Bar
@@ -332,16 +428,62 @@ struct MessageBrowserView: View {
     // MARK: - Page Bar
 
     private var totalPages: Int {
-        guard !messages.isEmpty else { return 0 }
-        return (messages.count + messagesPerPage - 1) / messagesPerPage
+        guard !filteredMessages.isEmpty else { return 0 }
+        return (filteredMessages.count + messagesPerPage - 1) / messagesPerPage
+    }
+
+    private var filteredMessages: [KafkaMessageRecord] {
+        guard !searchQuery.isEmpty else { return messages }
+
+        return messages.filter { message in
+            matchesSearch(message: message, query: searchQuery)
+        }
     }
 
     private var displayedMessages: [KafkaMessageRecord] {
-        let sorted = sortedMessages
+        let sorted = sortedFilteredMessages
         let start = currentPage * messagesPerPage
         let end = min(start + messagesPerPage, sorted.count)
         guard start < sorted.count else { return sorted }
         return Array(sorted[start ..< end])
+    }
+
+    private var sortedFilteredMessages: [KafkaMessageRecord] {
+        filteredMessages.sorted(using: appState.messagesSortOrder)
+    }
+
+    private func matchesSearch(message: KafkaMessageRecord, query: String) -> Bool {
+        let keyString = message.keyString(format: messageFormat)
+        let valueString = message.valueString(format: messageFormat)
+
+        let searchIn: [String] = switch searchScope {
+        case .key:
+            [keyString]
+        case .value:
+            [valueString]
+        case .both:
+            [keyString, valueString]
+        }
+
+        if isRegex {
+            guard let regex = try? NSRegularExpression(
+                pattern: query,
+                options: isCaseSensitive ? [] : .caseInsensitive,
+            ) else {
+                return false
+            }
+
+            return searchIn.contains { text in
+                let range = NSRange(text.startIndex..., in: text)
+                return regex.firstMatch(in: text, range: range) != nil
+            }
+        } else {
+            let searchQuery = isCaseSensitive ? query : query.lowercased()
+            return searchIn.contains { text in
+                let searchText = isCaseSensitive ? text : text.lowercased()
+                return searchText.contains(searchQuery)
+            }
+        }
     }
 
     @ViewBuilder
@@ -391,7 +533,7 @@ struct MessageBrowserView: View {
             Text(l10n.t(
                 "messages.page.info",
                 String(displayedMessages.count),
-                String(messages.count),
+                String(filteredMessages.count),
             ))
             .font(.caption)
             .foregroundStyle(.secondary)
@@ -498,10 +640,6 @@ struct MessageBrowserView: View {
         }
         .shadow(color: .black.opacity(0.15), radius: 8, x: -2)
         .transition(.move(edge: .trailing))
-    }
-
-    private var sortedMessages: [KafkaMessageRecord] {
-        messages.sorted(using: appState.messagesSortOrder)
     }
 
     /// Binding that returns nil when the stored topic isn't in the current list,
