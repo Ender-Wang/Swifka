@@ -173,6 +173,7 @@
   "messages.search.scope.both": "全部",
   "messages.search.regex": "正则表达式",
   "messages.search.case.sensitive": "区分大小写",
+  "messages.search.jsonpath": "JSON 路径",
   "messages.search.results": "{0} / {1} 条消息",
   "messages.time.filter.toggle": "按时间范围筛选",
   "messages.time.filter.from": "起始时间",

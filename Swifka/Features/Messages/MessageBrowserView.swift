@@ -35,6 +35,7 @@ struct MessageBrowserView: View {
     @State private var searchScope: SearchScope = .both
     @State private var isRegex = false
     @State private var isCaseSensitive = false
+    @State private var isJsonPath = false
 
     enum SearchScope: String, CaseIterable, Identifiable {
         case key, value, both
@@ -89,6 +90,7 @@ struct MessageBrowserView: View {
         .onChange(of: searchScope) { _, _ in currentPage = 0 }
         .onChange(of: isRegex) { _, _ in currentPage = 0 }
         .onChange(of: isCaseSensitive) { _, _ in currentPage = 0 }
+        .onChange(of: isJsonPath) { _, _ in currentPage = 0 }
         .onChange(of: timeRangeFrom) { _, _ in currentPage = 0 }
         .onChange(of: timeRangeTo) { _, _ in currentPage = 0 }
     }
@@ -241,15 +243,39 @@ struct MessageBrowserView: View {
 
     private func searchOptions(l10n: L10n) -> some View {
         Group {
-            Toggle(isOn: $isRegex) {
+            Toggle(isOn: Binding(
+                get: { isRegex },
+                set: { newValue in
+                    isRegex = newValue
+                    if newValue {
+                        isJsonPath = false // Mutually exclusive
+                    }
+                },
+            )) {
                 Text(l10n["messages.search.regex"])
             }
             .toggleStyle(.checkbox)
+            .disabled(isJsonPath)
 
             Toggle(isOn: $isCaseSensitive) {
                 Text(l10n["messages.search.case.sensitive"])
             }
             .toggleStyle(.checkbox)
+
+            Toggle(isOn: Binding(
+                get: { isJsonPath },
+                set: { newValue in
+                    isJsonPath = newValue
+                    if newValue {
+                        isRegex = false // Mutually exclusive
+                        searchScope = .value // Auto-set to Value
+                    }
+                },
+            )) {
+                Text(l10n["messages.search.jsonpath"])
+            }
+            .toggleStyle(.checkbox)
+            .disabled(isRegex)
         }
     }
 
@@ -584,6 +610,11 @@ struct MessageBrowserView: View {
         let keyString = message.keyString(format: messageFormat)
         let valueString = message.valueString(format: messageFormat)
 
+        // JSON Path search
+        if isJsonPath {
+            return matchesJsonPath(valueString: valueString, query: query)
+        }
+
         let searchIn: [String] = switch searchScope {
         case .key:
             [keyString]
@@ -612,6 +643,120 @@ struct MessageBrowserView: View {
                 return searchText.contains(searchQuery)
             }
         }
+    }
+
+    private func matchesJsonPath(valueString: String, query: String) -> Bool {
+        // Parse query: "path:value" or just "path"
+        let components = query.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false)
+        let path = String(components[0])
+        let searchValue = components.count > 1 ? String(components[1]) : nil
+
+        // Parse JSON
+        guard let data = valueString.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: data)
+        else {
+            return false
+        }
+
+        // Navigate to path
+        guard let extractedValue = extractValueAtPath(from: json, path: path) else {
+            return false
+        }
+
+        // If no search value specified, just check existence
+        guard let searchValue else {
+            return true
+        }
+
+        // Convert extracted value to string and search
+        let extractedString = String(describing: extractedValue)
+        let searchQuery = isCaseSensitive ? searchValue : searchValue.lowercased()
+        let searchText = isCaseSensitive ? extractedString : extractedString.lowercased()
+        return searchText.contains(searchQuery)
+    }
+
+    private func extractValueAtPath(from json: Any, path: String) -> Any? {
+        var current: Any = json
+        let pathComponents = parseJsonPath(path)
+
+        for component in pathComponents {
+            switch component {
+            case let .key(key):
+                guard let dict = current as? [String: Any],
+                      let value = dict[key]
+                else {
+                    return nil
+                }
+                current = value
+
+            case let .index(idx):
+                guard let array = current as? [Any],
+                      idx >= 0, idx < array.count
+                else {
+                    return nil
+                }
+                current = array[idx]
+            }
+        }
+
+        return current
+    }
+
+    private enum JsonPathComponent {
+        case key(String)
+        case index(Int)
+    }
+
+    private func parseJsonPath(_ path: String) -> [JsonPathComponent] {
+        var components: [JsonPathComponent] = []
+        var currentKey = ""
+        var i = path.startIndex
+
+        while i < path.endIndex {
+            let char = path[i]
+
+            if char == "." {
+                if !currentKey.isEmpty {
+                    components.append(.key(currentKey))
+                    currentKey = ""
+                }
+                i = path.index(after: i)
+            } else if char == "[" {
+                // Handle bracket notation: [0] or ["key"]
+                if !currentKey.isEmpty {
+                    components.append(.key(currentKey))
+                    currentKey = ""
+                }
+
+                // Find closing bracket
+                guard let closingBracket = path[i...].firstIndex(of: "]") else {
+                    break
+                }
+
+                let bracketContent = path[path.index(after: i) ..< closingBracket]
+                let content = String(bracketContent).trimmingCharacters(in: .whitespaces)
+
+                // Check if it's an array index or string key
+                if let index = Int(content) {
+                    components.append(.index(index))
+                } else {
+                    // Remove quotes if present
+                    let key = content.trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
+                    components.append(.key(key))
+                }
+
+                i = path.index(after: closingBracket)
+            } else {
+                currentKey.append(char)
+                i = path.index(after: i)
+            }
+        }
+
+        if !currentKey.isEmpty {
+            components.append(.key(currentKey))
+        }
+
+        return components
     }
 
     @ViewBuilder

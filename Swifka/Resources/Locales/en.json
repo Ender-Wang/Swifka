@@ -173,6 +173,7 @@
   "messages.search.scope.both": "Both",
   "messages.search.regex": "Regex",
   "messages.search.case.sensitive": "Case Sensitive",
+  "messages.search.jsonpath": "JSON Path",
   "messages.search.results": "{0} of {1} messages",
   "messages.time.filter.toggle": "Filter by Time Range",
   "messages.time.filter.from": "From",
