@@ -130,19 +130,7 @@ Or download the latest `.dmg` from [Releases](https://github.com/Ender-Wang/Swif
   - [x] Track last connected timestamp for each cluster
   - [x] Keyboard navigation (↑↓ arrows, Enter to connect, shortcuts for test/edit/delete/clone)
 
-## Milestone 4: Write Operations & Experiments
-
-✨ **Features**
-
-- [ ] Send test messages, create/delete topics, reset offsets (all opt-in)
-- [ ] ~~Docker API integration for local dev environments~~ — users manage Docker externally
-- [ ] ~~Failure simulation and recovery monitoring~~ — chaos engineering out of scope for a monitoring tool
-
-⚙️ **Settings & Infrastructure**
-
-- [ ] Permission tiers (Read / Write / Admin / Dangerous) with double confirmation
-
-## Milestone 5: Advanced Features
+## Milestone 4: Advanced Monitoring & Search
 
 ✨ **Features**
 
@@ -161,6 +149,18 @@ Or download the latest `.dmg` from [Releases](https://github.com/Ender-Wang/Swif
 📊 **Monitoring**
 
 - [ ] Broker liveness monitoring, consumer activity status
+
+## Milestone 5: Write Operations & Experiments
+
+✨ **Features**
+
+- [ ] Send test messages, create/delete topics, reset offsets (all opt-in)
+- [ ] ~~Docker API integration for local dev environments~~ — users manage Docker externally
+- [ ] ~~Failure simulation and recovery monitoring~~ — chaos engineering out of scope for a monitoring tool
+
+⚙️ **Settings & Infrastructure**
+
+- [ ] Permission tiers (Read / Write / Admin / Dangerous) with double confirmation
 
 📦 **Release**
 
