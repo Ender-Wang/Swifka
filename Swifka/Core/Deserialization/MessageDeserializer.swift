@@ -145,6 +145,7 @@ final class DeserializerRegistry {
         register(UTF8Deserializer())
         register(HexDeserializer())
         register(Base64Deserializer())
+        register(ProtobufDeserializer())
     }
 
     func register(_ deserializer: any MessageDeserializer) {

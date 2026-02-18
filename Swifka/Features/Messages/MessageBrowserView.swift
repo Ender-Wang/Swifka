@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct MessageBrowserView: View {
     @Environment(AppState.self) private var appState
@@ -18,7 +19,12 @@ struct MessageBrowserView: View {
     @State private var messages: [KafkaMessageRecord] = []
     @State private var isFetching = false
     @State private var fetchError: String?
+    @State private var fetchTask: Task<Void, Never>?
     @State private var messageFormat: MessageFormat = .utf8
+    @State private var protoManager = ProtobufConfigManager.shared
+    @State private var selectedProtoFileID: UUID?
+    @State private var selectedProtoMessageType: String?
+    @State private var isImportingProtoFile = false
     @State private var selectedMessageId: String?
     @State private var detailMessage: KafkaMessageRecord?
     @State private var detailPanelWidth: CGFloat = 320
@@ -127,6 +133,9 @@ struct MessageBrowserView: View {
                 timeRangeTo = nil
                 showTimeFilter = false
                 loadFormatForTopic(selectedTopicName) // Restore saved format
+                if messageFormat == .protobuf {
+                    loadProtobufConfig()
+                }
                 if selectedTopicName != nil {
                     fetchMessages()
                 } else {
@@ -153,7 +162,7 @@ struct MessageBrowserView: View {
                 currentPage = 0
             }
             .onChange(of: appState.refreshManager.tick) {
-                if selectedTopicName != nil {
+                if selectedTopicName != nil, !isFetching {
                     fetchMessages()
                 }
                 withAnimation(.easeInOut(duration: 0.6)) {
@@ -444,8 +453,285 @@ struct MessageBrowserView: View {
                 }
             }
             .fixedSize()
+            .onChange(of: messageFormat) { _, newFormat in
+                if newFormat == .protobuf {
+                    loadProtobufConfig()
+                }
+            }
+
+            // Inline protobuf pickers (shown when Protobuf format is selected)
+            if messageFormat == .protobuf {
+                protobufInlinePickers
+            }
         }
         .padding(12)
+        .fileImporter(
+            isPresented: $isImportingProtoFile,
+            allowedContentTypes: [.init(filenameExtension: "proto")!],
+            allowsMultipleSelection: false,
+        ) { result in
+            handleProtoFileImport(result)
+        }
+    }
+
+    // MARK: - Protobuf Inline Pickers
+
+    @ViewBuilder
+    private var protobufInlinePickers: some View {
+        let l10n = appState.l10n
+
+        Divider()
+            .frame(height: 16)
+
+        if clusterProtoFiles.isEmpty {
+            Button {
+                isImportingProtoFile = true
+            } label: {
+                Label(l10n["protobuf.import.file"], systemImage: "doc.badge.plus")
+            }
+            .controlSize(.small)
+        } else {
+            // Proto file picker with delete menu
+            Menu {
+                ForEach(clusterProtoFiles) { protoFile in
+                    Button {
+                        selectedProtoFileID = protoFile.id
+                        if let topicName = selectedTopicName {
+                            selectedProtoMessageType = autoMatchMessageType(for: topicName)
+                        } else {
+                            selectedProtoMessageType = nil
+                        }
+                        saveProtobufConfigIfReady()
+                        fetchMessages()
+                    } label: {
+                        HStack {
+                            Text(protoFile.fileName)
+                            if protoFile.id == selectedProtoFileID {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                }
+
+                Divider()
+
+                Button {
+                    isImportingProtoFile = true
+                } label: {
+                    Label(l10n["protobuf.import.file"], systemImage: "doc.badge.plus")
+                }
+
+                if let selectedID = selectedProtoFileID,
+                   let file = clusterProtoFiles.first(where: { $0.id == selectedID })
+                {
+                    Button(role: .destructive) {
+                        protoManager.removeProtoFile(selectedID)
+                        selectedProtoFileID = clusterProtoFiles.first?.id
+                        selectedProtoMessageType = nil
+                        saveProtobufConfigIfReady()
+                    } label: {
+                        Label(
+                            l10n.t("protobuf.delete.file", file.fileName),
+                            systemImage: "trash",
+                        )
+                    }
+                }
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "doc.text")
+                        .font(.caption2)
+                    Text(selectedProtoFileName)
+                        .lineLimit(1)
+                }
+            }
+            .fixedSize()
+            .help(l10n["protobuf.select.file"])
+
+            // Message type picker (shown when a proto file is selected)
+            if let selectedFileID = selectedProtoFileID,
+               let protoFile = clusterProtoFiles.first(where: { $0.id == selectedFileID }),
+               !protoFile.messageTypes.isEmpty
+            {
+                Picker(
+                    l10n["protobuf.select.message"],
+                    selection: Binding(
+                        get: { selectedProtoMessageType },
+                        set: { newValue in
+                            if newValue != selectedProtoMessageType {
+                                selectedProtoMessageType = newValue
+                                saveProtobufConfigIfReady()
+                                fetchMessages()
+                            }
+                        },
+                    ),
+                ) {
+                    Text(l10n["protobuf.select.placeholder"]).tag(nil as String?)
+
+                    ForEach(protoFile.messageTypes, id: \.self) { messageType in
+                        Text(isAutoMatchedType && messageType == selectedProtoMessageType
+                            ? "\(messageType) — auto" : messageType)
+                            .tag(messageType as String?)
+                    }
+                }
+                .fixedSize()
+            }
+        }
+    }
+
+    private var clusterProtoFiles: [ProtoFileInfo] {
+        guard let clusterID = appState.configStore.selectedClusterId else { return [] }
+        return protoManager.protoFiles(for: clusterID)
+    }
+
+    private var selectedProtoFileName: String {
+        guard let id = selectedProtoFileID,
+              let file = clusterProtoFiles.first(where: { $0.id == id })
+        else {
+            return appState.l10n["protobuf.select.placeholder"]
+        }
+        return file.fileName
+    }
+
+    /// Whether the current message type selection matches auto-match for the current topic
+    private var isAutoMatchedType: Bool {
+        guard let topicName = selectedTopicName,
+              let currentType = selectedProtoMessageType
+        else { return false }
+        return autoMatchMessageType(for: topicName) == currentType
+    }
+
+    private func loadProtobufConfig() {
+        guard let topicName = selectedTopicName else {
+            selectedProtoFileID = clusterProtoFiles.first?.id
+            selectedProtoMessageType = nil
+            return
+        }
+
+        // Restore saved config if it exists
+        if let config = deserializerConfigStore.config(for: topicName),
+           let protoFile = clusterProtoFiles.first(where: { $0.filePath == config.protoFilePath })
+        {
+            selectedProtoFileID = protoFile.id
+            selectedProtoMessageType = config.messageTypeName
+            return
+        }
+
+        // No saved config — auto-select first proto file
+        selectedProtoFileID = clusterProtoFiles.first?.id
+
+        // Auto-match: try to find a message type matching the topic name
+        // e.g. topic "protobuf-orders" or "orders" → message type "Order"
+        selectedProtoMessageType = autoMatchMessageType(for: topicName)
+
+        // Auto-save if we found a match
+        if selectedProtoMessageType != nil {
+            saveProtobufConfigIfReady()
+        }
+    }
+
+    /// Try to match topic name to a proto message type using fuzzy matching.
+    /// Picks the longest matching type to avoid "Order" matching before "OrderItem".
+    private func autoMatchMessageType(for topicName: String) -> String? {
+        guard let fileID = selectedProtoFileID,
+              let protoFile = clusterProtoFiles.first(where: { $0.id == fileID })
+        else { return nil }
+
+        let normalizedTopic = topicName.lowercased()
+            .replacingOccurrences(of: "-", with: "")
+            .replacingOccurrences(of: "_", with: "")
+
+        // Strip common format prefixes for better matching
+        let strippedTopic = normalizedTopic
+            .replacingOccurrences(of: "protobuf", with: "")
+            .replacingOccurrences(of: "proto", with: "")
+            .replacingOccurrences(of: "pb", with: "")
+
+        // Collect all matches, pick the longest (most specific) one
+        var bestMatch: String?
+        var bestLength = 0
+
+        for messageType in protoFile.messageTypes {
+            let normalizedType = messageType.lowercased()
+            var matched = false
+
+            // Direct/exact match
+            if normalizedTopic == normalizedType || strippedTopic == normalizedType {
+                matched = true
+            }
+            // Topic contains type: "protobuforderitems" contains "orderitem"
+            else if normalizedTopic.contains(normalizedType) {
+                matched = true
+            }
+            // Stripped plural: "orderitems" == "orderitem" + "s"
+            else if strippedTopic == normalizedType + "s" {
+                matched = true
+            }
+            // Type contains stripped topic: "orderitem" contains "item"
+            else if !strippedTopic.isEmpty, normalizedType.contains(strippedTopic) {
+                matched = true
+            }
+            // Plural in topic: "orders" ↔ "order"
+            else if normalizedTopic.contains(normalizedType + "s") ||
+                normalizedType + "s" == normalizedTopic
+            {
+                matched = true
+            }
+
+            if matched, normalizedType.count > bestLength {
+                bestMatch = messageType
+                bestLength = normalizedType.count
+            }
+        }
+
+        return bestMatch
+    }
+
+    private func saveProtobufConfigIfReady() {
+        guard let topicName = selectedTopicName,
+              let fileID = selectedProtoFileID,
+              let protoFile = clusterProtoFiles.first(where: { $0.id == fileID }),
+              let messageType = selectedProtoMessageType
+        else {
+            return
+        }
+
+        let config = TopicDeserializerConfig(
+            topicName: topicName,
+            keyDeserializerID: "protobuf",
+            valueDeserializerID: "protobuf",
+            protoFilePath: protoFile.filePath,
+            messageTypeName: messageType,
+        )
+        deserializerConfigStore.setConfig(config)
+    }
+
+    private func handleProtoFileImport(_ result: Result<[URL], Error>) {
+        guard let clusterID = appState.configStore.selectedClusterId else { return }
+        do {
+            let urls = try result.get()
+            guard let url = urls.first else { return }
+
+            let gotAccess = url.startAccessingSecurityScopedResource()
+            defer {
+                if gotAccess {
+                    url.stopAccessingSecurityScopedResource()
+                }
+            }
+
+            try protoManager.importProtoFile(from: url, clusterID: clusterID)
+
+            // Auto-select the newly imported file
+            if let newFile = clusterProtoFiles.last {
+                selectedProtoFileID = newFile.id
+                if let topicName = selectedTopicName {
+                    selectedProtoMessageType = autoMatchMessageType(for: topicName)
+                } else {
+                    selectedProtoMessageType = nil
+                }
+            }
+        } catch {
+            fetchError = error.localizedDescription
+        }
     }
 
     @ViewBuilder
@@ -615,8 +901,8 @@ struct MessageBrowserView: View {
     }
 
     private func matchesSearch(message: KafkaMessageRecord, query: String) -> Bool {
-        let keyString = message.keyString(format: messageFormat)
-        let valueString = message.valueString(format: messageFormat)
+        let keyString = message.keyString(format: messageFormat, protoContext: protoContext)
+        let valueString = message.valueString(format: messageFormat, protoContext: protoContext)
 
         // JSON Path search
         if isJsonPath {
@@ -855,14 +1141,14 @@ struct MessageBrowserView: View {
             .width(min: 40, ideal: 55, max: 70)
 
             TableColumn(l10n["messages.key"]) { message in
-                Text(message.keyString(format: messageFormat))
+                Text(message.keyString(format: messageFormat, protoContext: protoContext))
                     .lineLimit(1)
                     .padding(.vertical, appState.rowDensity.tablePadding)
             }
             .width(min: 60, ideal: 100, max: 150)
 
             TableColumn(l10n["messages.value"]) { message in
-                Text(message.valueString(format: messageFormat))
+                Text(message.valueString(format: messageFormat, protoContext: protoContext))
                     .lineLimit(1)
                     .padding(.vertical, appState.rowDensity.tablePadding)
             }
@@ -906,7 +1192,7 @@ struct MessageBrowserView: View {
                         },
                 )
 
-            MessageDetailView(message: message, format: messageFormat) {
+            MessageDetailView(message: message, format: messageFormat, protoContext: protoContext) {
                 selectedMessageId = nil
                 detailMessage = nil
             }
@@ -947,6 +1233,15 @@ struct MessageBrowserView: View {
             },
             set: { selectedPartition = $0 },
         )
+    }
+
+    /// Schema context for protobuf decoding — nil when not configured
+    private var protoContext: ProtobufContext? {
+        guard messageFormat == .protobuf else { return nil }
+        guard let fileID = selectedProtoFileID else { return nil }
+        guard let schema = protoManager.schema(for: fileID) else { return nil }
+        guard let messageType = selectedProtoMessageType else { return nil }
+        return ProtobufContext(schema: schema, messageTypeName: messageType)
     }
 
     private var userTopics: [TopicInfo] {
@@ -997,21 +1292,32 @@ struct MessageBrowserView: View {
 
     private func fetchMessages() {
         guard let topicName = selectedTopicName else { return }
+
+        // Cancel any in-flight fetch to prevent stale results
+        fetchTask?.cancel()
+
+        let partition = selectedPartition
+        let limit = maxMessages
+        let newest = newestFirst
+        let parsedFrom = Int64(offsetFromText)
+        let parsedTo = Int64(offsetToText)
+
         isFetching = true
         fetchError = nil
 
-        Task {
+        fetchTask = Task {
             do {
-                let parsedFrom = Int64(offsetFromText)
-                let parsedTo = Int64(offsetToText)
                 let newMessages = try await appState.fetchMessages(
                     topic: topicName,
-                    partition: selectedPartition,
-                    maxMessages: maxMessages,
-                    newestFirst: newestFirst,
+                    partition: partition,
+                    maxMessages: limit,
+                    newestFirst: newest,
                     offsetFrom: parsedFrom,
                     offsetTo: parsedTo,
                 )
+
+                // Discard results if topic changed while we were fetching
+                guard !Task.isCancelled, selectedTopicName == topicName else { return }
 
                 // Reconcile selection
                 if let id = selectedMessageId {
@@ -1028,10 +1334,15 @@ struct MessageBrowserView: View {
                 if currentPage >= pages {
                     currentPage = max(0, pages - 1)
                 }
+            } catch is CancellationError {
+                // Fetch was cancelled (e.g. topic changed)
             } catch {
+                guard !Task.isCancelled, selectedTopicName == topicName else { return }
                 fetchError = error.localizedDescription
             }
-            isFetching = false
+            if selectedTopicName == topicName {
+                isFetching = false
+            }
         }
     }
 
@@ -1072,6 +1383,7 @@ struct MessageDetailView: View {
     @Environment(AppState.self) private var appState
     let message: KafkaMessageRecord
     let format: MessageFormat
+    var protoContext: ProtobufContext?
     var onDismiss: () -> Void = {}
     @State private var keyCopied = false
     @State private var valueCopied = false
@@ -1110,17 +1422,17 @@ struct MessageDetailView: View {
                         Text(l10n["messages.key"])
                             .font(.subheadline.bold())
                         Spacer()
-                        CopyButton(text: message.keyPrettyString(format: format), copied: $keyCopied)
+                        CopyButton(text: message.keyPrettyString(format: format, protoContext: protoContext), copied: $keyCopied)
                     }
-                    codeBlock(message.keyPrettyString(format: format))
+                    codeBlock(message.keyPrettyString(format: format, protoContext: protoContext))
 
                     HStack {
                         Text(l10n["messages.value"])
                             .font(.subheadline.bold())
                         Spacer()
-                        CopyButton(text: message.valuePrettyString(format: format), copied: $valueCopied)
+                        CopyButton(text: message.valuePrettyString(format: format, protoContext: protoContext), copied: $valueCopied)
                     }
-                    codeBlock(message.valuePrettyString(format: format))
+                    codeBlock(message.valuePrettyString(format: format, protoContext: protoContext))
 
                     if !message.headers.isEmpty {
                         Text(l10n["messages.headers"])

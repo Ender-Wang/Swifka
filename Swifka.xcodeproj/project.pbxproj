@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		F83FB6532F45C51E007775F9 /* SwiftProtobuf in Frameworks */ = {isa = PBXBuildFile; productRef = F83FB6522F45C51E007775F9 /* SwiftProtobuf */; };
 		F86DB57B2F34E6F6009E3F6A /* Kafka in Frameworks */ = {isa = PBXBuildFile; productRef = F86DB57A2F34E6F6009E3F6A /* Kafka */; };
 		F86DB57D2F34E6F6009E3F6A /* KafkaFoundationCompat in Frameworks */ = {isa = PBXBuildFile; productRef = F86DB57C2F34E6F6009E3F6A /* KafkaFoundationCompat */; };
 		F8A1B0012F50A000009E3F6A /* SQLite in Frameworks */ = {isa = PBXBuildFile; productRef = F8A1B0032F50A000009E3F6A /* SQLite */; };
@@ -32,6 +33,7 @@
 				F86DB57D2F34E6F6009E3F6A /* KafkaFoundationCompat in Frameworks */,
 				F86DB57B2F34E6F6009E3F6A /* Kafka in Frameworks */,
 				F8A1B0012F50A000009E3F6A /* SQLite in Frameworks */,
+				F83FB6532F45C51E007775F9 /* SwiftProtobuf in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -78,6 +80,7 @@
 				F86DB57A2F34E6F6009E3F6A /* Kafka */,
 				F86DB57C2F34E6F6009E3F6A /* KafkaFoundationCompat */,
 				F8A1B0032F50A000009E3F6A /* SQLite */,
+				F83FB6522F45C51E007775F9 /* SwiftProtobuf */,
 			);
 			productName = Swifka;
 			productReference = F86DB56B2F34E4EB009E3F6A /* Swifka.app */;
@@ -110,6 +113,7 @@
 			packageReferences = (
 				F86DB5792F34E6F6009E3F6A /* XCRemoteSwiftPackageReference "swift-kafka-client" */,
 				F8A1B0022F50A000009E3F6A /* XCRemoteSwiftPackageReference "SQLite" */,
+				F83FB6512F45C51E007775F9 /* XCRemoteSwiftPackageReference "swift-protobuf" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = F86DB56C2F34E4EB009E3F6A /* Products */;
@@ -375,6 +379,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		F83FB6512F45C51E007775F9 /* XCRemoteSwiftPackageReference "swift-protobuf" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apple/swift-protobuf";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.35.0;
+			};
+		};
 		F86DB5792F34E6F6009E3F6A /* XCRemoteSwiftPackageReference "swift-kafka-client" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/swift-server/swift-kafka-client";
@@ -394,6 +406,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		F83FB6522F45C51E007775F9 /* SwiftProtobuf */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F83FB6512F45C51E007775F9 /* XCRemoteSwiftPackageReference "swift-protobuf" */;
+			productName = SwiftProtobuf;
+		};
 		F86DB57A2F34E6F6009E3F6A /* Kafka */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = F86DB5792F34E6F6009E3F6A /* XCRemoteSwiftPackageReference "swift-kafka-client" */;

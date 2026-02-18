@@ -26,11 +26,15 @@ struct TopicDeserializerConfig: Codable, Identifiable, Sendable {
         topicName: String,
         keyDeserializerID: String = "utf8",
         valueDeserializerID: String = "utf8",
+        protoFilePath: String? = nil,
+        messageTypeName: String? = nil,
     ) {
         self.id = id
         self.topicName = topicName
         self.keyDeserializerID = keyDeserializerID
         self.valueDeserializerID = valueDeserializerID
+        self.protoFilePath = protoFilePath
+        self.messageTypeName = messageTypeName
     }
 }
 

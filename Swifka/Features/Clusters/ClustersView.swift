@@ -27,6 +27,7 @@ struct ClustersView: View {
     @State private var showingImportSheet = false
     @State private var showingImportSelectionSheet = false
     @State private var importableClusters: [ClusterConfig] = []
+    @State private var importableProtoFiles: [ProtoFileInfo] = []
     @State private var selectedClustersForImport: Set<UUID> = []
     @State private var showingImportModeDialog = false
     @State private var pendingImportData: Data?
@@ -574,10 +575,10 @@ struct ClustersView: View {
             let data = try Data(contentsOf: url)
             pendingImportData = data
 
-            // Decode clusters to show in selection sheet
-            let decoder = JSONDecoder()
-            decoder.dateDecodingStrategy = .iso8601
-            importableClusters = try decoder.decode([ClusterConfig].self, from: data)
+            // Parse export data (supports both new wrapper and legacy formats)
+            let export = try ConfigStore.parseExportData(data)
+            importableClusters = export.clusters
+            importableProtoFiles = export.protoFiles
 
             // Select all by default
             selectedClustersForImport = Set(importableClusters.map(\.id))
@@ -592,16 +593,24 @@ struct ClustersView: View {
     private func performImport(mode: ImportMode) {
         do {
             if mode == .replace {
-                // Delete all existing clusters and their passwords
+                // Delete all existing clusters and their passwords + proto files
                 for cluster in appState.configStore.clusters {
                     KeychainManager.deletePassword(for: cluster.id)
+                    ProtobufConfigManager.shared.removeProtoFiles(for: cluster.id)
                 }
                 appState.configStore.clusters = []
             }
 
             // Import only selected clusters
             let selectedClusters = importableClusters.filter { selectedClustersForImport.contains($0.id) }
-            try appState.configStore.importSelectedClusters(selectedClusters)
+            let idMap = try appState.configStore.importSelectedClusters(selectedClusters)
+
+            // Import proto files for selected clusters with remapped IDs
+            let selectedClusterIDs = Set(selectedClusters.map(\.id))
+            let relevantProtoFiles = importableProtoFiles.filter { selectedClusterIDs.contains($0.clusterID) }
+            if !relevantProtoFiles.isEmpty {
+                ProtobufConfigManager.shared.importProtoFiles(relevantProtoFiles, clusterIDMap: idMap)
+            }
 
             // Check for missing passwords
             missingPasswordClusters = selectedClusters.compactMap { cluster in

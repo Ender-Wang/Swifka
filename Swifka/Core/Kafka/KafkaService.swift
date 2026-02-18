@@ -624,6 +624,9 @@ actor KafkaService {
         let maxEmptyPolls = 3
 
         while messages.count < maxMessages, emptyPolls < maxEmptyPolls {
+            // Allow early exit when the calling Task is cancelled
+            if Task.isCancelled { break }
+
             guard let msg = rd_kafka_consumer_poll(consumer, Constants.defaultFetchTimeout) else {
                 emptyPolls += 1
                 continue

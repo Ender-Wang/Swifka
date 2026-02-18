@@ -309,5 +309,28 @@
   "alert.isr.summary.danger": "{0} of {1} partitions below min.insync.replicas",
 
   "menubar.quit": "Quit Swifka",
-  "menubar.show": "Show Swifka"
+  "menubar.show": "Show Swifka",
+
+  "protobuf.config.title": "Configure Protobuf Decoding",
+  "protobuf.config.subtitle": "Import .proto file and select message type for this topic",
+  "protobuf.config.step1": "Step 1: Import or select .proto file",
+  "protobuf.config.step2": "Step 2: Select message type",
+  "protobuf.import.file": "Import .proto File",
+  "protobuf.import.another": "Import another file",
+  "protobuf.select.file": "Proto File",
+  "protobuf.select.message": "Message Type",
+  "protobuf.select.placeholder": "Select…",
+  "protobuf.no.files": "No .proto files imported yet",
+  "protobuf.config.edit": "Edit protobuf configuration",
+  "protobuf.delete.file": "Delete {0}",
+  "protobuf.error.title": "Protobuf Error",
+  "protobuf.file.path": "File Path",
+  "protobuf.message.types": "Message Types",
+  "protobuf.message.type.auto": "Auto-matched from topic name",
+
+  "ok": "OK",
+  "cancel": "Cancel",
+  "save": "Save",
+  "expand": "Expand",
+  "collapse": "Collapse"
 }

@@ -309,5 +309,28 @@
   "alert.isr.summary.danger": "{1} 个分区中有 {0} 个低于 min.insync.replicas",
 
   "menubar.quit": "退出 Swifka",
-  "menubar.show": "显示 Swifka"
+  "menubar.show": "显示 Swifka",
+
+  "protobuf.config.title": "配置 Protobuf 解码",
+  "protobuf.config.subtitle": "为此主题导入 .proto 文件并选择消息类型",
+  "protobuf.config.step1": "步骤 1：导入或选择 .proto 文件",
+  "protobuf.config.step2": "步骤 2：选择消息类型",
+  "protobuf.import.file": "导入 .proto 文件",
+  "protobuf.import.another": "导入另一个文件",
+  "protobuf.select.file": "Proto 文件",
+  "protobuf.select.message": "消息类型",
+  "protobuf.select.placeholder": "选择…",
+  "protobuf.no.files": "尚未导入 .proto 文件",
+  "protobuf.config.edit": "编辑 Protobuf 配置",
+  "protobuf.delete.file": "删除 {0}",
+  "protobuf.error.title": "Protobuf 错误",
+  "protobuf.file.path": "文件路径",
+  "protobuf.message.types": "消息类型",
+  "protobuf.message.type.auto": "根据 Topic 名称自动匹配",
+
+  "ok": "确定",
+  "cancel": "取消",
+  "save": "保存",
+  "expand": "展开",
+  "collapse": "收起"
 }

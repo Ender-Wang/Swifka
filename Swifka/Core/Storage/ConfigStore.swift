@@ -115,18 +115,29 @@ final class ConfigStore {
         return try? encoder.encode(clusters)
     }
 
+    /// Export selected clusters with their proto files
     static func exportClusters(_ clusters: [ClusterConfig]) -> Data? {
+        let clusterIDs = Set(clusters.map(\.id))
+        let protoFiles = ProtobufConfigManager.shared.allProtoFiles.filter { clusterIDs.contains($0.clusterID) }
+
+        let export = SwifkaExport(clusters: clusters, protoFiles: protoFiles)
+
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         encoder.outputFormatting = .prettyPrinted
-        return try? encoder.encode(clusters)
+        return try? encoder.encode(export)
     }
 
-    func importSelectedClusters(_ selectedClusters: [ClusterConfig]) throws {
-        // Assign new UUIDs to avoid conflicts with existing clusters
+    /// Import selected clusters, returns old→new UUID mapping for proto file remapping
+    @discardableResult
+    func importSelectedClusters(_ selectedClusters: [ClusterConfig]) throws -> [UUID: UUID] {
+        var idMap: [UUID: UUID] = [:]
+
         let withNewIds = selectedClusters.map { cluster in
-            ClusterConfig(
-                id: UUID(), // Generate new UUID
+            let newID = UUID()
+            idMap[cluster.id] = newID
+            return ClusterConfig(
+                id: newID,
                 name: cluster.name,
                 host: cluster.host,
                 port: cluster.port,
@@ -134,43 +145,54 @@ final class ConfigStore {
                 saslMechanism: cluster.saslMechanism,
                 saslUsername: cluster.saslUsername,
                 useTLS: cluster.useTLS,
-                createdAt: Date(), // Reset creation time
+                createdAt: Date(),
                 updatedAt: Date(),
-                isPinned: false, // Don't import pin status
-                lastConnectedAt: nil, // Reset last connected
+                isPinned: false,
+                lastConnectedAt: nil,
                 sortOrder: 0,
             )
         }
 
         clusters.append(contentsOf: withNewIds)
         save()
+        return idMap
+    }
+
+    /// Parse export data — supports both new wrapper format and legacy clusters-only format
+    static func parseExportData(_ data: Data) throws -> SwifkaExport {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+
+        // Try new wrapper format first
+        if let export = try? decoder.decode(SwifkaExport.self, from: data) {
+            return export
+        }
+
+        // Fall back to legacy format (just an array of clusters)
+        let clusters = try decoder.decode([ClusterConfig].self, from: data)
+        return SwifkaExport(clusters: clusters, protoFiles: [])
     }
 
     func importConfig(from data: Data) throws {
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        let imported = try decoder.decode([ClusterConfig].self, from: data)
+        let export = try Self.parseExportData(data)
 
-        // Assign new UUIDs to avoid conflicts with existing clusters
-        let withNewIds = imported.map { cluster in
-            ClusterConfig(
-                id: UUID(), // Generate new UUID
-                name: cluster.name,
-                host: cluster.host,
-                port: cluster.port,
-                authType: cluster.authType,
-                saslMechanism: cluster.saslMechanism,
-                saslUsername: cluster.saslUsername,
-                useTLS: cluster.useTLS,
-                createdAt: Date(), // Reset creation time
-                updatedAt: Date(),
-                isPinned: false, // Don't import pin status
-                lastConnectedAt: nil, // Reset last connected
-                sortOrder: 0,
-            )
+        let idMap = try importSelectedClusters(export.clusters)
+
+        // Import proto files with remapped cluster IDs
+        if !export.protoFiles.isEmpty {
+            ProtobufConfigManager.shared.importProtoFiles(export.protoFiles, clusterIDMap: idMap)
         }
+    }
+}
 
-        clusters.append(contentsOf: withNewIds)
-        save()
+// MARK: - Export Format
+
+struct SwifkaExport: Codable {
+    let clusters: [ClusterConfig]
+    let protoFiles: [ProtoFileInfo]
+
+    init(clusters: [ClusterConfig], protoFiles: [ProtoFileInfo] = []) {
+        self.clusters = clusters
+        self.protoFiles = protoFiles
     }
 }

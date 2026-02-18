@@ -235,23 +235,23 @@ nonisolated struct KafkaMessageRecord: Identifiable, Sendable {
         self.headers = headers
     }
 
-    func keyString(format: MessageFormat) -> String {
-        formatData(key, format: format)
+    func keyString(format: MessageFormat, protoContext: ProtobufContext? = nil) -> String {
+        formatData(key, format: format, protoContext: protoContext)
     }
 
-    func valueString(format: MessageFormat) -> String {
-        formatData(value, format: format)
+    func valueString(format: MessageFormat, protoContext: ProtobufContext? = nil) -> String {
+        formatData(value, format: format, protoContext: protoContext)
     }
 
-    func keyPrettyString(format: MessageFormat) -> String {
-        prettyFormatData(key, format: format)
+    func keyPrettyString(format: MessageFormat, protoContext: ProtobufContext? = nil) -> String {
+        prettyFormatData(key, format: format, protoContext: protoContext)
     }
 
-    func valuePrettyString(format: MessageFormat) -> String {
-        prettyFormatData(value, format: format)
+    func valuePrettyString(format: MessageFormat, protoContext: ProtobufContext? = nil) -> String {
+        prettyFormatData(value, format: format, protoContext: protoContext)
     }
 
-    private func formatData(_ data: Data?, format: MessageFormat) -> String {
+    private func formatData(_ data: Data?, format: MessageFormat, protoContext: ProtobufContext? = nil) -> String {
         guard let data else { return "(null)" }
         if data.isEmpty { return "(empty)" }
         switch format {
@@ -261,16 +261,41 @@ nonisolated struct KafkaMessageRecord: Identifiable, Sendable {
             return data.map { String(format: "%02x", $0) }.joined(separator: " ")
         case .base64:
             return data.base64EncodedString()
+        case .protobuf:
+            guard let ctx = protoContext else {
+                return "(protobuf - not configured)"
+            }
+            do {
+                var decoder = ProtobufWireDecoder(data: data)
+                let fields = try decoder.decodeFields()
+                return ProtobufDeserializer.formatFlatWithSchema(fields, schema: ctx.schema, messageType: ctx.messageTypeName)
+            } catch {
+                return "(protobuf decode error: \(error.localizedDescription))"
+            }
         }
     }
 
-    private func prettyFormatData(_ data: Data?, format: MessageFormat) -> String {
+    private func prettyFormatData(_ data: Data?, format: MessageFormat, protoContext: ProtobufContext? = nil) -> String {
+        if format == .protobuf {
+            guard let data, !data.isEmpty else { return formatData(data, format: format, protoContext: protoContext) }
+            guard let ctx = protoContext else {
+                return "(protobuf - not configured)"
+            }
+            do {
+                var decoder = ProtobufWireDecoder(data: data)
+                let fields = try decoder.decodeFields()
+                return ProtobufDeserializer.formatPrettyWithSchema(fields, schema: ctx.schema, messageType: ctx.messageTypeName)
+            } catch {
+                return "(protobuf decode error: \(error.localizedDescription))"
+            }
+        }
+        // UTF-8 supports pretty printing (JSON formatting)
         guard format == .utf8, let data, !data.isEmpty,
               let json = try? JSONSerialization.jsonObject(with: data),
               let pretty = try? JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted, .sortedKeys]),
               let prettyString = String(data: pretty, encoding: .utf8)
         else {
-            return formatData(data, format: format)
+            return formatData(data, format: format, protoContext: protoContext)
         }
         return prettyString
     }
@@ -306,6 +331,7 @@ nonisolated enum MessageFormat: String, CaseIterable, Identifiable, Sendable {
     case utf8 = "UTF-8"
     case hex = "Hex"
     case base64 = "Base64"
+    case protobuf = "Protobuf"
 
     var id: String {
         rawValue
@@ -321,6 +347,8 @@ nonisolated enum MessageFormat: String, CaseIterable, Identifiable, Sendable {
             HexDeserializer()
         case .base64:
             Base64Deserializer()
+        case .protobuf:
+            ProtobufDeserializer()
         }
     }
 
@@ -330,6 +358,7 @@ nonisolated enum MessageFormat: String, CaseIterable, Identifiable, Sendable {
         case .utf8: "utf8"
         case .hex: "hex"
         case .base64: "base64"
+        case .protobuf: "protobuf"
         }
     }
 }
