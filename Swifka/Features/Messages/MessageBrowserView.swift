@@ -43,7 +43,13 @@ struct MessageBrowserView: View {
         }
     }
 
-    var body: some View {
+    // Time Range Filter
+    @State private var showTimeFilter = false
+    @State private var timeRangeFrom: Date?
+    @State private var timeRangeTo: Date?
+
+    @ViewBuilder
+    private var mainContent: some View {
         let l10n = appState.l10n
 
         VStack(spacing: 0) {
@@ -79,78 +85,89 @@ struct MessageBrowserView: View {
                 }
             }
         }
-        .overlay(alignment: .trailing) {
-            if let message = detailMessage {
-                detailPanel(for: message)
-            }
-        }
-        .animation(.smooth(duration: 0.25), value: detailMessage?.id)
-        .onKeyPress(.escape) {
-            if detailMessage != nil {
-                selectedMessageId = nil
-                detailMessage = nil
-                return .handled
-            }
-            return .ignored
-        }
-        .onChange(of: selectedTopicName) {
-            UserDefaults.standard.set(selectedTopicName, forKey: "messages.selectedTopic")
-            selectedPartition = nil
-            selectedMessageId = nil
-            detailMessage = nil
-            offsetFromText = ""
-            offsetToText = ""
-            currentPage = 0
-            searchQuery = ""
-            if selectedTopicName != nil {
-                fetchMessages()
-            } else {
-                messages = []
-                fetchError = nil
-            }
-        }
-        .onChange(of: selectedPartition) {
-            if let p = selectedPartition {
-                UserDefaults.standard.set(Int(p), forKey: "messages.selectedPartition")
-            } else {
-                UserDefaults.standard.removeObject(forKey: "messages.selectedPartition")
-            }
-            currentPage = 0
-            clampOffsetFields()
-        }
-        .onChange(of: newestFirst) {
-            currentPage = 0
-        }
-        .onChange(of: appState.refreshManager.tick) {
-            if selectedTopicName != nil {
-                fetchMessages()
-            }
-            withAnimation(.easeInOut(duration: 0.6)) {
-                refreshRotation += 360
-            }
-        }
-        .onChange(of: appState.connectionStatus.isConnected) {
-            if appState.connectionStatus.isConnected, selectedTopicName != nil, appState.refreshManager.isAutoRefresh {
-                fetchMessages()
-                appState.refreshManager.restart()
-            }
-        }
-        .onChange(of: userTopics.map(\.name)) {
-            if let name = selectedTopicName, !userTopics.contains(where: { $0.name == name }) {
-                selectedTopicName = nil
-            }
-        }
-        .onAppear {
-            if appState.connectionStatus.isConnected, selectedTopicName != nil, messages.isEmpty, appState.refreshManager.isAutoRefresh {
-                fetchMessages()
-                appState.refreshManager.restart()
-            }
-        }
-        .navigationTitle(l10n["messages.title"])
         .onChange(of: searchQuery) { _, _ in currentPage = 0 }
         .onChange(of: searchScope) { _, _ in currentPage = 0 }
         .onChange(of: isRegex) { _, _ in currentPage = 0 }
         .onChange(of: isCaseSensitive) { _, _ in currentPage = 0 }
+        .onChange(of: timeRangeFrom) { _, _ in currentPage = 0 }
+        .onChange(of: timeRangeTo) { _, _ in currentPage = 0 }
+    }
+
+    var body: some View {
+        let l10n = appState.l10n
+
+        mainContent
+            .overlay(alignment: .trailing) {
+                if let message = detailMessage {
+                    detailPanel(for: message)
+                }
+            }
+            .animation(.smooth(duration: 0.25), value: detailMessage?.id)
+            .onKeyPress(.escape) {
+                if detailMessage != nil {
+                    selectedMessageId = nil
+                    detailMessage = nil
+                    return .handled
+                }
+                return .ignored
+            }
+            .onChange(of: selectedTopicName) {
+                UserDefaults.standard.set(selectedTopicName, forKey: "messages.selectedTopic")
+                selectedPartition = nil
+                selectedMessageId = nil
+                detailMessage = nil
+                offsetFromText = ""
+                offsetToText = ""
+                currentPage = 0
+                searchQuery = ""
+                timeRangeFrom = nil
+                timeRangeTo = nil
+                showTimeFilter = false
+                if selectedTopicName != nil {
+                    fetchMessages()
+                } else {
+                    messages = []
+                    fetchError = nil
+                }
+            }
+            .onChange(of: selectedPartition) {
+                if let p = selectedPartition {
+                    UserDefaults.standard.set(Int(p), forKey: "messages.selectedPartition")
+                } else {
+                    UserDefaults.standard.removeObject(forKey: "messages.selectedPartition")
+                }
+                currentPage = 0
+                clampOffsetFields()
+            }
+            .onChange(of: newestFirst) {
+                currentPage = 0
+            }
+            .onChange(of: appState.refreshManager.tick) {
+                if selectedTopicName != nil {
+                    fetchMessages()
+                }
+                withAnimation(.easeInOut(duration: 0.6)) {
+                    refreshRotation += 360
+                }
+            }
+            .onChange(of: appState.connectionStatus.isConnected) {
+                if appState.connectionStatus.isConnected, selectedTopicName != nil, appState.refreshManager.isAutoRefresh {
+                    fetchMessages()
+                    appState.refreshManager.restart()
+                }
+            }
+            .onChange(of: userTopics.map(\.name)) {
+                if let name = selectedTopicName, !userTopics.contains(where: { $0.name == name }) {
+                    selectedTopicName = nil
+                }
+            }
+            .onAppear {
+                if appState.connectionStatus.isConnected, selectedTopicName != nil, messages.isEmpty, appState.refreshManager.isAutoRefresh {
+                    fetchMessages()
+                    appState.refreshManager.restart()
+                }
+            }
+            .navigationTitle(l10n["messages.title"])
     }
 
     // MARK: - Search Bar
@@ -160,19 +177,31 @@ struct MessageBrowserView: View {
         let l10n = appState.l10n
 
         HStack(spacing: 12) {
-            searchTextField(l10n: l10n)
-            searchScopePicker(l10n: l10n)
-            searchOptions(l10n: l10n)
-
-            if !searchQuery.isEmpty {
-                searchResults(l10n: l10n)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    searchControls(l10n: l10n)
+                }
             }
 
-            Spacer()
+            Divider()
+                .frame(height: 20)
+
+            timeFilterSection(l10n: l10n)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .background(Color(nsColor: .controlBackgroundColor))
+    }
+
+    @ViewBuilder
+    private func searchControls(l10n: L10n) -> some View {
+        searchTextField(l10n: l10n)
+        searchScopePicker(l10n: l10n)
+        searchOptions(l10n: l10n)
+
+        if !searchQuery.isEmpty || hasActiveTimeFilter {
+            filterResults(l10n: l10n)
+        }
     }
 
     private func searchTextField(l10n: L10n) -> some View {
@@ -224,10 +253,84 @@ struct MessageBrowserView: View {
         }
     }
 
-    private func searchResults(l10n: L10n) -> some View {
+    @ViewBuilder
+    private func timeFilterSection(l10n: L10n) -> some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.25)) {
+                showTimeFilter.toggle()
+            }
+            if !showTimeFilter {
+                // Clear filter when hiding
+                timeRangeFrom = nil
+                timeRangeTo = nil
+            }
+        } label: {
+            Image(systemName: showTimeFilter ? "clock.fill" : "clock")
+                .foregroundStyle(hasActiveTimeFilter ? .blue : .secondary)
+                .font(.system(size: 14))
+        }
+        .buttonStyle(.plain)
+        .help(l10n["messages.time.filter.toggle"])
+        .padding(.horizontal, 4)
+
+        if showTimeFilter {
+            timeFilterControls(l10n: l10n)
+                .transition(.move(edge: .trailing).combined(with: .opacity))
+        }
+    }
+
+    @ViewBuilder
+    private func timeFilterControls(l10n: L10n) -> some View {
+        if let minTime = minTimestamp, let maxTime = maxTimestamp {
+            HStack(spacing: 8) {
+                DatePicker(
+                    l10n["messages.time.filter.from"],
+                    selection: Binding(
+                        get: { timeRangeFrom ?? minTime },
+                        set: { timeRangeFrom = $0 },
+                    ),
+                    in: minTime ... maxTime,
+                    displayedComponents: [.date, .hourAndMinute],
+                )
+                .labelsHidden()
+                .fixedSize()
+
+                Text("–")
+                    .foregroundStyle(.secondary)
+
+                DatePicker(
+                    l10n["messages.time.filter.to"],
+                    selection: Binding(
+                        get: { timeRangeTo ?? maxTime },
+                        set: { timeRangeTo = $0 },
+                    ),
+                    in: minTime ... maxTime,
+                    displayedComponents: [.date, .hourAndMinute],
+                )
+                .labelsHidden()
+                .fixedSize()
+
+                if hasActiveTimeFilter {
+                    Button {
+                        timeRangeFrom = nil
+                        timeRangeTo = nil
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.secondary)
+                            .font(.system(size: 13))
+                    }
+                    .buttonStyle(.plain)
+                    .help(l10n["messages.time.filter.clear"])
+                }
+            }
+        }
+    }
+
+    private func filterResults(l10n: L10n) -> some View {
         Text(l10n.t("messages.search.results", String(filteredMessages.count), String(messages.count)))
             .font(.caption)
             .foregroundStyle(.secondary)
+            .padding(.leading, 8)
     }
 
     // MARK: - Controls Bar
@@ -432,12 +535,37 @@ struct MessageBrowserView: View {
         return (filteredMessages.count + messagesPerPage - 1) / messagesPerPage
     }
 
-    private var filteredMessages: [KafkaMessageRecord] {
-        guard !searchQuery.isEmpty else { return messages }
+    private var minTimestamp: Date? {
+        messages.compactMap(\.timestamp).min()
+    }
 
-        return messages.filter { message in
-            matchesSearch(message: message, query: searchQuery)
+    private var maxTimestamp: Date? {
+        messages.compactMap(\.timestamp).max()
+    }
+
+    private var hasActiveTimeFilter: Bool {
+        timeRangeFrom != nil || timeRangeTo != nil
+    }
+
+    private var filteredMessages: [KafkaMessageRecord] {
+        var result = messages
+
+        // Apply text search filter
+        if !searchQuery.isEmpty {
+            result = result.filter { message in
+                matchesSearch(message: message, query: searchQuery)
+            }
         }
+
+        // Apply time range filter
+        if let from = timeRangeFrom {
+            result = result.filter { $0.timestamp >= from }
+        }
+        if let to = timeRangeTo {
+            result = result.filter { $0.timestamp <= to }
+        }
+
+        return result
     }
 
     private var displayedMessages: [KafkaMessageRecord] {
