@@ -181,10 +181,11 @@ struct ClustersView: View {
                     UserDefaults.standard.removeObject(forKey: "backup.recentlyImportedClusterIDs")
                 }
 
-                // Auto-focus list and select first cluster when navigating to Clusters page
+                // Auto-focus list; default to connected cluster, else first
                 isListFocused = true
-                if keyboardSelectedClusterId == nil, let first = sortedClusters.first {
-                    keyboardSelectedClusterId = first.id
+                if keyboardSelectedClusterId == nil {
+                    keyboardSelectedClusterId = appState.configStore.selectedClusterId
+                        ?? sortedClusters.first?.id
                 }
             } else {
                 // Clear "New" badges when navigating away
@@ -421,6 +422,13 @@ struct ClustersView: View {
             onClone: { cloneCluster(cluster) },
         )
         .contentShape(Rectangle())
+        .onHover { hovering in
+            if hovering {
+                keyboardSelectedClusterId = cluster.id
+            } else if keyboardSelectedClusterId == cluster.id {
+                keyboardSelectedClusterId = nil
+            }
+        }
         .onTapGesture {
             keyboardSelectedClusterId = cluster.id
             isListFocused = true
@@ -1003,7 +1011,6 @@ private struct ClusterRow: View {
     let onClone: () -> Void
 
     @Environment(AppState.self) private var appState
-    @State private var isHovered = false
 
     private let iconFont: Font = .system(size: 13, weight: .medium)
 
@@ -1015,11 +1022,13 @@ private struct ClusterRow: View {
             HStack(spacing: 10) {
                 // Pin indicator — click to unpin
                 if cluster.isPinned {
-                    Image(systemName: "pin.fill")
-                        .font(.caption)
-                        .foregroundStyle(.orange)
-                        .onTapGesture { onPin() }
-                        .help(l10n["cluster.unpin"])
+                    Button { onPin() } label: {
+                        Image(systemName: "pin.fill")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                    }
+                    .buttonStyle(IconHoverButtonStyle())
+                    .help(l10n["cluster.unpin"])
                 }
 
                 Circle()
@@ -1121,92 +1130,102 @@ private struct ClusterRow: View {
 
             Spacer()
 
-            // Right group — actions (switch button moved to beginning)
-            HStack(spacing: 10) {
-                // Switch button / Connected indicator - at beginning of action group
+            // Right group — status always visible, action buttons on hover/selection
+            HStack(spacing: 6) {
+                // Status indicator — always visible
                 if isConnected {
-                    // Show checkmark for connected cluster
                     Image(systemName: "checkmark.circle.fill")
                         .font(iconFont)
                         .foregroundStyle(.green)
+                        .frame(width: 24, height: 24)
                         .help(l10n["clusters.status.connected"])
-                } else {
-                    // Show switch button for disconnected clusters
+                }
+
+                // Action buttons — fade in on hover/keyboard selection
+                HStack(spacing: 6) {
+                    if !isConnected {
+                        Button {
+                            onConnect()
+                        } label: {
+                            Image(systemName: "arrow.right.arrow.left")
+                                .font(iconFont)
+                        }
+                        .buttonStyle(IconHoverButtonStyle())
+                        .help(l10n["clusters.switch"])
+                    }
+
                     Button {
-                        onConnect()
+                        onTest()
                     } label: {
-                        Image(systemName: "arrow.right.arrow.left")
+                        if isTesting {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else {
+                            Image(systemName: "network")
+                                .font(iconFont)
+                        }
+                    }
+                    .buttonStyle(IconHoverButtonStyle())
+                    .disabled(isTesting)
+                    .help(l10n["connection.test"])
+
+                    Button {
+                        onPin()
+                    } label: {
+                        Image(systemName: cluster.isPinned ? "pin.slash" : "pin")
                             .font(iconFont)
                     }
-                    .buttonStyle(.borderless)
-                    .help(l10n["clusters.switch"])
-                }
+                    .buttonStyle(IconHoverButtonStyle())
+                    .help(l10n[cluster.isPinned ? "cluster.unpin" : "cluster.pin"])
 
-                Button {
-                    onTest()
-                } label: {
-                    if isTesting {
-                        ProgressView()
-                            .controlSize(.small)
-                    } else {
-                        Image(systemName: "network")
+                    Button {
+                        onClone()
+                    } label: {
+                        Image(systemName: "doc.on.doc")
                             .font(iconFont)
                     }
-                }
-                .buttonStyle(.borderless)
-                .disabled(isTesting)
-                .help(l10n["connection.test"])
+                    .buttonStyle(IconHoverButtonStyle())
+                    .help(l10n["cluster.clone"])
 
-                Button {
-                    onPin()
-                } label: {
-                    Image(systemName: cluster.isPinned ? "pin.slash" : "pin")
-                        .font(iconFont)
-                }
-                .buttonStyle(.borderless)
-                .help(l10n[cluster.isPinned ? "cluster.unpin" : "cluster.pin"])
+                    Button {
+                        onEdit()
+                    } label: {
+                        Image(systemName: "pencil")
+                            .font(iconFont)
+                    }
+                    .buttonStyle(IconHoverButtonStyle())
+                    .help(l10n["cluster.edit"])
 
-                Button {
-                    onClone()
-                } label: {
-                    Image(systemName: "doc.on.doc")
-                        .font(iconFont)
+                    Button {
+                        onDelete()
+                    } label: {
+                        Image(systemName: "trash")
+                            .font(iconFont)
+                            .foregroundStyle(.red)
+                    }
+                    .buttonStyle(IconHoverButtonStyle())
+                    .help(l10n["cluster.delete"])
                 }
-                .buttonStyle(.borderless)
-                .help(l10n["cluster.clone"])
-
-                Button {
-                    onEdit()
-                } label: {
-                    Image(systemName: "pencil")
-                        .font(iconFont)
-                }
-                .buttonStyle(.borderless)
-                .help(l10n["cluster.edit"])
-
-                Button {
-                    onDelete()
-                } label: {
-                    Image(systemName: "trash")
-                        .font(iconFont)
-                        .foregroundStyle(.red)
-                }
-                .buttonStyle(.borderless)
-                .help(l10n["cluster.delete"])
+                .foregroundStyle(.secondary)
+                .opacity(showActions ? 1 : 0)
+                .animation(.easeInOut(duration: 0.15), value: showActions)
             }
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
         .background(
-            (isKeyboardSelected || isHovered)
+            isKeyboardSelected
                 ? Color.accentColor.opacity(0.1)
                 : Color.clear,
             in: RoundedRectangle(cornerRadius: 6),
         )
-        .onHover { isHovered = $0 }
-        .animation(.easeInOut(duration: 0.2), value: isHovered)
-        .animation(.snappy(duration: 0.08), value: isKeyboardSelected)
+        .animation(.easeInOut(duration: 0.15), value: isKeyboardSelected)
         .onTapGesture(count: 2) { onEdit() }
+    }
+
+    /// Show action buttons: always for connected cluster, on hover/selection for others
+    private var showActions: Bool {
+        isConnected || isKeyboardSelected || isTesting
     }
 
     private var dotColor: Color {
@@ -1227,6 +1246,28 @@ private struct ClusterRow: View {
         case .none: "lock.open"
         case .sasl: "lock.fill"
         }
+    }
+}
+
+// MARK: - Icon Hover Button Style
+
+/// Replicates the toolbar button hover effect for icon-only buttons outside a toolbar:
+/// transparent at rest, subtle rounded highlight on hover/press with fade transition.
+/// Uses a fixed square frame so all icons get a uniform background size.
+private struct IconHoverButtonStyle: ButtonStyle {
+    @State private var isHovered = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .frame(width: 24, height: 24)
+            .background(
+                RoundedRectangle(cornerRadius: 5)
+                    .fill(isHovered || configuration.isPressed
+                        ? Color.primary.opacity(0.08)
+                        : Color.clear),
+            )
+            .animation(.easeInOut(duration: 0.15), value: isHovered)
+            .onHover { isHovered = $0 }
     }
 }
 
