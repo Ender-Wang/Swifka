@@ -105,6 +105,22 @@ struct MessageBrowserView: View {
     var body: some View {
         let l10n = appState.l10n
 
+        if !appState.connectionStatus.isConnected {
+            ContentUnavailableView(
+                l10n["messages.not.connected"],
+                systemImage: "network.slash",
+                description: Text(l10n["messages.not.connected.description"]),
+            )
+            .navigationTitle(l10n["messages.title"])
+        } else {
+            connectedContent
+        }
+    }
+
+    @ViewBuilder
+    private var connectedContent: some View {
+        let l10n = appState.l10n
+
         mainContent
             .overlay(alignment: .trailing) {
                 if let message = detailMessage {
@@ -162,6 +178,7 @@ struct MessageBrowserView: View {
                 currentPage = 0
             }
             .onChange(of: appState.refreshManager.tick) {
+                guard appState.connectionStatus.isConnected else { return }
                 if selectedTopicName != nil, !isFetching {
                     fetchMessages()
                 }

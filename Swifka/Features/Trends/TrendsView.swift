@@ -10,7 +10,7 @@ struct TrendsView: View {
         if !appState.connectionStatus.isConnected {
             ContentUnavailableView(
                 l10n["trends.not.connected"],
-                systemImage: "chart.xyaxis.line",
+                systemImage: "network.slash",
                 description: Text(l10n["trends.not.connected.description"]),
             )
         } else {

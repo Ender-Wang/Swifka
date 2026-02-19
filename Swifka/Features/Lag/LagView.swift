@@ -28,7 +28,7 @@ struct LagView: View {
         if !appState.connectionStatus.isConnected {
             ContentUnavailableView(
                 l10n["lag.not.connected"],
-                systemImage: "chart.line.downtrend.xyaxis",
+                systemImage: "network.slash",
                 description: Text(l10n["lag.not.connected.description"]),
             )
         } else {

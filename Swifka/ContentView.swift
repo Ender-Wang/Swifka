@@ -139,10 +139,6 @@ struct ContentView: View {
                                 .foregroundStyle(.red)
                         }
                         .help(l10n["connection.connect"])
-                    } else {
-                        Label(l10n["connection.connect"], systemImage: "power")
-                            .foregroundStyle(.gray)
-                            .help(l10n["connection.connect"])
                     }
                 }
             }

@@ -256,16 +256,6 @@ struct ClustersView: View {
                             .foregroundStyle(.red)
                     }
                     .help(l10n["connection.connect"])
-                } else {
-                    Button {
-                        // No-op - disabled state
-                    } label: {
-                        Label(l10n["connection.connect"], systemImage: "power")
-                            .labelStyle(.iconOnly)
-                            .foregroundStyle(.gray)
-                    }
-                    .disabled(true)
-                    .help(l10n["connection.connect"])
                 }
             }
         }

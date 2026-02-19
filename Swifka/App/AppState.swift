@@ -192,7 +192,9 @@ final class AppState {
            let mode = try? JSONDecoder().decode(RefreshMode.self, from: data)
         {
             defaultRefreshMode = mode
-            refreshManager.updateMode(mode)
+            // Only remember the mode — don't start the timer.
+            // Timer starts on successful connect() via refreshManager.restart().
+            refreshManager.mode = mode
         }
         if let raw = UserDefaults.standard.string(forKey: "settings.appearanceMode"),
            let mode = AppearanceMode(rawValue: raw)

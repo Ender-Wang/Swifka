@@ -8,6 +8,19 @@ struct TopicListView: View {
     var body: some View {
         let l10n = appState.l10n
 
+        if !appState.connectionStatus.isConnected {
+            ContentUnavailableView(
+                l10n["topics.not.connected"],
+                systemImage: "network.slash",
+                description: Text(l10n["topics.not.connected.description"]),
+            )
+            .navigationTitle(l10n["topics.title"])
+        } else {
+            topicContent(l10n: l10n)
+        }
+    }
+
+    private func topicContent(l10n: L10n) -> some View {
         VStack(spacing: 0) {
             // Summary stat bar
             if !appState.topics.isEmpty {

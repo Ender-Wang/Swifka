@@ -131,6 +131,8 @@
   "lag.history.no.data": "无历史数据",
   "lag.history.no.data.description": "所选时间范围内未找到指标快照，请尝试扩大日期范围。",
 
+  "topics.not.connected": "未连接",
+  "topics.not.connected.description": "连接到集群以浏览 Topics。",
   "topics.title": "Topics",
   "topics.search": "搜索 Topic…",
   "topics.name": "Topic 名称",
@@ -152,6 +154,8 @@
   "topic.detail.high.watermark": "高水位",
   "topic.detail.messages": "消息数",
 
+  "messages.not.connected": "未连接",
+  "messages.not.connected.description": "连接到集群以浏览消息。",
   "messages.title": "消息",
   "messages.topic": "Topic",
   "messages.partition": "分区",
@@ -192,6 +196,8 @@
   "messages.select.topic": "选择一个 Topic 以浏览消息。",
   "messages.page.info": "第 {0} 条，共 {1} 条",
 
+  "groups.not.connected": "未连接",
+  "groups.not.connected.description": "连接到集群以查看消费者组。",
   "groups.title": "消费者组",
   "groups.name": "组名",
   "groups.state": "状态",
@@ -224,6 +230,8 @@
   "groups.member.host": "主机",
   "groups.member.assignments": "分区",
 
+  "brokers.not.connected": "未连接",
+  "brokers.not.connected.description": "连接到集群以查看 Brokers。",
   "brokers.title": "Brokers",
   "brokers.broker": "Broker",
   "brokers.broker.id": "Broker",

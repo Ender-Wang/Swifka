@@ -8,7 +8,14 @@ struct BrokersView: View {
         let l10n = appState.l10n
         let stats = appState.brokerStats
 
-        if stats.isEmpty {
+        if !appState.connectionStatus.isConnected {
+            ContentUnavailableView(
+                l10n["brokers.not.connected"],
+                systemImage: "network.slash",
+                description: Text(l10n["brokers.not.connected.description"]),
+            )
+            .navigationTitle(l10n["brokers.title"])
+        } else if stats.isEmpty {
             ContentUnavailableView(
                 l10n["brokers.empty"],
                 systemImage: "server.rack",

@@ -132,6 +132,8 @@
   "lag.history.no.data.description": "No metric snapshots found for the selected time range. Try expanding the date range.",
 
   "topics.title": "Topics",
+  "topics.not.connected": "Not Connected",
+  "topics.not.connected.description": "Connect to a cluster to browse topics.",
   "topics.search": "Search topics…",
   "topics.name": "Topic Name",
   "topics.partitions": "Partitions",
@@ -152,6 +154,8 @@
   "topic.detail.high.watermark": "High Watermark",
   "topic.detail.messages": "Messages",
 
+  "messages.not.connected": "Not Connected",
+  "messages.not.connected.description": "Connect to a cluster to browse messages.",
   "messages.title": "Messages",
   "messages.topic": "Topic",
   "messages.partition": "Partition",
@@ -192,6 +196,8 @@
   "messages.select.topic": "Select a topic to browse messages.",
   "messages.page.info": "{0} of {1} messages",
 
+  "groups.not.connected": "Not Connected",
+  "groups.not.connected.description": "Connect to a cluster to view consumer groups.",
   "groups.title": "Consumer Groups",
   "groups.name": "Group Name",
   "groups.state": "State",
@@ -224,6 +230,8 @@
   "groups.member.host": "Host",
   "groups.member.assignments": "Partitions",
 
+  "brokers.not.connected": "Not Connected",
+  "brokers.not.connected.description": "Connect to a cluster to view brokers.",
   "brokers.title": "Brokers",
   "brokers.broker": "Broker",
   "brokers.broker.id": "Broker",

@@ -40,6 +40,22 @@ struct ConsumerGroupsView: View {
         @Bindable var appState = appState
         let l10n = appState.l10n
 
+        if !appState.connectionStatus.isConnected {
+            ContentUnavailableView(
+                l10n["groups.not.connected"],
+                systemImage: "network.slash",
+                description: Text(l10n["groups.not.connected.description"]),
+            )
+            .navigationTitle(l10n["groups.title"])
+        } else {
+            groupsContent(l10n: l10n)
+        }
+    }
+
+    @ViewBuilder
+    private func groupsContent(l10n: L10n) -> some View {
+        @Bindable var appState = appState
+
         VStack(spacing: 0) {
             // Summary stat bar + filter chips
             if !appState.consumerGroups.isEmpty {
