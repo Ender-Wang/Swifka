@@ -16,6 +16,15 @@ enum BackupManager {
         let hasMetricsDB: Bool
     }
 
+    /// Matches the on-disk proto_index.json format (metadata only, no filePath/content).
+    private struct ProtoIndexEntry: Codable {
+        let id: UUID
+        let clusterID: UUID
+        let fileName: String
+        let messageTypes: [String]
+        let importedAt: Date
+    }
+
     // MARK: - Export
 
     /// Export all Swifka data as a ZIP archive.
@@ -103,29 +112,30 @@ enum BackupManager {
                 try fileData.write(to: dest, options: .atomic)
 
             case Constants.protoIndexFileName:
-                // Parse proto index — will be re-imported through ProtobufConfigManager
-                // We need the index + file contents together, so parse ProtoFileInfo from it
-                if let index = try? decoder.decode([ProtoFileInfo].self, from: fileData) {
-                    // Read content from the extracted proto files
+                // Parse proto index metadata — proto_index.json stores metadata-only entries
+                // (no filePath or content), so decode as ProtoIndexEntry, not ProtoFileInfo.
+                if let index = try? decoder.decode([ProtoIndexEntry].self, from: fileData) {
+                    // Build lookup from ZIP proto file paths to their content
                     let protoFileContents = Dictionary(
                         uniqueKeysWithValues: files
                             .filter { $0.path.hasPrefix("\(Constants.protosDirectory)/") }
                             .map { ($0.path, $0.data) },
                     )
-                    protoFiles = index.compactMap { info in
-                        // Reconstruct full ProtoFileInfo with content from ZIP
-                        let zipPath = "\(Constants.protosDirectory)/\(info.filePath.components(separatedBy: "/").last ?? "")"
+                    protoFiles = index.compactMap { meta in
+                        // Proto files are stored as <uuid>_<fileName> in the protos/ directory
+                        let expectedFileName = "\(meta.id.uuidString)_\(meta.fileName)"
+                        let zipPath = "\(Constants.protosDirectory)/\(expectedFileName)"
                         guard let content = protoFileContents[zipPath],
                               let contentStr = String(data: content, encoding: .utf8)
                         else { return nil }
                         return ProtoFileInfo(
-                            id: info.id,
-                            clusterID: info.clusterID,
-                            fileName: info.fileName,
-                            filePath: info.filePath,
+                            id: meta.id,
+                            clusterID: meta.clusterID,
+                            fileName: meta.fileName,
+                            filePath: zipPath,
                             content: contentStr,
-                            messageTypes: info.messageTypes,
-                            importedAt: info.importedAt,
+                            messageTypes: meta.messageTypes,
+                            importedAt: meta.importedAt,
                         )
                     }
                 }
