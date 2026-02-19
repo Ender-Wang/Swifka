@@ -429,17 +429,19 @@ final class ProtobufConfigManager {
     }
 
     /// Import proto files from cluster export (remapping cluster IDs).
+    /// Preserves original proto file ID when no collision exists locally.
     /// Returns a mapping of old filePath → new filePath for deserializer config remapping.
     @discardableResult
     func importProtoFiles(_ files: [ProtoFileInfo], clusterIDMap: [UUID: UUID]) -> [String: String] {
         var pathMap: [String: String] = [:]
+        let existingIDs = Set(allProtoFiles.map(\.id))
         for file in files {
             guard let newClusterID = clusterIDMap[file.clusterID] else { continue }
-            let id = UUID()
-            let newPath = protoFilePath(for: id, fileName: file.fileName)
+            let effectiveID = existingIDs.contains(file.id) ? UUID() : file.id
+            let newPath = protoFilePath(for: effectiveID, fileName: file.fileName)
             pathMap[file.filePath] = newPath
             let imported = ProtoFileInfo(
-                id: id,
+                id: effectiveID,
                 clusterID: newClusterID,
                 fileName: file.fileName,
                 filePath: newPath,
@@ -447,7 +449,7 @@ final class ProtobufConfigManager {
                 messageTypes: file.messageTypes,
                 importedAt: Date(),
             )
-            writeProtoContent(file.content, for: id, fileName: file.fileName)
+            writeProtoContent(file.content, for: effectiveID, fileName: file.fileName)
             allProtoFiles.append(imported)
         }
         saveIndex()

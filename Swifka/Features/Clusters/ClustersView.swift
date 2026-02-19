@@ -30,10 +30,11 @@ struct ClustersView: View {
     @State private var importableProtoFiles: [ProtoFileInfo] = []
     @State private var importableDeserializerConfigs: [TopicDeserializerConfig] = []
     @State private var selectedClustersForImport: Set<UUID> = []
-    @State private var showingImportModeDialog = false
     @State private var pendingImportData: Data?
     @State private var missingPasswordClusters: [String] = []
     @State private var showMissingPasswordAlert = false
+    @State private var duplicateActions: [UUID: DuplicateImportAction] = [:]
+    @State private var recentlyImportedClusterIDs: Set<UUID> = []
 
     /// Sorting
     @State private var sortMode: SortMode = .name
@@ -94,13 +95,17 @@ struct ClustersView: View {
         let pinnedClusters = sortedClusters.filter(\.isPinned)
         let unpinnedClusters = sortedClusters.filter { !$0.isPinned }
 
+        // Names that appear more than once — show short UUID to disambiguate
+        let nameCounts = Dictionary(grouping: appState.configStore.clusters, by: \.name)
+        let duplicateNames = Set(nameCounts.filter { $0.value.count > 1 }.keys)
+
         ZStack(alignment: .top) {
             List {
                 // Pinned section (only when there are pinned clusters)
                 if !pinnedClusters.isEmpty {
                     Section(l10n["cluster.section.pinned"]) {
                         ForEach(pinnedClusters) { cluster in
-                            clusterRow(for: cluster, isPinned: true)
+                            clusterRow(for: cluster, isPinned: true, duplicateNames: duplicateNames)
                         }
                     }
                 }
@@ -108,7 +113,7 @@ struct ClustersView: View {
                 // Regular clusters - no header to avoid gap
                 Section {
                     ForEach(unpinnedClusters) { cluster in
-                        clusterRow(for: cluster, isPinned: false)
+                        clusterRow(for: cluster, isPinned: false, duplicateNames: duplicateNames)
                     }
 
                     // Empty drop zone for unpinning - 3x cluster row height (~200px)
@@ -165,12 +170,25 @@ struct ClustersView: View {
             return .ignored
         }
         .task(id: appState.selectedSidebarItem) {
-            // Auto-focus list and select first cluster when navigating to Clusters page
             if appState.selectedSidebarItem == .clusters {
+                // Restore "New" badges persisted from backup import (one-time, survives restart)
+                if let idStrings = UserDefaults.standard.stringArray(forKey: "backup.recentlyImportedClusterIDs") {
+                    let ids = Set(idStrings.compactMap { UUID(uuidString: $0) })
+                    if !ids.isEmpty {
+                        recentlyImportedClusterIDs.formUnion(ids)
+                    }
+                    // Consume immediately — badges only show on first visit after import
+                    UserDefaults.standard.removeObject(forKey: "backup.recentlyImportedClusterIDs")
+                }
+
+                // Auto-focus list and select first cluster when navigating to Clusters page
                 isListFocused = true
                 if keyboardSelectedClusterId == nil, let first = sortedClusters.first {
                     keyboardSelectedClusterId = first.id
                 }
+            } else {
+                // Clear "New" badges when navigating away
+                recentlyImportedClusterIDs = []
             }
         }
         .navigationTitle(l10n["sidebar.clusters"])
@@ -281,32 +299,22 @@ struct ClustersView: View {
         .sheet(isPresented: $showingImportSelectionSheet) {
             ImportSelectionSheet(
                 clusters: importableClusters,
+                existingClusterIDs: Set(appState.configStore.clusters.map(\.id)),
                 selectedClusterIds: $selectedClustersForImport,
+                duplicateActions: $duplicateActions,
                 l10n: appState.l10n,
                 onImport: {
                     showingImportSelectionSheet = false
-                    // If no existing clusters, skip mode dialog and use Replace
-                    if appState.configStore.clusters.isEmpty {
-                        performImport(mode: .replace)
-                    } else {
-                        showingImportModeDialog = true
-                    }
+                    performImport()
+                },
+                onReplaceAll: {
+                    showingImportSelectionSheet = false
+                    performReplaceAll()
                 },
                 onCancel: {
                     showingImportSelectionSheet = false
                 },
             )
-        }
-        .alert(l10n["cluster.import.mode.title"], isPresented: $showingImportModeDialog) {
-            Button(l10n["cluster.import.append"], role: .none) {
-                performImport(mode: .append)
-            }
-            Button(l10n["cluster.import.replace"], role: .destructive) {
-                performImport(mode: .replace)
-            }
-            Button(l10n["common.cancel"], role: .cancel) {}
-        } message: {
-            Text(l10n["cluster.import.mode.message"])
         }
         .alert(l10n["cluster.import.missing.passwords.title"], isPresented: $showMissingPasswordAlert) {
             Button("OK", role: .cancel) {}
@@ -393,7 +401,7 @@ struct ClustersView: View {
     // MARK: - Helpers
 
     @ViewBuilder
-    private func clusterRow(for cluster: ClusterConfig, isPinned: Bool) -> some View {
+    private func clusterRow(for cluster: ClusterConfig, isPinned: Bool, duplicateNames: Set<String>) -> some View {
         let isConnected = appState.configStore.selectedClusterId == cluster.id
             && appState.connectionStatus.isConnected
         ClusterRow(
@@ -403,6 +411,8 @@ struct ClustersView: View {
             pingMs: isConnected ? appState.pingMs : clusterPingResults[cluster.id],
             pingFailed: pingFailedIds.contains(cluster.id),
             isKeyboardSelected: keyboardSelectedClusterId == cluster.id,
+            isNew: recentlyImportedClusterIDs.contains(cluster.id),
+            hasDuplicateName: duplicateNames.contains(cluster.name),
             onConnect: { connectTo(cluster) },
             onEdit: { editCluster(cluster) },
             onDelete: { confirmDelete(cluster) },
@@ -564,8 +574,6 @@ struct ClustersView: View {
 
     // MARK: - Import/Export
 
-    private enum ImportMode { case append, replace }
-
     private func handleImport(_ result: Result<URL, Error>) {
         guard case let .success(url) = result else { return }
 
@@ -582,8 +590,10 @@ struct ClustersView: View {
             importableProtoFiles = export.protoFiles
             importableDeserializerConfigs = export.deserializerConfigs
 
-            // Select all by default
-            selectedClustersForImport = Set(importableClusters.map(\.id))
+            // Select non-duplicates by default; duplicates are skipped
+            let existingIDs = Set(appState.configStore.clusters.map(\.id))
+            selectedClustersForImport = Set(importableClusters.filter { !existingIDs.contains($0.id) }.map(\.id))
+            duplicateActions = [:]
 
             // Show selection sheet
             showingImportSelectionSheet = true
@@ -592,49 +602,99 @@ struct ClustersView: View {
         }
     }
 
-    private func performImport(mode: ImportMode) {
+    /// Import selected clusters, handling duplicates per user choice
+    private func performImport() {
         do {
-            if mode == .replace {
-                // Delete all existing clusters and their passwords + proto files
-                for cluster in appState.configStore.clusters {
-                    KeychainManager.deletePassword(for: cluster.id)
-                    ProtobufConfigManager.shared.removeProtoFiles(for: cluster.id)
-                }
-                appState.configStore.clusters = []
-            }
-
-            // Import only selected clusters
+            let existingIDs = Set(appState.configStore.clusters.map(\.id))
             let selectedClusters = importableClusters.filter { selectedClustersForImport.contains($0.id) }
-            let idMap = try appState.configStore.importSelectedClusters(selectedClusters)
 
-            // Import proto files for selected clusters with remapped IDs
-            let selectedClusterIDs = Set(selectedClusters.map(\.id))
-            let relevantProtoFiles = importableProtoFiles.filter { selectedClusterIDs.contains($0.clusterID) }
-            var protoPathMap: [String: String] = [:]
-            if !relevantProtoFiles.isEmpty {
-                protoPathMap = ProtobufConfigManager.shared.importProtoFiles(relevantProtoFiles, clusterIDMap: idMap)
-            }
+            // Partition selected clusters by duplicate handling
+            var clustersToImport: [ClusterConfig] = []
+            var replacedClusterIDs: Set<UUID> = []
 
-            // Import deserializer configs with remapped proto file paths
-            if !importableDeserializerConfigs.isEmpty {
-                DeserializerConfigStore.shared.importConfigs(importableDeserializerConfigs, protoPathMap: protoPathMap)
-            }
-
-            // Check for missing passwords
-            missingPasswordClusters = selectedClusters.compactMap { cluster in
-                if cluster.authType == .sasl,
-                   KeychainManager.loadPassword(for: cluster.id) == nil
-                {
-                    return cluster.name
+            for cluster in selectedClusters {
+                if existingIDs.contains(cluster.id) {
+                    let action = duplicateActions[cluster.id] ?? .replace
+                    switch action {
+                    case .skip:
+                        continue
+                    case .replace:
+                        // Remove old cluster's proto files and associated deserializer configs, keep Keychain password
+                        let oldProtoPaths = Set(ProtobufConfigManager.shared.protoFiles(for: cluster.id).map(\.filePath))
+                        DeserializerConfigStore.shared.removeConfigs(withProtoPaths: oldProtoPaths)
+                        ProtobufConfigManager.shared.removeProtoFiles(for: cluster.id)
+                        appState.configStore.clusters.removeAll { $0.id == cluster.id }
+                        replacedClusterIDs.insert(cluster.id)
+                        clustersToImport.append(cluster)
+                    case .addAsNew:
+                        clustersToImport.append(cluster)
+                    }
+                } else {
+                    clustersToImport.append(cluster)
                 }
-                return nil
             }
 
-            if !missingPasswordClusters.isEmpty {
-                showMissingPasswordAlert = true
-            }
+            let idMap = try appState.configStore.importSelectedClusters(clustersToImport)
+            finishImport(clustersToImport: clustersToImport, idMap: idMap, replacedClusterIDs: replacedClusterIDs)
         } catch {
             // Could add error banner here
+        }
+    }
+
+    /// Delete all existing clusters and import selected ones fresh
+    private func performReplaceAll() {
+        do {
+            // Delete all existing clusters and their passwords + proto files
+            for cluster in appState.configStore.clusters {
+                KeychainManager.deletePassword(for: cluster.id)
+                ProtobufConfigManager.shared.removeProtoFiles(for: cluster.id)
+            }
+            appState.configStore.clusters = []
+
+            let selectedClusters = importableClusters.filter { selectedClustersForImport.contains($0.id) }
+            let idMap = try appState.configStore.importSelectedClusters(selectedClusters)
+            finishImport(clustersToImport: selectedClusters, idMap: idMap, replacedClusterIDs: [])
+        } catch {
+            // Could add error banner here
+        }
+    }
+
+    /// Shared import completion: proto files, deserializer configs, password check, "New" badges
+    private func finishImport(
+        clustersToImport: [ClusterConfig],
+        idMap: [UUID: UUID],
+        replacedClusterIDs: Set<UUID>,
+    ) {
+        // Import proto files for selected clusters with remapped IDs
+        let selectedClusterIDs = Set(clustersToImport.map(\.id))
+        let relevantProtoFiles = importableProtoFiles.filter { selectedClusterIDs.contains($0.clusterID) }
+        var protoPathMap: [String: String] = [:]
+        if !relevantProtoFiles.isEmpty {
+            protoPathMap = ProtobufConfigManager.shared.importProtoFiles(relevantProtoFiles, clusterIDMap: idMap)
+        }
+
+        // Import deserializer configs with remapped proto file paths
+        if !importableDeserializerConfigs.isEmpty {
+            DeserializerConfigStore.shared.importConfigs(importableDeserializerConfigs, protoPathMap: protoPathMap)
+        }
+
+        // Mark imported clusters as "New"
+        recentlyImportedClusterIDs = Set(idMap.values)
+
+        // Check for missing passwords (skip replaced clusters — their Keychain password is preserved)
+        missingPasswordClusters = clustersToImport.compactMap { cluster in
+            if replacedClusterIDs.contains(cluster.id) { return nil }
+            if cluster.authType == .sasl,
+               let effectiveID = idMap[cluster.id],
+               KeychainManager.loadPassword(for: effectiveID) == nil
+            {
+                return cluster.name
+            }
+            return nil
+        }
+
+        if !missingPasswordClusters.isEmpty {
+            showMissingPasswordAlert = true
         }
     }
 }
@@ -778,13 +838,25 @@ private struct ExportSelectionSheet: View {
     }
 }
 
+// MARK: - Duplicate Import Action
+
+/// Action for handling a duplicate cluster during Append import
+private enum DuplicateImportAction: String, CaseIterable {
+    case skip
+    case replace
+    case addAsNew
+}
+
 // MARK: - Import Selection Sheet
 
 private struct ImportSelectionSheet: View {
     let clusters: [ClusterConfig]
+    let existingClusterIDs: Set<UUID>
     @Binding var selectedClusterIds: Set<UUID>
+    @Binding var duplicateActions: [UUID: DuplicateImportAction]
     let l10n: L10n
     let onImport: () -> Void
+    let onReplaceAll: () -> Void
     let onCancel: () -> Void
 
     var body: some View {
@@ -825,12 +897,17 @@ private struct ImportSelectionSheet: View {
 
             // Cluster list
             List(clusters) { cluster in
+                let isDuplicate = existingClusterIDs.contains(cluster.id)
                 HStack(alignment: .center) {
                     Toggle(isOn: Binding(
                         get: { selectedClusterIds.contains(cluster.id) },
                         set: { isSelected in
                             if isSelected {
                                 selectedClusterIds.insert(cluster.id)
+                                // Default to replace when selecting a duplicate
+                                if isDuplicate, duplicateActions[cluster.id] == nil {
+                                    duplicateActions[cluster.id] = .replace
+                                }
                             } else {
                                 selectedClusterIds.remove(cluster.id)
                             }
@@ -847,9 +924,32 @@ private struct ImportSelectionSheet: View {
                                 .foregroundStyle(.secondary)
                                 .lineLimit(1)
                                 .truncationMode(.middle)
+
+                            if isDuplicate {
+                                Text(l10n["cluster.import.exists"])
+                                    .font(.caption)
+                                    .foregroundStyle(.orange)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(.orange.opacity(0.15), in: Capsule())
+                            }
                         }
                     }
                     .toggleStyle(.checkbox)
+
+                    Spacer()
+
+                    // Action picker for selected duplicates
+                    if isDuplicate, selectedClusterIds.contains(cluster.id) {
+                        Picker("", selection: Binding(
+                            get: { duplicateActions[cluster.id] ?? .replace },
+                            set: { duplicateActions[cluster.id] = $0 },
+                        )) {
+                            Text(l10n["cluster.import.action.replace"]).tag(DuplicateImportAction.replace)
+                            Text(l10n["cluster.import.action.add.new"]).tag(DuplicateImportAction.addAsNew)
+                        }
+                        .fixedSize()
+                    }
                 }
             }
             .frame(height: 300)
@@ -864,6 +964,13 @@ private struct ImportSelectionSheet: View {
                 .keyboardShortcut(.cancelAction)
 
                 Spacer()
+
+                if !existingClusterIDs.isEmpty {
+                    Button(l10n["cluster.import.replace"]) {
+                        onReplaceAll()
+                    }
+                    .foregroundStyle(.red)
+                }
 
                 Button(l10n["cluster.import"]) {
                     onImport()
@@ -886,6 +993,8 @@ private struct ClusterRow: View {
     var pingMs: Int?
     var pingFailed: Bool = false
     var isKeyboardSelected: Bool = false
+    var isNew: Bool = false
+    var hasDuplicateName: Bool = false
     let onConnect: () -> Void
     let onEdit: () -> Void
     let onDelete: () -> Void
@@ -916,8 +1025,25 @@ private struct ClusterRow: View {
                     .frame(width: 8, height: 8)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(cluster.name)
-                        .fontWeight(isConnected ? .semibold : .regular)
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Text(cluster.name)
+                            .fontWeight(isConnected ? .semibold : .regular)
+                        if hasDuplicateName {
+                            Text(String(cluster.id.uuidString.prefix(8)))
+                                .font(.caption2)
+                                .monospaced()
+                                .foregroundStyle(.tertiary)
+                        }
+                        if isNew {
+                            Text(l10n["cluster.import.new"])
+                                .font(.caption2)
+                                .fontWeight(.medium)
+                                .foregroundStyle(Color.accentColor)
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 1)
+                                .background(Color.accentColor.opacity(0.12), in: Capsule())
+                        }
+                    }
                     HStack(spacing: 6) {
                         Image(systemName: authIcon)
                             .font(.caption.weight(.semibold))

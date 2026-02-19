@@ -135,16 +135,18 @@ final class ConfigStore {
         return try? encoder.encode(export)
     }
 
-    /// Import selected clusters, returns old→new UUID mapping for proto file remapping
+    /// Import selected clusters, returns old→new UUID mapping for proto file remapping.
+    /// Preserves original UUID when no collision exists locally (enables metrics DB portability).
     @discardableResult
     func importSelectedClusters(_ selectedClusters: [ClusterConfig]) throws -> [UUID: UUID] {
         var idMap: [UUID: UUID] = [:]
+        let existingIDs = Set(clusters.map(\.id))
 
-        let withNewIds = selectedClusters.map { cluster in
-            let newID = UUID()
-            idMap[cluster.id] = newID
+        let imported = selectedClusters.map { cluster in
+            let effectiveID = existingIDs.contains(cluster.id) ? UUID() : cluster.id
+            idMap[cluster.id] = effectiveID
             return ClusterConfig(
-                id: newID,
+                id: effectiveID,
                 name: cluster.name,
                 host: cluster.host,
                 port: cluster.port,
@@ -160,7 +162,7 @@ final class ConfigStore {
             )
         }
 
-        clusters.append(contentsOf: withNewIds)
+        clusters.append(contentsOf: imported)
         save()
         return idMap
     }

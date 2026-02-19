@@ -413,4 +413,9 @@ actor MetricDatabase {
     func deleteAllData() throws -> Int {
         try db.run(snapshots.delete())
     }
+
+    /// Flush WAL journal into the main database file so a single-file copy is consistent.
+    func checkpoint() throws {
+        try db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+    }
 }

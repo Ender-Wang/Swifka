@@ -1,8 +1,26 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct SettingsView: View {
     @Environment(AppState.self) private var appState
     @State private var showClearDataConfirm = false
+    @State private var dataCleared = false
+
+    // Backup
+    @State private var showingBackupExport = false
+    @State private var showingBackupImport = false
+    @State private var backupData: Data?
+    @State private var showRestartAlert = false
+    @State private var isExporting = false
+    @State private var importError: String?
+    @State private var showImportError = false
+
+    private var backupFilename: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyyMMdd-HHmmss"
+        let timestamp = formatter.string(from: Date())
+        return "swifka-backup-\(timestamp).zip"
+    }
 
     var body: some View {
         @Bindable var state = appState
@@ -119,8 +137,56 @@ struct SettingsView: View {
                 }
             }
 
-            // Data Retention
-            Section(l10n["settings.data.retention"]) {
+            // Data
+            Section(l10n["settings.data"]) {
+                // Backup export
+                HStack {
+                    VStack(alignment: .leading) {
+                        Text(l10n["settings.data.export"])
+                        Text(l10n["settings.data.export.description"])
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    if isExporting {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else {
+                        Button(l10n["settings.data.export"]) {
+                            Task {
+                                isExporting = true
+                                do {
+                                    backupData = try await BackupManager.exportBackup(
+                                        metricDatabase: appState.metricDatabase,
+                                    )
+                                    showingBackupExport = true
+                                } catch {
+                                    importError = error.localizedDescription
+                                    showImportError = true
+                                }
+                                isExporting = false
+                            }
+                        }
+                    }
+                }
+
+                // Backup import
+                HStack {
+                    VStack(alignment: .leading) {
+                        Text(l10n["settings.data.import"])
+                        Text(l10n["settings.data.import.description"])
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button(l10n["settings.data.import"]) {
+                        showingBackupImport = true
+                    }
+                }
+
+                Divider()
+
+                // Retention policy
                 Picker(l10n["settings.retention.policy"], selection: $state.retentionPolicy) {
                     Text(l10n["settings.retention.1d"]).tag(DataRetentionPolicy.oneDay)
                     Text(l10n["settings.retention.7d"]).tag(DataRetentionPolicy.sevenDays)
@@ -134,6 +200,7 @@ struct SettingsView: View {
                 } label: {
                     Text(l10n["settings.retention.clear"])
                 }
+                .disabled(dataCleared)
                 .confirmationDialog(
                     l10n["settings.retention.clear.confirm"],
                     isPresented: $showClearDataConfirm,
@@ -142,6 +209,7 @@ struct SettingsView: View {
                     Button(l10n["common.delete"], role: .destructive) {
                         Task {
                             await appState.clearAllMetricData()
+                            dataCleared = true
                         }
                     }
                 }
@@ -161,7 +229,105 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         .navigationTitle(l10n["settings.title"])
+        .task(id: appState.selectedSidebarItem) {
+            dataCleared = false
+        }
+        .fileExporter(
+            isPresented: $showingBackupExport,
+            document: BackupDocument(data: backupData ?? Data()),
+            contentType: .zip,
+            defaultFilename: backupFilename,
+        ) { _ in }
+        .fileImporter(
+            isPresented: $showingBackupImport,
+            allowedContentTypes: [.zip],
+        ) { result in
+            handleBackupImport(result)
+        }
+        .alert(
+            l10n["settings.data.import.restart.title"],
+            isPresented: $showRestartAlert,
+        ) {
+            Button(l10n["settings.data.import.restart.button"]) {
+                // Spawn a shell that polls until the current process exits, then relaunches
+                let appPath = Bundle.main.bundleURL.path
+                let pid = ProcessInfo.processInfo.processIdentifier
+                let task = Process()
+                task.executableURL = URL(fileURLWithPath: "/bin/sh")
+                task.arguments = [
+                    "-c",
+                    "while kill -0 \(pid) 2>/dev/null; do sleep 0.1; done; open \"\(appPath)\"",
+                ]
+                try? task.run()
+                NSApplication.shared.terminate(nil)
+            }
+            Button(l10n["common.cancel"], role: .cancel) {}
+        } message: {
+            Text(l10n["settings.data.import.restart.message"])
+        }
+        .alert(
+            l10n["common.error"],
+            isPresented: $showImportError,
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(importError ?? "")
+        }
     }
+
+    // MARK: - Backup Import
+
+    private func handleBackupImport(_ result: Result<URL, Error>) {
+        guard case let .success(url) = result else { return }
+
+        guard url.startAccessingSecurityScopedResource() else { return }
+        defer { url.stopAccessingSecurityScopedResource() }
+
+        do {
+            let data = try Data(contentsOf: url)
+            let backup = try BackupManager.importBackup(from: data)
+
+            // Smart cluster import: skip duplicates, only add new clusters
+            let existingIDs = Set(appState.configStore.clusters.map(\.id))
+            let newClusters = backup.clusters.filter { !existingIDs.contains($0.id) }
+
+            if !newClusters.isEmpty {
+                let idMap = try appState.configStore.importSelectedClusters(newClusters)
+
+                // Import proto files for new clusters with ID remapping
+                let newClusterIDs = Set(newClusters.map(\.id))
+                let relevantProtoFiles = backup.protoFiles.filter { newClusterIDs.contains($0.clusterID) }
+                var protoPathMap: [String: String] = [:]
+                if !relevantProtoFiles.isEmpty {
+                    protoPathMap = ProtobufConfigManager.shared.importProtoFiles(
+                        relevantProtoFiles, clusterIDMap: idMap,
+                    )
+                }
+
+                // Import deserializer configs with proto path remapping
+                if !backup.deserializerConfigs.isEmpty {
+                    DeserializerConfigStore.shared.importConfigs(
+                        backup.deserializerConfigs, protoPathMap: protoPathMap,
+                    )
+                }
+
+                // Persist newly imported cluster IDs for "New" badge after restart
+                let importedIDs = Set(idMap.values)
+                let idStrings = importedIDs.map(\.uuidString)
+                UserDefaults.standard.set(idStrings, forKey: "backup.recentlyImportedClusterIDs")
+            }
+
+            // Show restart alert only if metrics DB was replaced
+            if backup.hasMetricsDB {
+                showRestartAlert = true
+            }
+        } catch {
+            importError = error.localizedDescription
+            showImportError = true
+        }
+    }
+
+    // MARK: - Helpers
 
     private func permissionLabel(_ level: OperationLevel, l10n: L10n) -> String {
         switch level {

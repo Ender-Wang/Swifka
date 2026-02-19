@@ -72,6 +72,16 @@ final class DeserializerConfigStore {
         save()
     }
 
+    /// Remove all configs whose protoFilePath is in the given set
+    func removeConfigs(withProtoPaths paths: Set<String>) {
+        guard !paths.isEmpty else { return }
+        configs.removeAll { config in
+            guard let path = config.protoFilePath else { return false }
+            return paths.contains(path)
+        }
+        save()
+    }
+
     /// Import configs from cluster export, remapping proto file paths to new managed locations.
     /// Only imports configs whose topic name doesn't already have a local config.
     func importConfigs(_ imported: [TopicDeserializerConfig], protoPathMap: [String: String]) {
