@@ -209,7 +209,7 @@ struct MessageBrowserView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(Color(nsColor: .controlBackgroundColor))
+        .background(.bar)
     }
 
     @ViewBuilder
@@ -438,7 +438,7 @@ struct MessageBrowserView: View {
             }
             .overlay(alignment: .trailing) {
                 LinearGradient(
-                    colors: [.clear, Color(nsColor: .windowBackgroundColor)],
+                    colors: [.clear, Color(nsColor: .controlBackgroundColor)],
                     startPoint: .leading,
                     endPoint: .trailing,
                 )
@@ -465,6 +465,7 @@ struct MessageBrowserView: View {
             }
         }
         .padding(12)
+        .background(.bar)
         .fileImporter(
             isPresented: $isImportingProtoFile,
             allowedContentTypes: [.init(filenameExtension: "proto")!],
