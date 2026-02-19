@@ -4,6 +4,8 @@ struct ContentView: View {
     @Environment(AppState.self) private var appState
     @State private var columnVisibility: NavigationSplitViewVisibility = .automatic
     @State private var showingAddClusterSheet = false
+    @State private var detailOpacity: Double = 1
+    @State private var detailOffset: CGFloat = 0
 
     private var sidebarHidden: Bool {
         columnVisibility == .detailOnly
@@ -47,6 +49,16 @@ struct ContentView: View {
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .opacity(detailOpacity)
+                .offset(y: detailOffset)
+                .onChange(of: appState.selectedSidebarItem) {
+                    detailOpacity = 0
+                    detailOffset = 6
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        detailOpacity = 1
+                        detailOffset = 0
+                    }
+                }
                 .environment(\.defaultMinListRowHeight, appState.rowDensity.rowHeight)
             }
         }
