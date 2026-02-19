@@ -21,6 +21,8 @@ A native macOS Kafka monitor. Read-only by design.
 
 **Why Swifka exists:** Every existing Kafka client is either Java-based (Offset Explorer, Conduktor) or web-based (AKHQ, Kafdrop, Redpanda Console) — and every single one of them tries to be a full Kafka Swiss Army knife. None of them feel at home on macOS, and none of them nail "lightweight, safe, read-only monitoring."
 
+<div align="center">
+
 | Tool | Stack | Problem |
 |------|-------|---------|
 | Offset Explorer | Java (Swing) | Feature-rich but bloated and dated |
@@ -28,6 +30,8 @@ A native macOS Kafka monitor. Read-only by design.
 | AKHQ / Kafdrop | Java (Web) | Requires deployment, full admin scope |
 | Redpanda Console | Go + React (Web) | Web-based, full admin capabilities |
 | kcat | CLI | Powerful but raw |
+
+</div>
 
 Swifka fills the gap: a native macOS client built for **monitoring only** — safe to point at production, with zero risk of accidental writes. The teams that adopt Swifka are the ones that want a tool they can hand to any engineer, including junior developers and on-call rotations, without worrying about accidental production damage.
 
