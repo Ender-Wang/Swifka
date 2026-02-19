@@ -15,6 +15,9 @@ nonisolated struct ClusterConfig: Codable, Identifiable, Hashable, Sendable {
     var createdAt: Date
     var updatedAt: Date
 
+    /// Schema Registry (optional)
+    var schemaRegistryURL: String? = nil
+
     // Cluster manager enhancements
     var isPinned: Bool = false
     var lastConnectedAt: Date? = nil
@@ -34,6 +37,7 @@ nonisolated struct ClusterConfig: Codable, Identifiable, Hashable, Sendable {
         saslMechanism: SASLMechanism? = nil,
         saslUsername: String? = nil,
         useTLS: Bool = false,
+        schemaRegistryURL: String? = nil,
         createdAt: Date = Date(),
         updatedAt: Date = Date(),
         isPinned: Bool = false,
@@ -48,6 +52,7 @@ nonisolated struct ClusterConfig: Codable, Identifiable, Hashable, Sendable {
         self.saslMechanism = saslMechanism
         self.saslUsername = saslUsername
         self.useTLS = useTLS
+        self.schemaRegistryURL = schemaRegistryURL
         self.createdAt = createdAt
         self.updatedAt = updatedAt
         self.isPinned = isPinned
@@ -84,6 +89,7 @@ nonisolated struct ClusterConfig: Codable, Identifiable, Hashable, Sendable {
         saslMechanism = try container.decodeIfPresent(SASLMechanism.self, forKey: .saslMechanism)
         saslUsername = try container.decodeIfPresent(String.self, forKey: .saslUsername)
         useTLS = try container.decode(Bool.self, forKey: .useTLS)
+        schemaRegistryURL = try container.decodeIfPresent(String.self, forKey: .schemaRegistryURL)
         createdAt = try container.decode(Date.self, forKey: .createdAt)
         updatedAt = try container.decode(Date.self, forKey: .updatedAt)
         isPinned = try container.decodeIfPresent(Bool.self, forKey: .isPinned) ?? false
@@ -102,6 +108,7 @@ nonisolated struct ClusterConfig: Codable, Identifiable, Hashable, Sendable {
         try container.encodeIfPresent(saslMechanism, forKey: .saslMechanism)
         try container.encodeIfPresent(saslUsername, forKey: .saslUsername)
         try container.encode(useTLS, forKey: .useTLS)
+        try container.encodeIfPresent(schemaRegistryURL, forKey: .schemaRegistryURL)
         try container.encode(createdAt, forKey: .createdAt)
         try container.encode(updatedAt, forKey: .updatedAt)
         try container.encode(isPinned, forKey: .isPinned)
@@ -111,7 +118,7 @@ nonisolated struct ClusterConfig: Codable, Identifiable, Hashable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case id, name, host, port, bootstrapServers, authType, saslMechanism, saslUsername, useTLS
-        case createdAt, updatedAt, isPinned, lastConnectedAt, sortOrder
+        case schemaRegistryURL, createdAt, updatedAt, isPinned, lastConnectedAt, sortOrder
     }
 }
 
@@ -522,6 +529,7 @@ nonisolated enum SidebarItem: String, Hashable, Sendable {
     case lag
     case topics
     case messages
+    case schemaRegistry
     case consumerGroups
     case brokers
     case clusters

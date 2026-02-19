@@ -62,6 +62,10 @@ struct SwifkaApp: App {
                     navigateTo(.messages)
                 }
                 .keyboardShortcut("m", modifiers: [.command, .shift])
+                Button(appState.l10n["sidebar.schemas"]) {
+                    navigateTo(.schemaRegistry)
+                }
+                .keyboardShortcut("r", modifiers: [.command, .shift])
             }
             CommandMenu(appState.l10n["sidebar.section.monitor"]) {
                 Button(appState.l10n["sidebar.groups"]) {

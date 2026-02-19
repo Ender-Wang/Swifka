@@ -33,6 +33,10 @@ struct MessageBrowserView: View {
     @State private var controlsOverflow = false
     @State private var controlsContentWidth: CGFloat = 0
 
+    // Schema Registry auto-decode cache
+    @State private var registrySchemas: [Int: SchemaInfo] = [:]
+    @State private var parsedRegistrySchemas: [Int: (schema: ProtoSchema, messageTypes: [String])] = [:]
+
     // Pagination
     @State private var currentPage = 0
     private let messagesPerPage = 500
@@ -187,6 +191,10 @@ struct MessageBrowserView: View {
                 }
             }
             .onChange(of: appState.connectionStatus.isConnected) {
+                if !appState.connectionStatus.isConnected {
+                    registrySchemas = [:]
+                    parsedRegistrySchemas = [:]
+                }
                 if appState.connectionStatus.isConnected, selectedTopicName != nil, appState.refreshManager.isAutoRefresh {
                     fetchMessages()
                     appState.refreshManager.restart()
@@ -931,8 +939,8 @@ struct MessageBrowserView: View {
     }
 
     private func matchesSearch(message: KafkaMessageRecord, query: String) -> Bool {
-        let keyString = message.keyString(format: messageFormat, protoContext: protoContext)
-        let valueString = message.valueString(format: messageFormat, protoContext: protoContext)
+        let keyString = displayKey(for: message)
+        let valueString = displayValue(for: message)
 
         // JSON Path search
         if isJsonPath {
@@ -1171,14 +1179,14 @@ struct MessageBrowserView: View {
             .width(min: 40, ideal: 55, max: 70)
 
             TableColumn(l10n["messages.key"]) { message in
-                Text(message.keyString(format: messageFormat, protoContext: protoContext))
+                Text(displayKey(for: message))
                     .lineLimit(1)
                     .padding(.vertical, appState.rowDensity.tablePadding)
             }
             .width(min: 60, ideal: 100, max: 150)
 
             TableColumn(l10n["messages.value"]) { message in
-                Text(message.valueString(format: messageFormat, protoContext: protoContext))
+                Text(displayValue(for: message))
                     .lineLimit(1)
                     .padding(.vertical, appState.rowDensity.tablePadding)
             }
@@ -1222,7 +1230,13 @@ struct MessageBrowserView: View {
                         },
                 )
 
-            MessageDetailView(message: message, format: messageFormat, protoContext: protoContext) {
+            MessageDetailView(
+                message: message,
+                format: messageFormat,
+                protoContext: protoContext,
+                registryKeyDisplay: registryDecode(message.key, pretty: true),
+                registryValueDisplay: registryDecode(message.value, pretty: true),
+            ) {
                 selectedMessageId = nil
                 detailMessage = nil
             }
@@ -1320,6 +1334,92 @@ struct MessageBrowserView: View {
         }
     }
 
+    // MARK: - Schema Registry Auto-Decode
+
+    /// Pre-fetch schemas from the registry for all Confluent-encoded messages.
+    private func prefetchRegistrySchemas(for messages: [KafkaMessageRecord]) async {
+        guard let client = appState.schemaRegistryClient else { return }
+
+        var schemaIDs = Set<Int>()
+        for message in messages {
+            if let key = message.key, let id = ConfluentWireFormat.extractSchemaID(key) {
+                schemaIDs.insert(id)
+            }
+            if let value = message.value, let id = ConfluentWireFormat.extractSchemaID(value) {
+                schemaIDs.insert(id)
+            }
+        }
+
+        // Only fetch schemas we haven't cached yet
+        schemaIDs.subtract(registrySchemas.keys)
+        guard !schemaIDs.isEmpty else { return }
+
+        for id in schemaIDs {
+            guard let schema = try? await client.fetchSchemaByID(id) else { continue }
+            registrySchemas[id] = schema
+            if schema.schemaType == .protobuf {
+                let parsed = ProtoSchemaParser.parse(schema.schema)
+                let types = ConfluentWireFormat.orderedMessageTypes(from: schema.schema)
+                parsedRegistrySchemas[id] = (schema: parsed, messageTypes: types)
+            }
+        }
+    }
+
+    /// Try to decode Confluent wire format data using cached registry schemas.
+    private func registryDecode(_ data: Data?, pretty: Bool = false) -> String? {
+        guard let data, ConfluentWireFormat.isConfluentEncoded(data),
+              let schemaID = ConfluentWireFormat.extractSchemaID(data),
+              let schemaInfo = registrySchemas[schemaID]
+        else { return nil }
+
+        switch schemaInfo.schemaType {
+        case .protobuf:
+            guard let (parsedSchema, messageTypes) = parsedRegistrySchemas[schemaID] else { return nil }
+            let (messageIndex, payload) = ConfluentWireFormat.extractProtobufPayload(data)
+            let typeName = messageIndex < messageTypes.count
+                ? messageTypes[messageIndex]
+                : (messageTypes.first ?? "")
+            do {
+                var decoder = ProtobufWireDecoder(data: payload)
+                let fields = try decoder.decodeFields()
+                return pretty
+                    ? ProtobufDeserializer.formatPrettyWithSchema(fields, schema: parsedSchema, messageType: typeName)
+                    : ProtobufDeserializer.formatFlatWithSchema(fields, schema: parsedSchema, messageType: typeName)
+            } catch {
+                return "(protobuf decode error: \(error.localizedDescription))"
+            }
+        case .json:
+            let payload = ConfluentWireFormat.extractPayload(data)
+            guard let string = String(data: payload, encoding: .utf8) else { return "(binary data)" }
+            if pretty,
+               let json = try? JSONSerialization.jsonObject(with: payload),
+               let prettyData = try? JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted, .sortedKeys]),
+               let prettyString = String(data: prettyData, encoding: .utf8)
+            {
+                return prettyString
+            }
+            return string
+        case .avro:
+            return "(Avro — decoding coming in next update)"
+        }
+    }
+
+    private func displayKey(for message: KafkaMessageRecord) -> String {
+        registryDecode(message.key) ?? message.keyString(format: messageFormat, protoContext: protoContext)
+    }
+
+    private func displayValue(for message: KafkaMessageRecord) -> String {
+        registryDecode(message.value) ?? message.valueString(format: messageFormat, protoContext: protoContext)
+    }
+
+    private func prettyDisplayKey(for message: KafkaMessageRecord) -> String {
+        registryDecode(message.key, pretty: true) ?? message.keyPrettyString(format: messageFormat, protoContext: protoContext)
+    }
+
+    private func prettyDisplayValue(for message: KafkaMessageRecord) -> String {
+        registryDecode(message.value, pretty: true) ?? message.valuePrettyString(format: messageFormat, protoContext: protoContext)
+    }
+
     private func fetchMessages() {
         guard let topicName = selectedTopicName else { return }
 
@@ -1348,6 +1448,9 @@ struct MessageBrowserView: View {
 
                 // Discard results if topic changed while we were fetching
                 guard !Task.isCancelled, selectedTopicName == topicName else { return }
+
+                // Pre-fetch schemas from registry for auto-decode
+                await prefetchRegistrySchemas(for: newMessages)
 
                 // Reconcile selection
                 if let id = selectedMessageId {
@@ -1414,6 +1517,8 @@ struct MessageDetailView: View {
     let message: KafkaMessageRecord
     let format: MessageFormat
     var protoContext: ProtobufContext?
+    var registryKeyDisplay: String?
+    var registryValueDisplay: String?
     var onDismiss: () -> Void = {}
     @State private var keyCopied = false
     @State private var valueCopied = false
@@ -1452,17 +1557,17 @@ struct MessageDetailView: View {
                         Text(l10n["messages.key"])
                             .font(.subheadline.bold())
                         Spacer()
-                        CopyButton(text: message.keyPrettyString(format: format, protoContext: protoContext), copied: $keyCopied)
+                        CopyButton(text: effectiveKeyDisplay, copied: $keyCopied)
                     }
-                    codeBlock(message.keyPrettyString(format: format, protoContext: protoContext))
+                    codeBlock(effectiveKeyDisplay)
 
                     HStack {
                         Text(l10n["messages.value"])
                             .font(.subheadline.bold())
                         Spacer()
-                        CopyButton(text: message.valuePrettyString(format: format, protoContext: protoContext), copied: $valueCopied)
+                        CopyButton(text: effectiveValueDisplay, copied: $valueCopied)
                     }
-                    codeBlock(message.valuePrettyString(format: format, protoContext: protoContext))
+                    codeBlock(effectiveValueDisplay)
 
                     if !message.headers.isEmpty {
                         Text(l10n["messages.headers"])
@@ -1491,6 +1596,14 @@ struct MessageDetailView: View {
             keyCopied = false
             valueCopied = false
         }
+    }
+
+    private var effectiveKeyDisplay: String {
+        registryKeyDisplay ?? message.keyPrettyString(format: format, protoContext: protoContext)
+    }
+
+    private var effectiveValueDisplay: String {
+        registryValueDisplay ?? message.valuePrettyString(format: format, protoContext: protoContext)
     }
 
     @ViewBuilder

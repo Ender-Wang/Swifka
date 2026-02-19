@@ -36,6 +36,8 @@ struct ContentView: View {
                         TopicListView()
                     case .messages:
                         MessageBrowserView()
+                    case .schemaRegistry:
+                        SchemaRegistryView()
                     case .consumerGroups:
                         ConsumerGroupsView()
                     case .brokers:
@@ -72,7 +74,8 @@ struct ContentView: View {
                 // Refresh controls (only on data pages)
                 if appState.connectionStatus.isConnected,
                    appState.selectedSidebarItem != .clusters,
-                   appState.selectedSidebarItem != .settings
+                   appState.selectedSidebarItem != .settings,
+                   appState.selectedSidebarItem != .schemaRegistry
                 {
                     Menu {
                         Button(l10n["common.refresh"]) {
@@ -200,6 +203,7 @@ struct ContentView: View {
         case .lag: "chart.line.downtrend.xyaxis"
         case .topics: "list.bullet.rectangle"
         case .messages: "envelope"
+        case .schemaRegistry: "doc.text.magnifyingglass"
         case .consumerGroups: "person.2"
         case .brokers: "server.rack"
         case .clusters: "square.stack.3d.up"
@@ -228,6 +232,7 @@ private struct CompactSidebarView: View {
         IconGroup(items: [
             (.topics, "list.bullet.rectangle"),
             (.messages, "envelope"),
+            (.schemaRegistry, "doc.text.magnifyingglass"),
         ]),
         IconGroup(items: [
             (.consumerGroups, "person.2"),
@@ -293,6 +298,7 @@ private struct CompactSidebarView: View {
         case .lag: l10n["sidebar.lag"]
         case .topics: l10n["sidebar.topics"]
         case .messages: l10n["sidebar.messages"]
+        case .schemaRegistry: l10n["sidebar.schemas"]
         case .consumerGroups: l10n["sidebar.groups"]
         case .brokers: l10n["sidebar.brokers"]
         case .clusters: l10n["sidebar.clusters"]
@@ -330,6 +336,8 @@ struct SidebarView: View {
                     .tag(SidebarItem.topics)
                 Label(l10n["sidebar.messages"], systemImage: "envelope")
                     .tag(SidebarItem.messages)
+                Label(l10n["sidebar.schemas"], systemImage: "doc.text.magnifyingglass")
+                    .tag(SidebarItem.schemaRegistry)
             }
 
             Section(l10n["sidebar.section.monitor"]) {

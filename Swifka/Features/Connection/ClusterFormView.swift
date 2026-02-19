@@ -21,6 +21,11 @@ struct ClusterFormView: View {
     @State private var saslPassword: String = ""
     @State private var useTLS = false
 
+    // Schema Registry
+    @State private var schemaRegistryURL: String = ""
+    @State private var isTestingRegistry = false
+    @State private var registryTestResult: ConnectionViewModel.TestResult?
+
     @State private var isTesting = false
     @State private var testResult: ConnectionViewModel.TestResult?
 
@@ -65,6 +70,53 @@ struct ClusterFormView: View {
                     Toggle("Use TLS", isOn: $useTLS)
                 }
 
+                Section {
+                    HStack {
+                        TextField(
+                            l10n["cluster.schema.registry.url"],
+                            text: $schemaRegistryURL,
+                            prompt: Text("http://localhost:8081"),
+                        )
+
+                        ZStack {
+                            ProgressView()
+                                .controlSize(.small)
+                                .opacity(isTestingRegistry ? 1 : 0)
+
+                            Button(l10n["connection.test"]) {
+                                testSchemaRegistry()
+                            }
+                            .disabled(schemaRegistryURL.isEmpty || isTestingRegistry)
+                            .opacity(isTestingRegistry ? 0 : 1)
+                        }
+                    }
+
+                    Group {
+                        switch registryTestResult {
+                        case .success:
+                            Label(
+                                l10n["cluster.schema.registry.test.success"],
+                                systemImage: "checkmark.circle.fill",
+                            )
+                            .foregroundStyle(.green)
+                        case let .failure(msg):
+                            Label(msg, systemImage: "xmark.circle.fill")
+                                .foregroundStyle(.red)
+                        case .none:
+                            Label(" ", systemImage: "circle")
+                                .foregroundStyle(.clear)
+                        }
+                    }
+                    .opacity(registryTestResult != nil ? 1 : 0)
+
+                    Text(l10n["cluster.schema.registry.description"])
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                } header: {
+                    Text(l10n["cluster.schema.registry"] + " (" + l10n["cluster.schema.registry.optional"] + ")")
+                }
+
                 if let testResult {
                     Section {
                         switch testResult {
@@ -101,7 +153,7 @@ struct ClusterFormView: View {
             }
             .padding()
         }
-        .frame(width: 450, height: 420)
+        .frame(width: 450, height: 520)
         .onAppear {
             if case let .edit(cluster) = mode {
                 name = cluster.name
@@ -111,6 +163,7 @@ struct ClusterFormView: View {
                 saslMechanism = cluster.saslMechanism ?? .plain
                 saslUsername = cluster.saslUsername ?? ""
                 useTLS = cluster.useTLS
+                schemaRegistryURL = cluster.schemaRegistryURL ?? ""
                 if let pwd = KeychainManager.loadPassword(for: cluster.id) {
                     saslPassword = pwd
                 }
@@ -131,11 +184,38 @@ struct ClusterFormView: View {
             saslMechanism: authType == .sasl ? saslMechanism : nil,
             saslUsername: authType == .sasl ? saslUsername : nil,
             useTLS: useTLS,
+            schemaRegistryURL: schemaRegistryURL.isEmpty ? nil : schemaRegistryURL,
         )
 
         let password: String? = authType == .sasl && !saslPassword.isEmpty ? saslPassword : nil
         onSave(cluster, password)
         dismiss()
+    }
+
+    private func testSchemaRegistry() {
+        isTestingRegistry = true
+        registryTestResult = nil
+
+        Task {
+            do {
+                guard let url = URL(string: schemaRegistryURL.trimmingCharacters(in: .whitespacesAndNewlines)),
+                      let subjectsURL = URL(string: "\(url.absoluteString)/subjects")
+                else {
+                    registryTestResult = .failure("Invalid URL")
+                    isTestingRegistry = false
+                    return
+                }
+                let (_, response) = try await URLSession.shared.data(from: subjectsURL)
+                if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
+                    registryTestResult = .success
+                } else {
+                    registryTestResult = .failure("HTTP \((response as? HTTPURLResponse)?.statusCode ?? 0)")
+                }
+            } catch {
+                registryTestResult = .failure(error.localizedDescription)
+            }
+            isTestingRegistry = false
+        }
     }
 
     private func testConnection() {

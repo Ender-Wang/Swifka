@@ -10,6 +10,9 @@ final class AppState {
     let metricStore: MetricStore
     let metricDatabase: MetricDatabase?
 
+    /// Schema Registry client, created on connect if cluster has a registry URL.
+    var schemaRegistryClient: SchemaRegistryClient?
+
     var connectionStatus: ConnectionStatus = .disconnected
     var brokers: [BrokerInfo] = []
     var topics: [TopicInfo] = []
@@ -256,6 +259,14 @@ final class AppState {
                 : nil
             try await kafkaService.connect(config: cluster, password: password)
             connectionStatus = .connected
+
+            // Create Schema Registry client if configured
+            if let registryURL = cluster.schemaRegistryURL,
+               let url = URL(string: registryURL)
+            {
+                schemaRegistryClient = SchemaRegistryClient(baseURL: url)
+            }
+
             // Don't update lastConnectedAt here - only update on disconnect
             await loadHistoricalMetrics(for: cluster.id)
             await refreshAll()
@@ -276,6 +287,7 @@ final class AppState {
         connectionStatus = .disconnected
         isLoading = false
         pingMs = nil
+        schemaRegistryClient = nil
         brokers = []
         topics = []
         consumerGroups = []

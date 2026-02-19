@@ -83,6 +83,9 @@ struct MenuBarView: View {
             MenuBarItem(icon: "envelope", label: l10n["sidebar.messages"], shortcut: "⇧⌘ M", keyEquivalent: "m", keyModifiers: [.command, .shift]) {
                 navigateTo(.messages)
             }
+            MenuBarItem(icon: "doc.text.magnifyingglass", label: l10n["sidebar.schemas"], shortcut: "⇧⌘ R", keyEquivalent: "r", keyModifiers: [.command, .shift]) {
+                navigateTo(.schemaRegistry)
+            }
             MenuBarItem(icon: "person.2", label: l10n["sidebar.groups"], shortcut: "⇧⌘ C", keyEquivalent: "c", keyModifiers: [.command, .shift]) {
                 navigateTo(.consumerGroups)
             }
