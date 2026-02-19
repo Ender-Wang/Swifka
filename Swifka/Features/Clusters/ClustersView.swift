@@ -1013,11 +1013,13 @@ private struct ClusterRow: View {
         HStack(spacing: 12) {
             // Left group — cluster info (with hover effect)
             HStack(spacing: 10) {
-                // Pin indicator
+                // Pin indicator — click to unpin
                 if cluster.isPinned {
                     Image(systemName: "pin.fill")
                         .font(.caption)
                         .foregroundStyle(.orange)
+                        .onTapGesture { onPin() }
+                        .help(l10n["cluster.unpin"])
                 }
 
                 Circle()
