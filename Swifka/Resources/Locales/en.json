@@ -269,6 +269,8 @@
   "settings.data.export.description": "Export all data including metrics, clusters, and protobuf schemas as a ZIP file.",
   "settings.data.import": "Import Backup",
   "settings.data.import.description": "Import a backup file to replace all local data. The app will restart after import.",
+  "settings.data.reveal": "Reveal in Finder",
+  "settings.data.reveal.description": "Open the Swifka data directory containing cluster configs, metrics database, and protobuf schemas.",
   "settings.data.import.restart.title": "Restart Required",
   "settings.data.import.restart.message": "Data has been imported successfully. Restart Swifka to apply changes.",
   "settings.data.import.restart.button": "Restart Now",

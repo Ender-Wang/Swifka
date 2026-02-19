@@ -22,6 +22,12 @@ struct SettingsView: View {
         return "swifka-backup-\(timestamp).zip"
     }
 
+    private var dataDirectoryPath: String {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+            .appendingPathComponent(Constants.configDirectory)
+            .path
+    }
+
     var body: some View {
         @Bindable var state = appState
         let l10n = appState.l10n
@@ -184,7 +190,24 @@ struct SettingsView: View {
                     }
                 }
 
-                Divider()
+                // Reveal data folder
+                HStack {
+                    VStack(alignment: .leading) {
+                        Text(l10n["settings.data.reveal"])
+                        Text(l10n["settings.data.reveal.description"])
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text(dataDirectoryPath)
+                            .font(.caption2)
+                            .monospaced()
+                            .foregroundStyle(.tertiary)
+                            .textSelection(.enabled)
+                    }
+                    Spacer()
+                    Button(l10n["settings.data.reveal"]) {
+                        NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: dataDirectoryPath)
+                    }
+                }
 
                 // Retention policy
                 Picker(l10n["settings.retention.policy"], selection: $state.retentionPolicy) {
