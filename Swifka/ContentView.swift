@@ -63,6 +63,11 @@ struct ContentView: View {
             }
         }
         .toolbar {
+            ToolbarItem(placement: .navigation) {
+                Image(systemName: sidebarIcon(for: appState.selectedSidebarItem))
+                    .foregroundStyle(.secondary)
+            }
+
             ToolbarItemGroup(placement: .primaryAction) {
                 // Refresh controls (only on data pages)
                 if appState.connectionStatus.isConnected,
@@ -185,6 +190,20 @@ struct ContentView: View {
         switch mode {
         case .manual: l10n["settings.refresh.manual"]
         case let .interval(seconds): l10n.t("settings.refresh.interval.seconds", "\(seconds)")
+        }
+    }
+
+    private func sidebarIcon(for item: SidebarItem?) -> String {
+        switch item {
+        case .dashboard, .none: "gauge.with.dots.needle.33percent"
+        case .trends: "chart.xyaxis.line"
+        case .lag: "chart.line.downtrend.xyaxis"
+        case .topics: "list.bullet.rectangle"
+        case .messages: "envelope"
+        case .consumerGroups: "person.2"
+        case .brokers: "server.rack"
+        case .clusters: "square.stack.3d.up"
+        case .settings: "gear"
         }
     }
 }
