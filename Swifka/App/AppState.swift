@@ -87,12 +87,6 @@ final class AppState {
     var isLoading = false
     var pingMs: Int?
 
-    var operationLevel: OperationLevel = .readonly {
-        didSet {
-            UserDefaults.standard.set(operationLevel.rawValue, forKey: "settings.operationLevel")
-        }
-    }
-
     var defaultRefreshMode: RefreshMode = .manual {
         didSet {
             if let data = try? JSONEncoder().encode(defaultRefreshMode) {
@@ -194,11 +188,6 @@ final class AppState {
         self.metricDatabase = metricDatabase ?? (try? MetricDatabase())
 
         // Restore persisted settings
-        if let raw = UserDefaults.standard.string(forKey: "settings.operationLevel"),
-           let level = OperationLevel(rawValue: raw)
-        {
-            operationLevel = level
-        }
         if let data = UserDefaults.standard.data(forKey: "settings.refreshMode"),
            let mode = try? JSONDecoder().decode(RefreshMode.self, from: data)
         {

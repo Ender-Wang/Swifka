@@ -410,21 +410,6 @@ nonisolated struct PartitionLag: Identifiable, Sendable {
 
 // MARK: - Settings
 
-nonisolated enum OperationLevel: String, Codable, CaseIterable, Identifiable, Sendable {
-    case readonly
-    case write
-    case admin
-    case dangerous
-
-    var id: String {
-        rawValue
-    }
-
-    var isAvailable: Bool {
-        self == .readonly
-    }
-}
-
 nonisolated enum RefreshMode: Codable, Hashable, Identifiable, Sendable {
     case manual
     case interval(Int)

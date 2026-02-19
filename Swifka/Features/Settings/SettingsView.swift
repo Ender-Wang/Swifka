@@ -33,37 +33,18 @@ struct SettingsView: View {
         let l10n = appState.l10n
 
         Form {
-            // Permissions
-            Section(l10n["settings.permissions"]) {
-                ForEach(OperationLevel.allCases) { level in
-                    HStack {
-                        VStack(alignment: .leading) {
-                            Text(permissionLabel(level, l10n: l10n))
-                                .fontWeight(level == appState.operationLevel ? .bold : .regular)
-                            Text(permissionDescription(level, l10n: l10n))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
+            // Appearance
+            Section(l10n["settings.appearance"]) {
+                Picker(l10n["settings.appearance"], selection: $state.appearanceMode) {
+                    Text(l10n["settings.appearance.system"]).tag(AppearanceMode.system)
+                    Text(l10n["settings.appearance.light"]).tag(AppearanceMode.light)
+                    Text(l10n["settings.appearance.dark"]).tag(AppearanceMode.dark)
+                }
 
-                        Spacer()
-
-                        if level.isAvailable {
-                            if level == appState.operationLevel {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundStyle(.blue)
-                            } else {
-                                Button(l10n["common.save"]) {
-                                    appState.operationLevel = level
-                                }
-                                .buttonStyle(.borderless)
-                            }
-                        } else {
-                            Text(l10n["common.comingSoon"])
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .padding(.vertical, 2)
+                Picker(l10n["settings.display.density"], selection: $state.rowDensity) {
+                    Text(l10n["settings.density.compact"]).tag(RowDensity.compact)
+                    Text(l10n["settings.density.regular"]).tag(RowDensity.regular)
+                    Text(l10n["settings.density.large"]).tag(RowDensity.large)
                 }
             }
 
@@ -122,24 +103,6 @@ struct SettingsView: View {
                     Text(l10n["settings.alerts.desktop.denied"])
                         .font(.caption)
                         .foregroundStyle(.red)
-                }
-            }
-
-            // Display
-            Section(l10n["settings.display"]) {
-                Picker(l10n["settings.display.density"], selection: $state.rowDensity) {
-                    Text(l10n["settings.density.compact"]).tag(RowDensity.compact)
-                    Text(l10n["settings.density.regular"]).tag(RowDensity.regular)
-                    Text(l10n["settings.density.large"]).tag(RowDensity.large)
-                }
-            }
-
-            // Appearance
-            Section(l10n["settings.appearance"]) {
-                Picker(l10n["settings.appearance"], selection: $state.appearanceMode) {
-                    Text(l10n["settings.appearance.system"]).tag(AppearanceMode.system)
-                    Text(l10n["settings.appearance.light"]).tag(AppearanceMode.light)
-                    Text(l10n["settings.appearance.dark"]).tag(AppearanceMode.dark)
                 }
             }
 
@@ -351,24 +314,6 @@ struct SettingsView: View {
     }
 
     // MARK: - Helpers
-
-    private func permissionLabel(_ level: OperationLevel, l10n: L10n) -> String {
-        switch level {
-        case .readonly: l10n["settings.permission.readonly"]
-        case .write: l10n["settings.permission.write"]
-        case .admin: l10n["settings.permission.admin"]
-        case .dangerous: l10n["settings.permission.dangerous"]
-        }
-    }
-
-    private func permissionDescription(_ level: OperationLevel, l10n: L10n) -> String {
-        switch level {
-        case .readonly: l10n["settings.permission.readonly.description"]
-        case .write: l10n["settings.permission.write.description"]
-        case .admin: l10n["settings.permission.admin.description"]
-        case .dangerous: l10n["settings.permission.dangerous.description"]
-        }
-    }
 
     private func refreshModeLabel(_ mode: RefreshMode, l10n: L10n) -> String {
         switch mode {
