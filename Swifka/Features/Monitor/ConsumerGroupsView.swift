@@ -3,56 +3,97 @@ import SwiftUI
 struct ConsumerGroupsView: View {
     @Environment(AppState.self) private var appState
     @State private var selectedGroup: ConsumerGroupInfo?
+    @State private var searchText = ""
+    @State private var stateFilter: StateFilter = .all
+
+    private enum StateFilter: String, CaseIterable {
+        case all
+        case stable
+        case empty
+        case dead
+        case rebalancing
+
+        func matches(_ state: String) -> Bool {
+            switch self {
+            case .all: true
+            case .stable: state.lowercased() == "stable"
+            case .empty: state.lowercased() == "empty"
+            case .dead: state.lowercased() == "dead"
+            case .rebalancing:
+                state.lowercased() == "preparingrebalance"
+                    || state.lowercased() == "completingrebalance"
+            }
+        }
+
+        func label(_ l10n: L10n) -> String {
+            switch self {
+            case .all: l10n["groups.filter.all"]
+            case .stable: l10n["groups.filter.stable"]
+            case .empty: l10n["groups.filter.empty"]
+            case .dead: l10n["groups.filter.dead"]
+            case .rebalancing: l10n["groups.filter.rebalancing"]
+            }
+        }
+    }
 
     var body: some View {
         @Bindable var appState = appState
         let l10n = appState.l10n
 
-        Table(sortedGroups, selection: Binding(
-            get: { selectedGroup?.id },
-            set: { id in selectedGroup = sortedGroups.first { $0.id == id } },
-        ), sortOrder: $appState.consumerGroupsSortOrder) {
-            TableColumn(l10n["groups.name"], value: \.name) { group in
-                Text(group.name)
-                    .fontWeight(.medium)
-                    .padding(.vertical, appState.rowDensity.tablePadding)
+        VStack(spacing: 0) {
+            // Summary stat bar + filter chips
+            if !appState.consumerGroups.isEmpty {
+                summaryBar(l10n: l10n)
             }
 
-            TableColumn(l10n["groups.state"], value: \.state) { group in
-                Text(group.state)
-                    .foregroundStyle(stateColor(group.state))
-                    .padding(.vertical, appState.rowDensity.tablePadding)
-            }
-            .width(min: 60, ideal: 100)
+            Table(filteredGroups, selection: Binding(
+                get: { selectedGroup?.id },
+                set: { id in selectedGroup = filteredGroups.first { $0.id == id } },
+            ), sortOrder: $appState.consumerGroupsSortOrder) {
+                TableColumn(l10n["groups.name"], value: \.name) { group in
+                    Text(group.name)
+                        .fontWeight(.medium)
+                        .padding(.vertical, appState.rowDensity.tablePadding)
+                }
 
-            TableColumn(l10n["groups.members"], value: \.members.count) { group in
-                Text("\(group.members.count)")
-                    .padding(.vertical, appState.rowDensity.tablePadding)
-            }
-            .width(min: 50, ideal: 80)
+                TableColumn(l10n["groups.state"], value: \.state) { group in
+                    Text(group.state)
+                        .foregroundStyle(stateColor(group.state))
+                        .padding(.vertical, appState.rowDensity.tablePadding)
+                }
+                .width(min: 60, ideal: 100)
 
-            TableColumn(l10n["groups.lag"]) { group in
-                let lag = appState.consumerGroupLags[group.name] ?? 0
-                Text(formatLag(lag))
-                    .foregroundStyle(lagColor(lag))
-                    .padding(.vertical, appState.rowDensity.tablePadding)
-            }
-            .width(min: 60, ideal: 100)
+                TableColumn(l10n["groups.members"], value: \.members.count) { group in
+                    Text("\(group.members.count)")
+                        .padding(.vertical, appState.rowDensity.tablePadding)
+                }
+                .width(min: 50, ideal: 80)
 
-            TableColumn(l10n["groups.protocol.type"], value: \.protocolType) { group in
-                Text(group.protocolType)
-                    .padding(.vertical, appState.rowDensity.tablePadding)
+                TableColumn(l10n["groups.lag"]) { group in
+                    let lag = appState.consumerGroupLags[group.name] ?? 0
+                    Text(formatLag(lag))
+                        .foregroundStyle(lagColor(lag))
+                        .padding(.vertical, appState.rowDensity.tablePadding)
+                }
+                .width(min: 60, ideal: 100)
+
+                TableColumn(l10n["groups.protocol.type"], value: \.protocolType) { group in
+                    Text(group.protocolType)
+                        .padding(.vertical, appState.rowDensity.tablePadding)
+                }
+                .width(min: 60, ideal: 100)
             }
-            .width(min: 60, ideal: 100)
-        }
-        .font(.system(size: appState.rowDensity.fontSize))
-        .overlay {
-            if appState.consumerGroups.isEmpty {
-                ContentUnavailableView(
-                    l10n["groups.empty"],
-                    systemImage: "person.2",
-                    description: Text(l10n["groups.empty.description"]),
-                )
+            .font(.system(size: appState.rowDensity.fontSize))
+            .overlay {
+                if appState.consumerGroups.isEmpty {
+                    ContentUnavailableView(
+                        l10n["groups.empty"],
+                        systemImage: "person.2",
+                        description: Text(l10n["groups.empty.description"]),
+                    )
+                } else if filteredGroups.isEmpty {
+                    ContentUnavailableView.search(text: searchText)
+                }
             }
         }
         .overlay(alignment: .trailing) {
@@ -83,8 +124,119 @@ struct ConsumerGroupsView: View {
         .navigationTitle(l10n["groups.title"])
     }
 
-    private var sortedGroups: [ConsumerGroupInfo] {
-        appState.consumerGroups.sorted(using: appState.consumerGroupsSortOrder)
+    // MARK: - Summary Bar
+
+    private func summaryBar(l10n: L10n) -> some View {
+        let groups = appState.consumerGroups
+        let stableCount = groups.count(where: { $0.state.lowercased() == "stable" })
+        let laggingCount = groups.count(where: { (appState.consumerGroupLags[$0.name] ?? 0) > 0 })
+        let totalLag = appState.consumerGroupLags.values.reduce(Int64(0), +)
+
+        return HStack(spacing: 0) {
+            // Stats
+            HStack(spacing: 16) {
+                statPill(label: l10n["groups.summary.total"], value: "\(groups.count)")
+                statPill(
+                    label: l10n["groups.summary.stable"],
+                    value: "\(stableCount)",
+                    color: stableCount == groups.count ? .green : .secondary,
+                )
+                statPill(
+                    label: l10n["groups.summary.lagging"],
+                    value: "\(laggingCount)",
+                    color: laggingCount > 0 ? .orange : .secondary,
+                )
+                if totalLag > 0 {
+                    statPill(
+                        label: l10n["groups.summary.total.lag"],
+                        value: formatLag(totalLag),
+                        color: totalLag > 10000 ? .red : .orange,
+                    )
+                }
+            }
+
+            Spacer()
+
+            // State filter chips
+            HStack(spacing: 4) {
+                ForEach(StateFilter.allCases, id: \.self) { filter in
+                    let isActive = stateFilter == filter
+                    let count = filter == .all
+                        ? groups.count
+                        : groups.count(where: { filter.matches($0.state) })
+
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.15)) {
+                            stateFilter = filter
+                        }
+                    } label: {
+                        HStack(spacing: 3) {
+                            Text(filter.label(l10n))
+                            if filter != .all {
+                                Text("\(count)")
+                                    .foregroundStyle(isActive ? .white.opacity(0.7) : .secondary)
+                            }
+                        }
+                        .font(.caption)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(
+                            isActive
+                                ? Color.accentColor
+                                : Color.primary.opacity(0.06),
+                            in: Capsule(),
+                        )
+                        .foregroundStyle(isActive ? .white : .primary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            searchField(prompt: l10n["groups.search"])
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .background(.bar)
+    }
+
+    private func statPill(label: String, value: String, color: Color = .primary) -> some View {
+        HStack(spacing: 4) {
+            Text(value)
+                .fontWeight(.semibold)
+                .monospacedDigit()
+                .foregroundStyle(color)
+            Text(label)
+                .foregroundStyle(.secondary)
+        }
+        .font(.caption)
+    }
+
+    private func searchField(prompt: String) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+                .font(.caption)
+            TextField(prompt, text: $searchText)
+                .textFieldStyle(.plain)
+                .font(.caption)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 6))
+        .frame(width: 160)
+    }
+
+    // MARK: - Data
+
+    private var filteredGroups: [ConsumerGroupInfo] {
+        appState.consumerGroups
+            .filter { group in
+                stateFilter.matches(group.state)
+            }
+            .filter { group in
+                searchText.isEmpty || group.name.localizedCaseInsensitiveContains(searchText)
+            }
+            .sorted(using: appState.consumerGroupsSortOrder)
     }
 
     private func stateColor(_ state: String) -> Color {

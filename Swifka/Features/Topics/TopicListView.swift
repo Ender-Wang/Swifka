@@ -9,21 +9,10 @@ struct TopicListView: View {
         let l10n = appState.l10n
 
         VStack(spacing: 0) {
-            HStack(spacing: 12) {
-                Image(systemName: "magnifyingglass")
-                    .foregroundStyle(.secondary)
-                TextField(l10n["topics.search"], text: $searchText)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: 200)
-
-                Spacer()
-
-                Toggle(isOn: $hideInternal) {
-                    Text(l10n["topics.hide.internal"])
-                }
-                .toggleStyle(.checkbox)
+            // Summary stat bar
+            if !appState.topics.isEmpty {
+                summaryBar(l10n: l10n)
             }
-            .padding(12)
 
             List {
                 ForEach(filteredTopics) { topic in
@@ -69,8 +58,89 @@ struct TopicListView: View {
                 }
             }
             .listStyle(.inset(alternatesRowBackgrounds: true))
+            .overlay {
+                if appState.topics.isEmpty {
+                    ContentUnavailableView(
+                        l10n["topics.empty"],
+                        systemImage: "list.bullet.rectangle",
+                        description: Text(l10n["topics.empty.description"]),
+                    )
+                } else if filteredTopics.isEmpty {
+                    ContentUnavailableView.search(text: searchText)
+                }
+            }
         }
         .navigationTitle(l10n["topics.title"])
+        .onAppear { expandFirstTopicIfNeeded() }
+        .onChange(of: appState.topics) { expandFirstTopicIfNeeded() }
+    }
+
+    private func summaryBar(l10n: L10n) -> some View {
+        let visibleTopics = filteredTopics
+        let totalPartitions = visibleTopics.reduce(0) { $0 + $1.partitionCount }
+        let totalMessages = visibleTopics.reduce(into: Int64(0)) { total, topic in
+            total += topic.partitions.compactMap(\.messageCount).reduce(0, +)
+        }
+
+        return HStack(spacing: 16) {
+            statPill(label: l10n["topics.summary.topics"], value: "\(visibleTopics.count)")
+            statPill(label: l10n["topics.summary.partitions"], value: "\(totalPartitions)")
+            if totalMessages > 0 {
+                statPill(label: l10n["topics.summary.messages"], value: formatCount(totalMessages))
+            }
+
+            Spacer()
+
+            Toggle(isOn: $hideInternal) {
+                Text(l10n["topics.hide.internal"])
+            }
+            .toggleStyle(.checkbox)
+            .font(.caption)
+
+            searchField(prompt: l10n["topics.search"])
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .background(.bar)
+    }
+
+    private func statPill(label: String, value: String) -> some View {
+        HStack(spacing: 4) {
+            Text(value)
+                .fontWeight(.semibold)
+                .monospacedDigit()
+            Text(label)
+                .foregroundStyle(.secondary)
+        }
+        .font(.caption)
+    }
+
+    private func searchField(prompt: String) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+                .font(.caption)
+            TextField(prompt, text: $searchText)
+                .textFieldStyle(.plain)
+                .font(.caption)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 6))
+        .frame(width: 160)
+    }
+
+    private func expandFirstTopicIfNeeded() {
+        if appState.expandedTopics.isEmpty, let first = filteredTopics.first {
+            appState.expandedTopics.insert(first.name)
+        }
+    }
+
+    private func formatCount(_ count: Int64) -> String {
+        if count >= 1_000_000_000 { return String(format: "%.1fB", Double(count) / 1_000_000_000) }
+        if count >= 1_000_000 { return String(format: "%.1fM", Double(count) / 1_000_000) }
+        if count >= 1000 { return String(format: "%.1fK", Double(count) / 1000) }
+        return "\(count)"
     }
 
     private var filteredTopics: [TopicInfo] {
