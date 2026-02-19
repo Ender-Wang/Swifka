@@ -2,7 +2,7 @@
 
 <b><font>Swifka</font></b>
 
-A read-focused, lightweight, native macOS Kafka client for monitoring clusters, browsing topics, and tracking consumer lag.
+A native macOS Kafka monitor. Read-only by design.
 
 <br clear="all" />
 
@@ -19,19 +19,58 @@ A read-focused, lightweight, native macOS Kafka client for monitoring clusters, 
   <a href="LICENSE"><img src="https://img.shields.io/github/license/Ender-Wang/Swifka?color=blue" alt="License" /></a>
 </p>
 
-**Why Swifka exists:** Every existing Kafka client is either Java-based (Offset Explorer, Conduktor) or web-based (AKHQ, Kafdrop, Redpanda Console) — none of them feel at home on macOS. When one of our projects started migrating from Redis to Kafka, we needed a fast, frictionless way to monitor clusters, browse messages, and track consumer lag without spinning up a web app or dealing with clunky Java UIs. So we built a native one.
+**Why Swifka exists:** Every existing Kafka client is either Java-based (Offset Explorer, Conduktor) or web-based (AKHQ, Kafdrop, Redpanda Console) — and every single one of them tries to be a full Kafka Swiss Army knife. None of them feel at home on macOS, and none of them nail "lightweight, safe, read-only monitoring."
+
+| Tool | Stack | Problem |
+|------|-------|---------|
+| Offset Explorer | Java (Swing) | Feature-rich but bloated and dated |
+| Conduktor | Java (JavaFX) | Pivoted to SaaS, heavy |
+| AKHQ / Kafdrop | Java (Web) | Requires deployment, full admin scope |
+| Redpanda Console | Go + React (Web) | Web-based, full admin capabilities |
+| kcat | CLI | Powerful but raw |
+
+Swifka fills the gap: a native macOS client built for **monitoring only** — safe to point at production, with zero risk of accidental writes. The teams that adopt Swifka are the ones that want a tool they can hand to any engineer, including junior developers and on-call rotations, without worrying about accidental production damage.
 
 <p align="center">
-  <img src=".github/assets/Swifka_demo.gif" alt="Swifka Demo" width="800" />
+  <img src=".github/assets/screenshots.png" alt="Swifka — Trends, Consumer Lag, Messages, Settings" />
 </p>
 
 # Features
 
+**Cluster & Connection**
+
 - Connect to any Kafka-compatible cluster (Kafka, Redpanda, etc.)
-- Browse topics, partitions, and messages (UTF-8 / Hex / Base64 / Protobuf)
-- Monitor consumer groups and lag in real time
-- View broker stats and cluster metadata
-- All read-only by default — safe to point at production
+- Multi-cluster management with pin, clone, drag-to-reorder, and keyboard navigation
+- Cluster backup & restore (timestamped `.zip` export/import)
+- Keychain-secured credentials
+
+**Topics & Messages**
+
+- Browse topics, partitions, and messages with detailed metadata
+- Message decoding: UTF-8, Hex, Base64, Protobuf (import `.proto` files), JSON pretty-print
+- Search messages by keyword, regex, or JSON path (e.g., `user.email:john@`) with time range filter
+
+**Monitoring & Charts**
+
+- Consumer group lag monitoring with per-partition breakdown
+- Real-time trend charts: throughput, lag, ISR health (Live & History modes)
+- Per-consumer member lag investigation
+- Broker health dashboard with leader distribution
+- SQL-downsampled historical data with configurable retention
+
+**Alerts & Notifications**
+
+- ISR health alerts (under-replicated, critical, below min.insync.replicas)
+- macOS desktop notifications
+
+**Quality of Life**
+
+- Menu bar resident mode
+- Excel (.xlsx) chart data export
+- Manual + timed refresh (5s / 10s / 30s / 60s) with circuit breaker
+- Dark mode, compact/regular/large row density
+- English + Simplified Chinese (JSON-based, easy to contribute)
+- Read-only by design — zero risk of accidental writes to production
 
 # Install
 
@@ -40,13 +79,6 @@ brew install --cask ender-wang/tap/swifka
 ```
 
 Or download the latest `.dmg` from [Releases](https://github.com/Ender-Wang/Swifka/releases).
-
-# Built With
-
-- SwiftUI + Swift 6.2
-- [swift-kafka-client](https://github.com/swift-server/swift-kafka-client) + direct librdkafka C interop
-- macOS Keychain for credential storage
-- JSON-based i18n (English + Simplified Chinese)
 
 ---
 
@@ -151,17 +183,23 @@ Or download the latest `.dmg` from [Releases](https://github.com/Ender-Wang/Swif
 
 - [x] Broker liveness monitoring, consumer activity status
 
-## Milestone 5: Write Operations & Experiments
+## Milestone 5: Release Polish & Extended Monitoring
 
-✨ **Features**
+- [x] ~~Send test messages, create/delete topics, reset offsets~~ — write operations contradict Swifka's core identity as a safe, read-only monitor; in production environments, topic management belongs in IaC (Terraform), offset resets in audited CLI runbooks, and message production in application code
+- [x] ~~Permission tiers (Read / Write / Admin / Dangerous)~~ — unnecessary without write operations
+- [x] ~~Docker API integration for local dev environments~~ — users manage Docker externally
+- [x] ~~Failure simulation and recovery monitoring~~ — chaos engineering, not monitoring; out of scope
 
-- [ ] Send test messages, create/delete topics, reset offsets (all opt-in)
-- [ ] ~~Docker API integration for local dev environments~~ — users manage Docker externally
-- [ ] ~~Failure simulation and recovery monitoring~~ — chaos engineering out of scope for a monitoring tool
+🔍 **Extended Monitoring**
 
-⚙️ **Settings & Infrastructure**
+- [ ] Schema Registry integration (read-only, Confluent-compatible)
+- [ ] Avro deserialization support
+- [ ] Configurable alert rules (lag thresholds, broker liveness)
+- [ ] Structured logging (os.Logger + Console.app)
 
-- [ ] Permission tiers (Read / Write / Admin / Dangerous) with double confirmation
+🎨 **Polish**
+
+- [ ] Accessibility (VoiceOver, keyboard-only workflows)
 
 📦 **Release**
 
@@ -169,47 +207,15 @@ Or download the latest `.dmg` from [Releases](https://github.com/Ender-Wang/Swif
 
 ---
 
-# Code Formatting
+# Contributing
 
-This project uses [SwiftFormat](https://github.com/nicklockwood/SwiftFormat) for consistent code style.
-
-## Configuration
-
-Formatting rules are defined in **`.swiftformat`** at the project root. Both Xcode and Cursor (or other editors) use this file when formatting Swift code, so the result is the same everywhere.
-
-The config includes:
-
-- Swift version target (`--swiftversion 6.2`)
-- Indentation, line breaks, wrapping
-- Rules such as `isEmpty` and `preferFinalClasses`
-
-## Setup for Contributors
-
-**Requirements:**
-
-- macOS 15.7 or later
-- Xcode 16.2+ (Swift 6, macOS 15.7 SDK)
-- [Homebrew](https://brew.sh)
-
-**Install SwiftFormat (required for Xcode build):**
+**Requirements:** macOS 15.7+, Xcode 16.2+, [Homebrew](https://brew.sh)
 
 ```bash
 brew install swiftformat
 ```
 
-The Xcode project has a **Run Script** build phase that runs SwiftFormat on the `Swifka` app target before compilation. It uses `/opt/homebrew/bin/swiftformat` (Homebrew on Apple Silicon).
-
-If SwiftFormat is not installed, the script prints a warning and the build continues without formatting.
-
-## Format on Save (Cursor / VS Code)
-
-Configure your editor to use SwiftFormat on save so that Cursor and Xcode stay in sync:
-
-1. Install a SwiftFormat extension (e.g. SwiftFormat for VS Code).
-2. Set SwiftFormat path to `/opt/homebrew/bin/swiftformat`.
-3. Enable **Format on Save** for Swift files.
-
-Both the editor and Xcode will then use the same `.swiftformat` file.
+Code style is enforced by [SwiftFormat](https://github.com/nicklockwood/SwiftFormat) via a build phase — rules are in `.swiftformat` at the project root.
 
 ---
 
@@ -255,6 +261,8 @@ Swifka is built on top of these open-source projects:
 
 | Project | License | Description |
 |---------|---------|-------------|
-| [swift-kafka-client](https://github.com/swift-server/swift-kafka-client) | Apache-2.0 | SSWG-maintained Swift wrapper for librdkafka |
-| [librdkafka](https://github.com/confluentinc/librdkafka) | BSD-2-Clause | Industry-standard C library for the Kafka protocol |
+| [swift-kafka-client](https://github.com/swift-server/swift-kafka-client) | Apache-2.0 | SSWG-maintained Swift Kafka client |
+| [librdkafka](https://github.com/confluentinc/librdkafka) | BSD-2-Clause | C library for Kafka protocol, used directly for metadata and watermark APIs |
+| [SQLite.swift](https://github.com/stephencelis/SQLite.swift) | MIT | Type-safe SQLite wrapper for metrics storage |
+| [SwiftProtobuf](https://github.com/apple/swift-protobuf) | Apache-2.0 | Protocol Buffers runtime for message decoding |
 | [SwiftFormat](https://github.com/nicklockwood/SwiftFormat) | MIT | Code formatting tool used in the build pipeline |
