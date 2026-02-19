@@ -50,7 +50,7 @@ struct ConsumerGroupsView: View {
             if appState.consumerGroups.isEmpty {
                 ContentUnavailableView(
                     l10n["groups.empty"],
-                    systemImage: "person.3",
+                    systemImage: "person.2",
                     description: Text(l10n["groups.empty.description"]),
                 )
             }

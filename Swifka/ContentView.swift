@@ -203,7 +203,7 @@ private struct CompactSidebarView: View {
             (.messages, "envelope"),
         ]),
         IconGroup(items: [
-            (.consumerGroups, "person.3"),
+            (.consumerGroups, "person.2"),
             (.brokers, "server.rack"),
         ]),
         IconGroup(items: [
@@ -306,7 +306,7 @@ struct SidebarView: View {
             }
 
             Section(l10n["sidebar.section.monitor"]) {
-                Label(l10n["sidebar.groups"], systemImage: "person.3")
+                Label(l10n["sidebar.groups"], systemImage: "person.2")
                     .tag(SidebarItem.consumerGroups)
                 Label(l10n["sidebar.brokers"], systemImage: "server.rack")
                     .tag(SidebarItem.brokers)

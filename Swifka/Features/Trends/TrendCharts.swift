@@ -843,7 +843,7 @@ struct ConsumerGroupLagChart: View {
         ) {
             if store.knownGroups.isEmpty {
                 ContentUnavailableView {
-                    Label(l10n["trends.consumer.lag"], systemImage: "person.3")
+                    Label(l10n["trends.consumer.lag"], systemImage: "person.2")
                 } description: {
                     Text(l10n["trends.not.enough.data.description"])
                 }
