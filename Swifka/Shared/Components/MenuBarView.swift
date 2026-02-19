@@ -10,7 +10,7 @@ struct MenuBarView: View {
 
         VStack(alignment: .leading, spacing: 0) {
             // Open main window
-            MenuBarItem(icon: "macwindow", label: l10n["menubar.show"], shortcut: "⇧⌘ N", keyEquivalent: "n", keyModifiers: [.command, .shift]) {
+            MenuBarItem(icon: "macwindow", label: l10n["menubar.show"], appIcon: true, shortcut: "⇧⌘ N", keyEquivalent: "n", keyModifiers: [.command, .shift]) {
                 showSwifka()
             }
 
@@ -26,26 +26,41 @@ struct MenuBarView: View {
                     enabled: false,
                 )
             } else {
+                let duplicateNames = Set(
+                    Dictionary(grouping: appState.configStore.clusters, by: \.name)
+                        .filter { $0.value.count > 1 }.keys,
+                )
+
                 ForEach(appState.configStore.clusters) { cluster in
                     let isSelected = appState.configStore.selectedClusterId == cluster.id
                     let isConnected = isSelected && appState.connectionStatus.isConnected
                     let isConnecting = isSelected && appState.connectionStatus == .connecting
+                    let isDuplicate = duplicateNames.contains(cluster.name)
 
                     MenuBarItem(
-                        icon: isSelected ? "checkmark.circle.fill" : "circle",
+                        icon: isConnected ? "power"
+                            : isConnecting ? "arrow.triangle.2.circlepath"
+                            : "circle",
                         label: cluster.name,
+                        suffix: isDuplicate ? String(cluster.id.uuidString.prefix(8)) : nil,
+                        hoverIcon: isConnected ? "power" : nil,
+                        hoverIconColor: isConnected ? .red : nil,
                         iconColor: isConnected ? .green
                             : isConnecting ? .orange
-                            : isSelected ? .secondary : .secondary,
-                        enabled: !isConnecting && !isConnected,
+                            : .secondary,
+                        enabled: !isConnecting,
                     ) {
                         dismiss()
                         Task {
-                            if appState.connectionStatus.isConnected {
+                            if isConnected {
                                 await appState.disconnect()
+                            } else {
+                                if appState.connectionStatus.isConnected {
+                                    await appState.disconnect()
+                                }
+                                appState.configStore.selectedClusterId = cluster.id
+                                await appState.connect()
                             }
-                            appState.configStore.selectedClusterId = cluster.id
-                            await appState.connect()
                         }
                     }
                 }
@@ -114,6 +129,10 @@ struct MenuBarView: View {
 private struct MenuBarItem: View {
     let icon: String
     let label: String
+    var suffix: String?
+    var appIcon: Bool = false
+    var hoverIcon: String?
+    var hoverIconColor: Color?
     var shortcut: String?
     var keyEquivalent: KeyEquivalent?
     var keyModifiers: EventModifiers = []
@@ -148,15 +167,39 @@ private struct MenuBarItem: View {
             }
         } label: {
             HStack(spacing: 10) {
-                Image(systemName: icon)
-                    .font(.system(size: 14))
-                    .foregroundStyle(highlighted ? .white : iconColor)
-                    .frame(width: 20, alignment: .center)
-                Text(label)
-                    .lineLimit(1)
+                let showHoverIcon = isHovered && hoverIcon != nil
+                if appIcon {
+                    Image("MenuBarIcon")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 16, height: 16)
+                        .frame(width: 20, alignment: .center)
+                } else {
+                    let iconForeground: Color = if showHoverIcon {
+                        hoverIconColor ?? (highlighted ? .white : iconColor)
+                    } else {
+                        highlighted ? .white : iconColor
+                    }
+                    Image(systemName: showHoverIcon ? hoverIcon! : icon)
+                        .font(.system(size: 14))
+                        .foregroundStyle(iconForeground)
+                        .frame(width: 20, alignment: .center)
+                        .contentTransition(.symbolEffect(.replace))
+                        .animation(.easeInOut(duration: 0.15), value: showHoverIcon)
+                }
+                HStack(alignment: .lastTextBaseline, spacing: 4) {
+                    Text(label)
+                        .lineLimit(1)
+                    if let suffix {
+                        Text(suffix)
+                            .font(.system(size: 10))
+                            .monospaced()
+                            .foregroundStyle(highlighted ? Color.white.opacity(0.5) : Color.secondary.opacity(0.6))
+                    }
+                }
                 Spacer(minLength: 12)
                 if let shortcut {
-                    Text(shortcut)
+                    shortcutView(shortcut)
                         .foregroundStyle(highlighted ? Color.white.opacity(0.8) : Color.secondary)
                 }
             }
@@ -173,6 +216,39 @@ private struct MenuBarItem: View {
             button.keyboardShortcut(keyEquivalent, modifiers: keyModifiers)
         } else {
             button
+        }
+    }
+
+    private func shortcutView(_ shortcut: String) -> some View {
+        let symbolSize: CGFloat = 10
+        let keySize: CGFloat = 11
+        let cellWidth: CGFloat = 14
+
+        return HStack(spacing: 0) {
+            // Pad leading space so all shortcuts right-align at the same width
+            // Longest shortcut has 2 modifiers + key = 3 cells
+            let parts = shortcut.split(separator: " ")
+            let modifiers = parts.count > 1 ? String(parts[0]) : ""
+            let key = parts.count > 1 ? String(parts[1]) : String(parts[0])
+            let hasShift = modifiers.contains("⇧")
+            let hasCommand = modifiers.contains("⌘")
+
+            // Shift slot (empty if no shift)
+            Image(systemName: "shift")
+                .font(.system(size: symbolSize, weight: .medium))
+                .frame(width: cellWidth)
+                .opacity(hasShift ? 1 : 0)
+
+            // Command slot
+            Image(systemName: "command")
+                .font(.system(size: symbolSize, weight: .medium))
+                .frame(width: cellWidth)
+                .opacity(hasCommand ? 1 : 0)
+
+            // Key letter
+            Text(key)
+                .font(.system(size: keySize, weight: .medium))
+                .frame(width: cellWidth)
         }
     }
 }
