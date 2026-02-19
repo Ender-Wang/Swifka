@@ -327,6 +327,7 @@
   "protobuf.file.path": "File Path",
   "protobuf.message.types": "Message Types",
   "protobuf.message.type.auto": "Auto-matched from topic name",
+  "protobuf.reveal.in.finder": "Reveal in Finder",
 
   "ok": "OK",
   "cancel": "Cancel",

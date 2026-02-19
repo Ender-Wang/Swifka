@@ -346,7 +346,9 @@ extension ProtobufDeserializer {
 
 // MARK: - Protobuf Configuration Manager
 
-/// Manages .proto file imports and message type registrations, scoped per cluster
+/// Manages .proto file imports and message type registrations, scoped per cluster.
+/// Proto file content is stored on disk at ~/Library/Application Support/Swifka/protos/<uuid>_<fileName>.proto.
+/// Metadata index is stored alongside as proto_index.json.
 @MainActor
 @Observable
 final class ProtobufConfigManager {
@@ -359,7 +361,26 @@ final class ProtobufConfigManager {
     @ObservationIgnored
     private var schemaCache: [UUID: ProtoSchema] = [:]
 
+    @ObservationIgnored
+    private let protosDir: URL
+
+    @ObservationIgnored
+    private let indexURL: URL
+
     private init() {
+        let appSupport = FileManager.default.urls(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask,
+        ).first!
+        let baseDir = appSupport.appendingPathComponent(Constants.configDirectory)
+        protosDir = baseDir.appendingPathComponent(Constants.protosDirectory)
+        indexURL = baseDir.appendingPathComponent(Constants.protoIndexFileName)
+
+        try? FileManager.default.createDirectory(at: protosDir, withIntermediateDirectories: true)
+
+        // Clean up legacy UserDefaults storage if present
+        UserDefaults.standard.removeObject(forKey: "proto_files")
+
         load()
     }
 
@@ -389,59 +410,134 @@ final class ProtobufConfigManager {
 
         let content = try String(contentsOf: url, encoding: .utf8)
         let messageTypes = parseMessageTypes(from: content)
+        let id = UUID()
+        let originalFileName = url.lastPathComponent
 
         let protoInfo = ProtoFileInfo(
-            id: UUID(),
+            id: id,
             clusterID: clusterID,
-            fileName: url.lastPathComponent,
-            filePath: url.path,
+            fileName: originalFileName,
+            filePath: protoFilePath(for: id, fileName: originalFileName),
             content: content,
             messageTypes: messageTypes,
             importedAt: Date(),
         )
 
+        writeProtoContent(content, for: id, fileName: originalFileName)
         allProtoFiles.append(protoInfo)
-        save()
+        saveIndex()
     }
 
-    /// Import proto files from cluster export (remapping cluster IDs)
-    func importProtoFiles(_ files: [ProtoFileInfo], clusterIDMap: [UUID: UUID]) {
+    /// Import proto files from cluster export (remapping cluster IDs).
+    /// Returns a mapping of old filePath → new filePath for deserializer config remapping.
+    @discardableResult
+    func importProtoFiles(_ files: [ProtoFileInfo], clusterIDMap: [UUID: UUID]) -> [String: String] {
+        var pathMap: [String: String] = [:]
         for file in files {
             guard let newClusterID = clusterIDMap[file.clusterID] else { continue }
+            let id = UUID()
+            let newPath = protoFilePath(for: id, fileName: file.fileName)
+            pathMap[file.filePath] = newPath
             let imported = ProtoFileInfo(
-                id: UUID(),
+                id: id,
                 clusterID: newClusterID,
                 fileName: file.fileName,
-                filePath: file.filePath,
+                filePath: newPath,
                 content: file.content,
                 messageTypes: file.messageTypes,
                 importedAt: Date(),
             )
+            writeProtoContent(file.content, for: id, fileName: file.fileName)
             allProtoFiles.append(imported)
         }
-        save()
+        saveIndex()
+        return pathMap
     }
 
     /// Remove a proto file
     func removeProtoFile(_ id: UUID) {
+        let fileName = allProtoFiles.first { $0.id == id }?.fileName ?? ""
         allProtoFiles.removeAll { $0.id == id }
         schemaCache.removeValue(forKey: id)
-        save()
+        deleteProtoContent(for: id, fileName: fileName)
+        saveIndex()
     }
 
     /// Remove all proto files for a cluster
     func removeProtoFiles(for clusterID: UUID) {
-        let idsToRemove = allProtoFiles.filter { $0.clusterID == clusterID }.map(\.id)
+        let toRemove = allProtoFiles.filter { $0.clusterID == clusterID }
         allProtoFiles.removeAll { $0.clusterID == clusterID }
-        for id in idsToRemove {
-            schemaCache.removeValue(forKey: id)
+        for file in toRemove {
+            schemaCache.removeValue(forKey: file.id)
+            deleteProtoContent(for: file.id, fileName: file.fileName)
         }
-        save()
+        saveIndex()
     }
 
     /// Get message types from a specific proto file
     func messageTypes(for protoFileID: UUID) -> [String] {
         allProtoFiles.first { $0.id == protoFileID }?.messageTypes ?? []
+    }
+
+    // MARK: - Disk Storage
+
+    /// Disk filename for a proto file: <uuid>_<originalFileName>.proto
+    private func diskFileName(for id: UUID, fileName: String) -> String {
+        // Strip .proto extension from original name since we add it back
+        let baseName = fileName.hasSuffix(".proto")
+            ? String(fileName.dropLast(6))
+            : fileName
+        return "\(id.uuidString)_\(baseName).proto"
+    }
+
+    /// Managed path for a proto file: ~/Library/Application Support/Swifka/protos/<uuid>_<name>.proto
+    private func protoFilePath(for id: UUID, fileName: String) -> String {
+        protosDir.appendingPathComponent(diskFileName(for: id, fileName: fileName)).path
+    }
+
+    private func writeProtoContent(_ content: String, for id: UUID, fileName: String) {
+        let url = protosDir.appendingPathComponent(diskFileName(for: id, fileName: fileName))
+        try? content.write(to: url, atomically: true, encoding: .utf8)
+    }
+
+    private func readProtoContent(for id: UUID, fileName: String) -> String? {
+        let url = protosDir.appendingPathComponent(diskFileName(for: id, fileName: fileName))
+        return try? String(contentsOf: url, encoding: .utf8)
+    }
+
+    private func deleteProtoContent(for id: UUID, fileName: String) {
+        let url = protosDir.appendingPathComponent(diskFileName(for: id, fileName: fileName))
+        try? FileManager.default.removeItem(at: url)
+    }
+
+    /// Save metadata index (without content — content lives in individual .proto files)
+    private func saveIndex() {
+        let metadata = allProtoFiles.map { ProtoFileMetadata(from: $0) }
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        guard let data = try? encoder.encode(metadata) else { return }
+        try? data.write(to: indexURL, options: .atomic)
+    }
+
+    /// Load metadata index and fill in content from individual .proto files
+    private func load() {
+        guard let data = try? Data(contentsOf: indexURL) else { return }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        guard let metadata = try? decoder.decode([ProtoFileMetadata].self, from: data) else { return }
+
+        allProtoFiles = metadata.compactMap { meta in
+            guard let content = readProtoContent(for: meta.id, fileName: meta.fileName) else { return nil }
+            return ProtoFileInfo(
+                id: meta.id,
+                clusterID: meta.clusterID,
+                fileName: meta.fileName,
+                filePath: protoFilePath(for: meta.id, fileName: meta.fileName),
+                content: content,
+                messageTypes: meta.messageTypes,
+                importedAt: meta.importedAt,
+            )
+        }
     }
 
     // MARK: - Private Helpers
@@ -466,17 +562,30 @@ final class ProtobufConfigManager {
 
         return types
     }
+}
 
-    private func save() {
-        guard let data = try? JSONEncoder().encode(allProtoFiles) else { return }
-        UserDefaults.standard.set(data, forKey: "proto_files")
+/// Metadata-only struct for the on-disk index (content stored in separate .proto files)
+private struct ProtoFileMetadata: Codable {
+    let id: UUID
+    let clusterID: UUID
+    let fileName: String
+    let messageTypes: [String]
+    let importedAt: Date
+
+    init(id: UUID, clusterID: UUID, fileName: String, messageTypes: [String], importedAt: Date) {
+        self.id = id
+        self.clusterID = clusterID
+        self.fileName = fileName
+        self.messageTypes = messageTypes
+        self.importedAt = importedAt
     }
 
-    private func load() {
-        guard let data = UserDefaults.standard.data(forKey: "proto_files"),
-              let loaded = try? JSONDecoder().decode([ProtoFileInfo].self, from: data)
-        else { return }
-        allProtoFiles = loaded
+    init(from info: ProtoFileInfo) {
+        id = info.id
+        clusterID = info.clusterID
+        fileName = info.fileName
+        messageTypes = info.messageTypes
+        importedAt = info.importedAt
     }
 }
 

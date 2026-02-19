@@ -18,6 +18,8 @@ nonisolated enum Constants {
 
     static let metricStoreCapacity = 300
     static let metricsDatabaseFileName = "metrics.sqlite3"
+    static let protosDirectory = "protos"
+    static let protoIndexFileName = "proto_index.json"
 
     /// Max ratio of total data range to visible window in scrollable charts.
     /// Exceeding this causes Metal texture allocation failures (width > 16384px).

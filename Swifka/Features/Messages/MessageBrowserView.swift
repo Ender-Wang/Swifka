@@ -524,6 +524,18 @@ struct MessageBrowserView: View {
                 if let selectedID = selectedProtoFileID,
                    let file = clusterProtoFiles.first(where: { $0.id == selectedID })
                 {
+                    Button {
+                        NSWorkspace.shared.selectFile(
+                            file.filePath,
+                            inFileViewerRootedAtPath: "",
+                        )
+                    } label: {
+                        Label(
+                            l10n["protobuf.reveal.in.finder"],
+                            systemImage: "folder",
+                        )
+                    }
+
                     Button(role: .destructive) {
                         protoManager.removeProtoFile(selectedID)
                         selectedProtoFileID = clusterProtoFiles.first?.id

@@ -28,6 +28,7 @@ struct ClustersView: View {
     @State private var showingImportSelectionSheet = false
     @State private var importableClusters: [ClusterConfig] = []
     @State private var importableProtoFiles: [ProtoFileInfo] = []
+    @State private var importableDeserializerConfigs: [TopicDeserializerConfig] = []
     @State private var selectedClustersForImport: Set<UUID> = []
     @State private var showingImportModeDialog = false
     @State private var pendingImportData: Data?
@@ -579,6 +580,7 @@ struct ClustersView: View {
             let export = try ConfigStore.parseExportData(data)
             importableClusters = export.clusters
             importableProtoFiles = export.protoFiles
+            importableDeserializerConfigs = export.deserializerConfigs
 
             // Select all by default
             selectedClustersForImport = Set(importableClusters.map(\.id))
@@ -608,8 +610,14 @@ struct ClustersView: View {
             // Import proto files for selected clusters with remapped IDs
             let selectedClusterIDs = Set(selectedClusters.map(\.id))
             let relevantProtoFiles = importableProtoFiles.filter { selectedClusterIDs.contains($0.clusterID) }
+            var protoPathMap: [String: String] = [:]
             if !relevantProtoFiles.isEmpty {
-                ProtobufConfigManager.shared.importProtoFiles(relevantProtoFiles, clusterIDMap: idMap)
+                protoPathMap = ProtobufConfigManager.shared.importProtoFiles(relevantProtoFiles, clusterIDMap: idMap)
+            }
+
+            // Import deserializer configs with remapped proto file paths
+            if !importableDeserializerConfigs.isEmpty {
+                DeserializerConfigStore.shared.importConfigs(importableDeserializerConfigs, protoPathMap: protoPathMap)
             }
 
             // Check for missing passwords

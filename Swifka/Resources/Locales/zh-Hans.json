@@ -327,6 +327,7 @@
   "protobuf.file.path": "文件路径",
   "protobuf.message.types": "消息类型",
   "protobuf.message.type.auto": "根据 Topic 名称自动匹配",
+  "protobuf.reveal.in.finder": "在 Finder 中显示",
 
   "ok": "确定",
   "cancel": "取消",

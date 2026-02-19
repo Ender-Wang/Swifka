@@ -115,12 +115,19 @@ final class ConfigStore {
         return try? encoder.encode(clusters)
     }
 
-    /// Export selected clusters with their proto files
+    /// Export selected clusters with their proto files and deserializer configs
     static func exportClusters(_ clusters: [ClusterConfig]) -> Data? {
         let clusterIDs = Set(clusters.map(\.id))
         let protoFiles = ProtobufConfigManager.shared.allProtoFiles.filter { clusterIDs.contains($0.clusterID) }
 
-        let export = SwifkaExport(clusters: clusters, protoFiles: protoFiles)
+        // Include deserializer configs that reference exported proto files
+        let exportedProtoPaths = Set(protoFiles.map(\.filePath))
+        let configs = DeserializerConfigStore.shared.configs.filter { config in
+            guard let path = config.protoFilePath else { return false }
+            return exportedProtoPaths.contains(path)
+        }
+
+        let export = SwifkaExport(clusters: clusters, protoFiles: protoFiles, deserializerConfigs: configs)
 
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
@@ -145,11 +152,11 @@ final class ConfigStore {
                 saslMechanism: cluster.saslMechanism,
                 saslUsername: cluster.saslUsername,
                 useTLS: cluster.useTLS,
-                createdAt: Date(),
-                updatedAt: Date(),
-                isPinned: false,
+                createdAt: cluster.createdAt,
+                updatedAt: cluster.updatedAt,
+                isPinned: cluster.isPinned,
                 lastConnectedAt: nil,
-                sortOrder: 0,
+                sortOrder: cluster.sortOrder,
             )
         }
 
@@ -179,8 +186,14 @@ final class ConfigStore {
         let idMap = try importSelectedClusters(export.clusters)
 
         // Import proto files with remapped cluster IDs
+        var protoPathMap: [String: String] = [:]
         if !export.protoFiles.isEmpty {
-            ProtobufConfigManager.shared.importProtoFiles(export.protoFiles, clusterIDMap: idMap)
+            protoPathMap = ProtobufConfigManager.shared.importProtoFiles(export.protoFiles, clusterIDMap: idMap)
+        }
+
+        // Import deserializer configs with remapped proto file paths
+        if !export.deserializerConfigs.isEmpty {
+            DeserializerConfigStore.shared.importConfigs(export.deserializerConfigs, protoPathMap: protoPathMap)
         }
     }
 }
@@ -190,9 +203,22 @@ final class ConfigStore {
 struct SwifkaExport: Codable {
     let clusters: [ClusterConfig]
     let protoFiles: [ProtoFileInfo]
+    let deserializerConfigs: [TopicDeserializerConfig]
 
-    init(clusters: [ClusterConfig], protoFiles: [ProtoFileInfo] = []) {
+    init(
+        clusters: [ClusterConfig],
+        protoFiles: [ProtoFileInfo] = [],
+        deserializerConfigs: [TopicDeserializerConfig] = [],
+    ) {
         self.clusters = clusters
         self.protoFiles = protoFiles
+        self.deserializerConfigs = deserializerConfigs
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        clusters = try container.decode([ClusterConfig].self, forKey: .clusters)
+        protoFiles = try container.decodeIfPresent([ProtoFileInfo].self, forKey: .protoFiles) ?? []
+        deserializerConfigs = try container.decodeIfPresent([TopicDeserializerConfig].self, forKey: .deserializerConfigs) ?? []
     }
 }
