@@ -34,7 +34,7 @@ struct SettingsView: View {
 
         Form {
             // Appearance
-            Section(l10n["settings.appearance"]) {
+            Section(header: Label(l10n["settings.appearance"], systemImage: "paintpalette")) {
                 Picker(l10n["settings.appearance"], selection: $state.appearanceMode) {
                     Text(l10n["settings.appearance.system"]).tag(AppearanceMode.system)
                     Text(l10n["settings.appearance.light"]).tag(AppearanceMode.light)
@@ -49,7 +49,7 @@ struct SettingsView: View {
             }
 
             // Refresh
-            Section(l10n["settings.refresh"]) {
+            Section(header: Label(l10n["settings.refresh"], systemImage: "arrow.clockwise")) {
                 Picker(l10n["settings.refresh.mode"], selection: Binding(
                     get: { appState.defaultRefreshMode },
                     set: { newMode in
@@ -64,7 +64,7 @@ struct SettingsView: View {
             }
 
             // Charts
-            Section(l10n["settings.charts"]) {
+            Section(header: Label(l10n["settings.charts"], systemImage: "chart.bar.xaxis")) {
                 Picker(l10n["settings.charts.time.window"], selection: $state.chartTimeWindow) {
                     ForEach(ChartTimeWindow.allCases) { window in
                         Text(window.rawValue).tag(window)
@@ -73,7 +73,7 @@ struct SettingsView: View {
             }
 
             // Alerts
-            Section(l10n["settings.alerts"]) {
+            Section(header: Label(l10n["settings.alerts"], systemImage: "bell")) {
                 Toggle(l10n["settings.alerts.isr.enabled"], isOn: $state.isrAlertsEnabled)
 
                 if appState.isrAlertsEnabled {
@@ -95,8 +95,6 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                Divider()
-
                 Toggle(l10n["settings.alerts.desktop"], isOn: $state.desktopNotificationsEnabled)
 
                 if appState.desktopNotificationsEnabled, !appState.notificationPermissionGranted {
@@ -107,7 +105,7 @@ struct SettingsView: View {
             }
 
             // Data
-            Section(l10n["settings.data"]) {
+            Section(header: Label(l10n["settings.data"], systemImage: "internaldrive")) {
                 // Backup export
                 HStack {
                     VStack(alignment: .leading) {
@@ -202,7 +200,7 @@ struct SettingsView: View {
             }
 
             // Language
-            Section(l10n["settings.language"]) {
+            Section(header: Label(l10n["settings.language"], systemImage: "globe")) {
                 Picker(l10n["settings.language"], selection: Binding(
                     get: { appState.l10n.locale },
                     set: { appState.l10n.locale = $0 },
