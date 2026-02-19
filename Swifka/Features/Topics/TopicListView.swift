@@ -126,7 +126,7 @@ struct TopicListView: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
-        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 6))
+        .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
         .frame(width: 160)
     }
 
