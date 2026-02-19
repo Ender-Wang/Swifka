@@ -1072,7 +1072,7 @@ private struct ClusterRow: View {
                                     .contentTransition(.numericText())
                             }
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(pingColor)
                             .animation(.default, value: pingMs)
                         }
                     }
@@ -1232,6 +1232,13 @@ private struct ClusterRow: View {
         if isConnected { return .green }
         if pingFailed { return .red }
         return .gray.opacity(0.3)
+    }
+
+    private var pingColor: Color {
+        guard let pingMs else { return .secondary }
+        if pingMs < 50 { return .green }
+        if pingMs < 200 { return .yellow }
+        return .red
     }
 
     private var authLabel: String {
