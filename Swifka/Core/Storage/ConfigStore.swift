@@ -158,6 +158,7 @@ final class ConfigStore {
                 saslMechanism: cluster.saslMechanism,
                 saslUsername: cluster.saslUsername,
                 useTLS: cluster.useTLS,
+                schemaRegistryURL: cluster.schemaRegistryURL,
                 createdAt: cluster.createdAt,
                 updatedAt: cluster.updatedAt,
                 isPinned: cluster.isPinned,
