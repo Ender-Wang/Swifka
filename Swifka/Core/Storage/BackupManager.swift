@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 
 /// Handles full data backup export (ZIP) and import for Swifka.
 enum BackupManager {
@@ -72,6 +73,7 @@ enum BackupManager {
             files.append(("deserializer_configs.json", data))
         }
 
+        Log.storage.info("[BackupManager] export: \(files.count) files archived")
         return MiniZIP.archive(files)
     }
 
@@ -104,6 +106,7 @@ enum BackupManager {
             case Constants.metricsDatabaseFileName:
                 // Replace metrics DB on disk (requires restart to take effect)
                 hasMetricsDB = true
+                Log.storage.info("[BackupManager] import: metrics database replaced on disk")
                 let walFile = dir.appendingPathComponent(Constants.metricsDatabaseFileName + "-wal")
                 let shmFile = dir.appendingPathComponent(Constants.metricsDatabaseFileName + "-shm")
                 try? fm.removeItem(at: walFile)
@@ -151,6 +154,7 @@ enum BackupManager {
             }
         }
 
+        Log.storage.info("[BackupManager] import: \(clusters.count) clusters, \(protoFiles.count) proto files, metricsDB=\(hasMetricsDB)")
         return BackupContents(
             clusters: clusters,
             protoFiles: protoFiles,

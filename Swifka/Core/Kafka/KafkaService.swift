@@ -1,6 +1,7 @@
 import Crdkafka
 import Foundation
 import Kafka
+import OSLog
 
 /// Wrapper to send OpaquePointer across isolation boundaries.
 /// librdkafka handles are thread-safe for concurrent operations, so this is sound.
@@ -86,16 +87,19 @@ actor KafkaService {
                 }
             }
         } catch {
+            Log.kafka.error("[KafkaService] connect: metadata verify failed — \(error.localizedDescription, privacy: .public)")
             rd_kafka_destroy(kafkaHandle)
             throw error
         }
 
         handle = kafkaHandle
+        Log.kafka.info("[KafkaService] connect: handle created for \(config.bootstrapServers, privacy: .public)")
     }
 
     func disconnect() {
         guard let oldHandle = handle else { return }
         handle = nil
+        Log.kafka.info("[KafkaService] disconnect: handle released")
         // Destroy on serial queue so it waits for any in-flight C calls to finish first
         let h = SendableHandle(pointer: oldHandle)
         Self.blockingQueue.async {
@@ -235,6 +239,7 @@ actor KafkaService {
                 ))
             }
 
+            Log.kafka.debug("[KafkaService] fetchMetadata: \(brokers.count) brokers, \(topics.count) topics")
             return (brokers, topics)
         }
     }
@@ -346,6 +351,7 @@ actor KafkaService {
                 ))
             }
 
+            Log.kafka.debug("[KafkaService] fetchConsumerGroups: \(groups.count) groups")
             return groups
         }
     }
@@ -682,6 +688,7 @@ actor KafkaService {
             ))
         }
 
+        Log.kafka.debug("[KafkaService] browseMessages: \(topic, privacy: .public) — \(messages.count) messages")
         return messages
     }
 

@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 
 @Observable
 final class RefreshManager {
@@ -16,6 +17,7 @@ final class RefreshManager {
     func start() {
         stop()
         guard case let .interval(seconds) = mode else { return }
+        Log.app.debug("[RefreshManager] timer started — \(seconds)s interval")
         timer = Timer.scheduledTimer(withTimeInterval: TimeInterval(seconds), repeats: true) { [weak self] _ in
             guard let self else { return }
             Task { @MainActor in
@@ -41,6 +43,7 @@ final class RefreshManager {
 
     func updateMode(_ newMode: RefreshMode) {
         mode = newMode
+        Log.app.info("[RefreshManager] mode: \(String(describing: newMode), privacy: .public)")
         if isAutoRefresh {
             start()
         } else {

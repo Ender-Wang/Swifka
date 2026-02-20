@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 import SwiftProtobuf
 
 // MARK: - Protobuf Deserializer
@@ -426,6 +427,7 @@ final class ProtobufConfigManager {
         writeProtoContent(content, for: id, fileName: originalFileName)
         allProtoFiles.append(protoInfo)
         saveIndex()
+        Log.decode.info("[ProtobufConfigManager] import: \(originalFileName, privacy: .public) — \(messageTypes.count) message types")
     }
 
     /// Import proto files from cluster export (remapping cluster IDs).
@@ -453,6 +455,7 @@ final class ProtobufConfigManager {
             allProtoFiles.append(imported)
         }
         saveIndex()
+        Log.decode.info("[ProtobufConfigManager] import: \(files.count) proto files from cluster export")
         return pathMap
     }
 
@@ -463,6 +466,7 @@ final class ProtobufConfigManager {
         schemaCache.removeValue(forKey: id)
         deleteProtoContent(for: id, fileName: fileName)
         saveIndex()
+        Log.decode.info("[ProtobufConfigManager] remove: proto file deleted")
     }
 
     /// Remove all proto files for a cluster

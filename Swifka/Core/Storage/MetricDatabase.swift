@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 import SQLite
 
 actor MetricDatabase {
@@ -140,6 +141,7 @@ actor MetricDatabase {
             ))
         }
 
+        Log.storage.info("[MetricDatabase] init: database opened, WAL enabled")
         return conn
     }
 
@@ -463,6 +465,7 @@ actor MetricDatabase {
     /// Flush WAL journal into the main database file so a single-file copy is consistent.
     func checkpoint() throws {
         try db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        Log.storage.debug("[MetricDatabase] checkpoint: WAL truncated")
     }
 
     // MARK: - Alert Records

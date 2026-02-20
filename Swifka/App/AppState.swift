@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 import UserNotifications
 
 @Observable
@@ -310,12 +311,14 @@ final class AppState {
                 : nil
             try await kafkaService.connect(config: cluster, password: password)
             connectionStatus = .connected
+            Log.app.info("[AppState] connect: established to \(cluster.bootstrapServers, privacy: .public)")
 
             // Create Schema Registry client if configured
             if let registryURL = cluster.schemaRegistryURL,
                let url = URL(string: registryURL)
             {
                 schemaRegistryClient = SchemaRegistryClient(baseURL: url)
+                Log.app.info("[AppState] connect: schema registry at \(registryURL, privacy: .public)")
             }
 
             // Don't update lastConnectedAt here - only update on disconnect
@@ -325,10 +328,12 @@ final class AppState {
         } catch {
             connectionStatus = .error(error.localizedDescription)
             lastError = error.localizedDescription
+            Log.app.error("[AppState] connect: failed — \(error.localizedDescription, privacy: .public)")
         }
     }
 
     func disconnect() async {
+        Log.app.info("[AppState] disconnect: tearing down connection")
         // Update lastConnectedAt timestamp if we were connected
         if connectionStatus.isConnected, let clusterId = configStore.selectedClusterId {
             configStore.updateLastConnected(for: clusterId)
@@ -387,6 +392,7 @@ final class AppState {
         do {
             let metadata = try await kafkaService.fetchMetadata()
             guard connectionStatus.isConnected else { isLoading = false; return }
+            Log.app.debug("[AppState] refresh: \(metadata.brokers.count) brokers, \(metadata.topics.count) topics")
             brokers = metadata.brokers
             topics = await kafkaService.fetchAllWatermarks(topics: metadata.topics)
             guard connectionStatus.isConnected else { isLoading = false; return }
@@ -402,6 +408,8 @@ final class AppState {
             // Circuit breaker: stop auto-refresh after 3 consecutive failures
             // to avoid hammering librdkafka while brokers are down
             if consecutiveRefreshErrors >= 3 {
+                let errCount = consecutiveRefreshErrors
+                Log.app.error("[AppState] refresh: circuit breaker tripped after \(errCount) failures")
                 // Update lastConnectedAt since connection is failing
                 if let clusterId = configStore.selectedClusterId {
                     configStore.updateLastConnected(for: clusterId)
@@ -424,7 +432,7 @@ final class AppState {
         } catch {
             guard connectionStatus.isConnected else { isLoading = false; return }
             // Consumer groups might not be available; don't block on this
-            print("Failed to fetch consumer groups: \(error)")
+            Log.app.error("[AppState] refresh: consumer groups failed — \(error.localizedDescription, privacy: .public)")
         }
 
         // Fetch committed offsets and compute lag per consumer group
@@ -643,11 +651,13 @@ final class AppState {
         // Persist resolution for types that just resolved
         let resolvedTypes = previousAlertTypes.subtracting(currentTypes)
         for typeRaw in resolvedTypes {
+            Log.alerts.info("[AppState] alerts: \(typeRaw, privacy: .public) resolved")
             persistAlertResolution(typeRaw)
         }
 
         // Send notifications and persist for newly triggered alerts
         for alert in alerts where newlyTriggered.contains(alert.type.rawValue) {
+            Log.alerts.info("[AppState] alerts: \(alert.type.rawValue, privacy: .public) triggered — \(alert.severity == .critical ? "CRITICAL" : "warning", privacy: .public)")
             sendAlertNotification(alert)
             persistAlertRecord(alert)
         }
@@ -780,7 +790,7 @@ final class AppState {
                 metricStore.loadHistorical(historical)
             }
         } catch {
-            print("Failed to load historical metrics: \(error)")
+            Log.storage.error("[AppState] loadHistorical: failed — \(error.localizedDescription, privacy: .public)")
         }
     }
 
@@ -790,9 +800,9 @@ final class AppState {
         do {
             let deleted = try await db.deleteAllData()
             let deletedAlerts = try await db.deleteAllAlerts()
-            print("Cleared \(deleted) metric snapshots, \(deletedAlerts) alert records")
+            Log.storage.info("[AppState] clearMetrics: \(deleted) snapshots, \(deletedAlerts) alert records")
         } catch {
-            print("Failed to clear metric data: \(error)")
+            Log.storage.error("[AppState] clearMetrics: failed — \(error.localizedDescription, privacy: .public)")
         }
     }
 
@@ -802,10 +812,10 @@ final class AppState {
             let deleted = try await db.pruneAllClusters(retentionPolicy: retentionPolicy)
             let deletedAlerts = try await db.pruneAlerts(retentionPolicy: retentionPolicy)
             if deleted > 0 || deletedAlerts > 0 {
-                print("Pruned \(deleted) old metric snapshots, \(deletedAlerts) old alert records")
+                Log.storage.info("[AppState] pruneMetrics: \(deleted) snapshots, \(deletedAlerts) alerts")
             }
         } catch {
-            print("Failed to prune metrics: \(error)")
+            Log.storage.error("[AppState] pruneMetrics: failed — \(error.localizedDescription, privacy: .public)")
         }
     }
 

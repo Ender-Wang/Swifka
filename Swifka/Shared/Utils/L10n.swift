@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 
 @Observable
 final class L10n: @unchecked Sendable {
@@ -45,7 +46,7 @@ final class L10n: @unchecked Sendable {
                 strings = dict
             }
         } catch {
-            print("L10n: Failed to load strings from \(url): \(error)")
+            Log.app.error("[L10n] loadStrings: failed from \(url.path, privacy: .public) — \(error.localizedDescription, privacy: .public)")
         }
     }
 

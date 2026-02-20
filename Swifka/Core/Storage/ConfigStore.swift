@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 
 @Observable
 final class ConfigStore {
@@ -60,6 +61,7 @@ final class ConfigStore {
             selectedClusterId = clusters.first?.id
         }
         save()
+        Log.storage.info("[ConfigStore] delete: cluster removed")
     }
 
     func togglePin(for clusterId: UUID) {
@@ -86,7 +88,7 @@ final class ConfigStore {
             let data = try encoder.encode(clusters)
             try data.write(to: fileURL, options: .atomic)
         } catch {
-            print("ConfigStore: Failed to save: \(error)")
+            Log.storage.error("[ConfigStore] save: failed — \(error.localizedDescription, privacy: .public)")
         }
     }
 
@@ -106,7 +108,7 @@ final class ConfigStore {
                 selectedClusterId = clusters.first?.id
             }
         } catch {
-            print("ConfigStore: Failed to load: \(error)")
+            Log.storage.error("[ConfigStore] load: failed — \(error.localizedDescription, privacy: .public)")
         }
     }
 
@@ -169,6 +171,7 @@ final class ConfigStore {
 
         clusters.append(contentsOf: imported)
         save()
+        Log.storage.info("[ConfigStore] import: \(imported.count) clusters imported")
         return idMap
     }
 
@@ -202,6 +205,8 @@ final class ConfigStore {
         if !export.deserializerConfigs.isEmpty {
             DeserializerConfigStore.shared.importConfigs(export.deserializerConfigs, protoPathMap: protoPathMap)
         }
+
+        Log.storage.info("[ConfigStore] import: \(export.clusters.count) clusters, \(export.protoFiles.count) proto files")
     }
 }
 

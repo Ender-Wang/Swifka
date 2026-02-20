@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 
 // MARK: - Schema Registry Client
 
@@ -26,7 +27,9 @@ actor SchemaRegistryClient {
     func fetchSubjects() async throws -> [String] {
         let url = baseURL.appendingPathComponent("subjects")
         let data = try await fetch(url)
-        return try JSONDecoder().decode([String].self, from: data)
+        let subjects = try JSONDecoder().decode([String].self, from: data)
+        Log.decode.debug("[SchemaRegistryClient] fetchSubjects: \(subjects.count) subjects")
+        return subjects
     }
 
     /// List all version numbers for a subject.
@@ -65,6 +68,7 @@ actor SchemaRegistryClient {
     /// Fetch a schema by its global ID. Uses cache if available.
     func fetchSchemaByID(_ id: Int) async throws -> SchemaInfo {
         if let cached = schemaCache[id] {
+            Log.decode.debug("[SchemaRegistryClient] fetchSchemaByID: cache hit for ID \(id)")
             return cached
         }
 
@@ -84,6 +88,7 @@ actor SchemaRegistryClient {
         )
 
         schemaCache[id] = info
+        Log.decode.debug("[SchemaRegistryClient] fetchSchemaByID: fetched ID \(id) — \(info.schemaType.rawValue, privacy: .public)")
         return info
     }
 
@@ -113,10 +118,13 @@ actor SchemaRegistryClient {
         case 200:
             return data
         case 401:
+            Log.decode.error("[SchemaRegistryClient] fetch: HTTP 401 unauthorized for \(url.path, privacy: .public)")
             throw SchemaRegistryError.unauthorized
         case 404:
+            Log.decode.error("[SchemaRegistryClient] fetch: HTTP 404 not found for \(url.path, privacy: .public)")
             throw SchemaRegistryError.notFound
         default:
+            Log.decode.error("[SchemaRegistryClient] fetch: HTTP \(httpResponse.statusCode) for \(url.path, privacy: .public)")
             throw SchemaRegistryError.httpError(httpResponse.statusCode)
         }
     }

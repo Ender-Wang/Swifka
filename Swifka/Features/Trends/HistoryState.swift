@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 
 @Observable
 final class HistoryState {
@@ -129,6 +130,7 @@ final class HistoryState {
             }
 
             store.loadHistorical(snapshots)
+            Log.storage.debug("[HistoryState] loadData: \(snapshots.count) snapshots loaded")
 
             // Auto-select first topic/group if empty
             if selectedTopics.isEmpty,
@@ -140,7 +142,7 @@ final class HistoryState {
                 selectedGroups.append(first)
             }
         } catch {
-            print("Failed to load history data: \(error)")
+            Log.storage.error("[HistoryState] loadData: failed — \(error.localizedDescription, privacy: .public)")
         }
 
         isLoading = false
