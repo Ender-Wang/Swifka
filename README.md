@@ -51,7 +51,8 @@ Swifka fills the gap: a native macOS client built for **monitoring only** — sa
 **Topics & Messages**
 
 - Browse topics, partitions, and messages with detailed metadata
-- Message decoding: UTF-8, Hex, Base64, Protobuf (import `.proto` files), JSON pretty-print
+- Message decoding: UTF-8, Hex, Base64, Protobuf (import `.proto` files), Avro, JSON pretty-print
+- Schema Registry integration — auto-decode Confluent wire format messages (Protobuf, Avro, JSON)
 - Search messages by keyword, regex, or JSON path (e.g., `user.email:john@`) with time range filter
 
 **Monitoring & Charts**
@@ -64,7 +65,8 @@ Swifka fills the gap: a native macOS client built for **monitoring only** — sa
 
 **Alerts & Notifications**
 
-- ISR health alerts (under-replicated, critical, below min.insync.replicas)
+- Configurable alert rules: ISR health, cluster lag, broker latency, broker offline
+- Alert history with resolution tracking and detail panel
 - macOS desktop notifications
 
 **Quality of Life**
@@ -198,7 +200,7 @@ Or download the latest `.dmg` from [Releases](https://github.com/Ender-Wang/Swif
 
 - [x] Schema Registry integration (read-only, Confluent-compatible)
 - [x] Avro deserialization support
-- [ ] Configurable alert rules (lag thresholds, broker liveness)
+- [x] Configurable alert rules (lag thresholds, broker latency, broker offline)
 - [ ] Structured logging (os.Logger + Console.app)
 
 🎨 **Polish**
