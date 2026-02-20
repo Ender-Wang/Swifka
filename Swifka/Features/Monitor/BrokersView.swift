@@ -71,9 +71,11 @@ struct BrokersView: View {
 
     @ViewBuilder
     private func brokerGrid(stats: [BrokerStats], l10n: L10n) -> some View {
-        let columns = [
-            GridItem(.adaptive(minimum: 250, maximum: 350), spacing: 16),
-        ]
+        let columnCount = min(stats.count, 4)
+        let columns = Array(
+            repeating: GridItem(.flexible(minimum: 200), spacing: 16),
+            count: max(columnCount, 1),
+        )
 
         LazyVGrid(columns: columns, spacing: 16) {
             ForEach(stats) { broker in

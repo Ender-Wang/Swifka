@@ -74,7 +74,7 @@ struct ContentView: View {
 
             ToolbarItemGroup(placement: .primaryAction) {
                 // Alert history bell (always visible, before refresh controls)
-                let activeCount = appState.activeAlerts.count
+                let activeCount = alertHistory.count(where: { $0.resolvedAt == nil })
                 Button {
                     showAlertHistory.toggle()
                 } label: {
@@ -702,12 +702,6 @@ private struct AlertHistoryPopover: View {
                     .fixedSize()
 
                     Spacer()
-
-                    if !appState.activeAlerts.isEmpty {
-                        Text(l10n.t("alerts.active.count", "\(appState.activeAlerts.count)"))
-                            .font(.caption)
-                            .foregroundStyle(.orange)
-                    }
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 14)
