@@ -37,7 +37,7 @@ struct ClustersView: View {
     @State private var recentlyImportedClusterIDs: Set<UUID> = []
 
     /// Sorting
-    @State private var sortMode: SortMode = .name
+    @AppStorage("clusters.sortMode") private var sortMode: SortMode = .name
 
     private var exportFilename: String {
         let formatter = DateFormatter()

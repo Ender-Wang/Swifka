@@ -172,11 +172,11 @@ struct ClusterFormView: View {
     }
 
     private func saveCluster() {
-        let existingId: UUID? = if case let .edit(cluster) = mode { cluster.id } else { nil }
+        let existing: ClusterConfig? = if case let .edit(cluster) = mode { cluster } else { nil }
         guard let portNum = Int(port), portNum > 0, portNum <= 65535 else { return }
 
         let cluster = ClusterConfig(
-            id: existingId ?? UUID(),
+            id: existing?.id ?? UUID(),
             name: name,
             host: host,
             port: portNum,
@@ -185,6 +185,10 @@ struct ClusterFormView: View {
             saslUsername: authType == .sasl ? saslUsername : nil,
             useTLS: useTLS,
             schemaRegistryURL: schemaRegistryURL.isEmpty ? nil : schemaRegistryURL,
+            createdAt: existing?.createdAt ?? Date(),
+            isPinned: existing?.isPinned ?? false,
+            lastConnectedAt: existing?.lastConnectedAt,
+            sortOrder: existing?.sortOrder ?? 0,
         )
 
         let password: String? = authType == .sasl && !saslPassword.isEmpty ? saslPassword : nil

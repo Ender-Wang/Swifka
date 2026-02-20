@@ -34,9 +34,13 @@ final class ConfigStore {
     // MARK: - CRUD
 
     func addCluster(_ cluster: ClusterConfig) {
-        clusters.append(cluster)
+        var newCluster = cluster
+        if newCluster.sortOrder == 0 {
+            newCluster.sortOrder = (clusters.map(\.sortOrder).max() ?? -1) + 1
+        }
+        clusters.append(newCluster)
         if selectedClusterId == nil {
-            selectedClusterId = cluster.id
+            selectedClusterId = newCluster.id
         }
         save()
     }
