@@ -6,6 +6,8 @@ struct ContentView: View {
     @State private var showingAddClusterSheet = false
     @State private var detailOpacity: Double = 1
     @State private var detailOffset: CGFloat = 0
+    @State private var showAlertHistory = false
+    @State private var alertHistory: [AlertRecord] = []
 
     private var sidebarHidden: Bool {
         columnVisibility == .detailOnly
@@ -71,6 +73,33 @@ struct ContentView: View {
             }
 
             ToolbarItemGroup(placement: .primaryAction) {
+                // Alert history bell (always visible, before refresh controls)
+                let activeCount = appState.activeAlerts.count
+                Button {
+                    showAlertHistory.toggle()
+                } label: {
+                    Label(l10n["toolbar.alerts"], systemImage: "bell")
+                        .foregroundStyle(activeCount > 0 ? .orange : .secondary)
+                        .symbolEffect(.bounce, value: activeCount)
+                }
+                .overlay(alignment: .topTrailing) {
+                    if activeCount > 0 {
+                        Text("\(activeCount)")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 3)
+                            .frame(minWidth: 15, minHeight: 15)
+                            .background(.orange, in: Circle())
+                            .offset(x: 6, y: -6)
+                            .allowsHitTesting(false)
+                    }
+                }
+                .id("alertBell")
+                .help(l10n["toolbar.alerts"])
+                .popover(isPresented: $showAlertHistory) {
+                    AlertHistoryPopover(appState: appState, history: alertHistory)
+                }
+
                 // Refresh controls (only on data pages)
                 if appState.connectionStatus.isConnected,
                    appState.selectedSidebarItem != .clusters,
@@ -128,8 +157,7 @@ struct ContentView: View {
                     .keyboardShortcut("n", modifiers: .command)
                 }
 
-                // Connection controls (rightmost - only show here when NOT on Clusters page)
-                // On Clusters page, power button is added in ClustersView toolbar to ensure rightmost position
+                // Connection controls (rightmost)
                 if appState.selectedSidebarItem != .clusters {
                     if appState.connectionStatus.isConnected {
                         Button {
@@ -152,18 +180,30 @@ struct ContentView: View {
             }
         }
         .overlay(alignment: .top) {
-            if let alert = appState.activeISRAlertState,
-               !appState.isrAlertDismissed
-            {
-                ISRAlertBanner(
-                    alert: alert,
-                    l10n: appState.l10n,
-                    onDismiss: { appState.isrAlertDismissed = true },
-                )
-                .transition(.move(edge: .top).combined(with: .opacity))
+            let visibleAlerts = appState.activeAlerts.filter {
+                !appState.dismissedAlertTypes.contains($0.type.rawValue)
+            }
+            if !visibleAlerts.isEmpty {
+                VStack(spacing: 4) {
+                    ForEach(visibleAlerts) { alert in
+                        AlertRuleBanner(
+                            alert: alert,
+                            l10n: appState.l10n,
+                            onDismiss: { appState.dismissedAlertTypes.insert(alert.type.rawValue) },
+                        )
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                    }
+                }
             }
         }
-        .animation(.easeInOut(duration: 0.3), value: appState.activeISRAlertState != nil && !appState.isrAlertDismissed)
+        .animation(.easeInOut(duration: 0.3), value: appState.activeAlerts.count)
+        .animation(.easeInOut(duration: 0.3), value: appState.dismissedAlertTypes)
+        .onChange(of: appState.activeAlerts.count) {
+            Task { await loadAlertHistory() }
+        }
+        .onChange(of: showAlertHistory) {
+            if showAlertHistory { Task { await loadAlertHistory() } }
+        }
         .sheet(isPresented: $showingAddClusterSheet) {
             ClusterFormView(mode: .add) { cluster, password in
                 appState.configStore.addCluster(cluster)
@@ -209,6 +249,16 @@ struct ContentView: View {
         case .clusters: "square.stack.3d.up"
         case .settings: "gear"
         }
+    }
+
+    private func loadAlertHistory() async {
+        guard let db = appState.metricDatabase,
+              let clusterId = appState.configStore.selectedCluster?.id
+        else {
+            alertHistory = []
+            return
+        }
+        alertHistory = await (try? db.loadRecentAlerts(clusterId: clusterId, limit: 50)) ?? []
     }
 }
 
@@ -528,17 +578,17 @@ private struct CompactMetricIcon: View {
     }
 }
 
-// MARK: - ISR Alert Banner
+// MARK: - Alert Rule Banner
 
-private struct ISRAlertBanner: View {
-    let alert: ISRAlertState
+private struct AlertRuleBanner: View {
+    let alert: AlertRecord
     let l10n: L10n
     let onDismiss: () -> Void
 
     private var bannerColor: Color {
         switch alert.severity {
         case .warning: .orange
-        case .critical, .danger: .red
+        case .critical: .red
         }
     }
 
@@ -546,38 +596,6 @@ private struct ISRAlertBanner: View {
         switch alert.severity {
         case .warning: "exclamationmark.triangle.fill"
         case .critical: "exclamationmark.octagon.fill"
-        case .danger: "xmark.octagon.fill"
-        }
-    }
-
-    private var severityLabel: String {
-        switch alert.severity {
-        case .warning: l10n["alert.isr.severity.warning"]
-        case .critical: l10n["alert.isr.severity.critical"]
-        case .danger: l10n["alert.isr.severity.danger"]
-        }
-    }
-
-    private var summaryText: String {
-        switch alert.severity {
-        case .warning:
-            l10n.t(
-                "alert.isr.summary.warning",
-                "\(alert.underReplicatedCount)",
-                "\(alert.totalPartitions)",
-            )
-        case .critical:
-            l10n.t(
-                "alert.isr.summary.critical",
-                "\(alert.criticalCount)",
-                "\(alert.totalPartitions)",
-            )
-        case .danger:
-            l10n.t(
-                "alert.isr.summary.danger",
-                "\(alert.belowMinISRCount)",
-                "\(alert.totalPartitions)",
-            )
         }
     }
 
@@ -586,10 +604,10 @@ private struct ISRAlertBanner: View {
             Image(systemName: severityIcon)
                 .foregroundStyle(bannerColor)
 
-            Text(severityLabel)
+            Text(alert.title)
                 .fontWeight(.medium)
 
-            Text(summaryText)
+            Text(alert.summary)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
 
@@ -608,6 +626,281 @@ private struct ISRAlertBanner: View {
         .background(.ultraThinMaterial, in: Capsule())
         .shadow(color: .black.opacity(0.1), radius: 8, y: 4)
         .padding(.top, 8)
+    }
+}
+
+// MARK: - Alert History Popover
+
+private enum AlertTab: String, CaseIterable {
+    case current
+    case history
+}
+
+private struct AlertHistoryPopover: View {
+    let appState: AppState
+    let history: [AlertRecord]
+    @State private var selectedRecord: AlertRecord?
+    @State private var selectedTab: AlertTab = .current
+
+    private let contentHeight: CGFloat = 320
+
+    private func isActive(_ record: AlertRecord) -> Bool {
+        appState.activeAlerts.contains(where: { $0.type == record.type })
+    }
+
+    private var currentAlerts: [AlertRecord] {
+        let startOfDay = Calendar.current.startOfDay(for: Date())
+        return history.filter { $0.timestamp >= startOfDay }
+    }
+
+    private var pastAlerts: [AlertRecord] {
+        let startOfDay = Calendar.current.startOfDay(for: Date())
+        return history.filter { $0.timestamp < startOfDay }
+    }
+
+    private var displayedAlerts: [AlertRecord] {
+        selectedTab == .current ? currentAlerts : pastAlerts
+    }
+
+    var body: some View {
+        let l10n = appState.l10n
+
+        // Fixed-width popover: detail (left 220) + stream (right 380) = 600px always
+        HStack(spacing: 0) {
+            // Detail area — always 220px, content fades in/out
+            ZStack {
+                if let record = selectedRecord {
+                    ScrollView {
+                        alertDetailPanel(record, l10n: l10n)
+                    }
+                } else {
+                    VStack(spacing: 8) {
+                        Image(systemName: "bell")
+                            .font(.system(size: 24))
+                            .foregroundStyle(.quaternary)
+                        Text(l10n["alerts.select.detail"])
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+            }
+            .frame(width: 220)
+            .frame(maxHeight: .infinity)
+            .animation(.easeInOut(duration: 0.15), value: selectedRecord?.id)
+
+            Divider()
+
+            // Stream panel — always 380px, never moves
+            VStack(alignment: .leading, spacing: 0) {
+                // Header
+                HStack {
+                    Picker("", selection: $selectedTab) {
+                        Text(l10n["alerts.tab.current"]).tag(AlertTab.current)
+                        Text(l10n["alerts.tab.history"]).tag(AlertTab.history)
+                    }
+                    .pickerStyle(.segmented)
+                    .fixedSize()
+
+                    Spacer()
+
+                    if !appState.activeAlerts.isEmpty {
+                        Text(l10n.t("alerts.active.count", "\(appState.activeAlerts.count)"))
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 14)
+                .padding(.bottom, 10)
+
+                Divider()
+
+                if displayedAlerts.isEmpty {
+                    Text(selectedTab == .current
+                        ? l10n["alerts.current.empty"]
+                        : l10n["alerts.history.empty"])
+                        .foregroundStyle(.secondary)
+                        .font(.callout)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .padding(.vertical, 24)
+                } else {
+                    ScrollView {
+                        LazyVStack(spacing: 0) {
+                            ForEach(displayedAlerts) { record in
+                                alertRow(record, l10n: l10n)
+                                    .contentShape(Rectangle())
+                                    .onTapGesture {
+                                        if selectedRecord?.id == record.id {
+                                            selectedRecord = nil
+                                        } else {
+                                            selectedRecord = record
+                                        }
+                                    }
+                                    .background(selectedRecord?.id == record.id
+                                        ? Color.accentColor.opacity(0.1)
+                                        : Color.clear)
+
+                                if record.id != displayedAlerts.last?.id {
+                                    Divider()
+                                        .padding(.leading, 44)
+                                }
+                            }
+                        }
+                    }
+                    .frame(height: contentHeight)
+                }
+            }
+            .frame(width: 380, alignment: .top)
+        }
+        .onChange(of: selectedTab) {
+            selectedRecord = nil
+        }
+        .onChange(of: history) {
+            if let sel = selectedRecord, !history.contains(where: { $0.id == sel.id }) {
+                selectedRecord = nil
+            }
+        }
+    }
+
+    // MARK: - Row
+
+    private func alertRow(_ record: AlertRecord, l10n: L10n) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: record.severity == .critical
+                ? "exclamationmark.octagon.fill"
+                : "exclamationmark.triangle.fill")
+                .foregroundStyle(record.severity == .critical ? .red : .orange)
+                .font(.system(size: 13))
+                .frame(width: 18)
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 4) {
+                    Text(record.title)
+                        .font(.callout)
+                        .fontWeight(.medium)
+                        .lineLimit(1)
+                    if record.resolvedAt == nil, isActive(record) {
+                        Text(l10n["alerts.badge.active"])
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 1)
+                            .background(.orange, in: RoundedRectangle(cornerRadius: 3))
+                    } else if record.resolvedAt != nil {
+                        Text(l10n["alerts.badge.resolved"])
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 1)
+                            .background(.green, in: RoundedRectangle(cornerRadius: 3))
+                    }
+                }
+                Text(record.summary)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            Spacer()
+            Text(record.timestamp, format: .dateTime.hour().minute().second())
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+                .fixedSize()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+    }
+
+    // MARK: - Detail Panel (left side, vertical)
+
+    private func alertDetailPanel(_ record: AlertRecord, l10n: L10n) -> some View {
+        let color: Color = record.severity == .critical ? .red : .orange
+        let active = record.resolvedAt == nil && isActive(record)
+
+        return VStack(alignment: .leading, spacing: 10) {
+            // Severity + Status
+            HStack(spacing: 8) {
+                Image(systemName: record.severity == .critical
+                    ? "exclamationmark.octagon.fill"
+                    : "exclamationmark.triangle.fill")
+                    .foregroundStyle(color)
+                    .font(.system(size: 18))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(record.severity == .critical
+                        ? l10n["alerts.severity.critical"]
+                        : l10n["alerts.severity.warning"])
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(color)
+                    Text(active ? l10n["alerts.status.active"] : l10n["alerts.status.resolved"])
+                        .font(.caption2)
+                        .foregroundStyle(active ? .orange : .green)
+                }
+            }
+
+            Text(record.title)
+                .font(.headline)
+
+            Text(record.summary)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Divider()
+
+            // Triggered
+            VStack(alignment: .leading, spacing: 2) {
+                Text(l10n["alerts.detail.triggered"])
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                Text(record.timestamp, format: .dateTime.month(.abbreviated).day().hour().minute().second())
+                    .font(.caption.monospacedDigit())
+            }
+
+            // Resolved
+            if let resolvedAt = record.resolvedAt {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(l10n["alerts.detail.resolved"])
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                    Text(resolvedAt, format: .dateTime.month(.abbreviated).day().hour().minute().second())
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.green)
+                }
+
+                let duration = resolvedAt.timeIntervalSince(record.timestamp)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(l10n["alerts.detail.duration"])
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                    Text(formatDuration(duration))
+                        .font(.caption.monospacedDigit())
+                }
+            }
+
+            // Type
+            VStack(alignment: .leading, spacing: 2) {
+                Text(l10n["alerts.detail.type"])
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                Text(record.type.rawValue)
+                    .font(.caption)
+                    .monospaced()
+            }
+        }
+        .padding(12)
+    }
+
+    private func formatDuration(_ seconds: TimeInterval) -> String {
+        if seconds < 60 {
+            return "\(Int(seconds))s"
+        } else if seconds < 3600 {
+            let m = Int(seconds) / 60
+            let s = Int(seconds) % 60
+            return "\(m)m \(s)s"
+        } else {
+            let h = Int(seconds) / 3600
+            let m = (Int(seconds) % 3600) / 60
+            return "\(h)h \(m)m"
+        }
     }
 }
 

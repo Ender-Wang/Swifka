@@ -74,6 +74,7 @@ struct SettingsView: View {
 
             // Alerts
             Section(header: Label(l10n["settings.alerts"], systemImage: "bell")) {
+                // ISR
                 Toggle(l10n["settings.alerts.isr.enabled"], isOn: $state.isrAlertsEnabled)
 
                 if appState.isrAlertsEnabled {
@@ -95,6 +96,75 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
 
+                // Cluster Lag
+                Toggle(l10n["settings.alerts.clusterLag.enabled"], isOn: $state.clusterLagAlertEnabled)
+
+                if appState.clusterLagAlertEnabled {
+                    Stepper(
+                        value: $state.clusterLagThreshold,
+                        in: 1000 ... 1_000_000,
+                        step: 1000,
+                    ) {
+                        HStack {
+                            Text(l10n["settings.alerts.clusterLag.threshold"])
+                            Spacer()
+                            Text("\(appState.clusterLagThreshold)")
+                                .monospacedDigit()
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    Text(l10n["settings.alerts.clusterLag.description"])
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                // High Latency
+                Toggle(l10n["settings.alerts.highLatency.enabled"], isOn: $state.highLatencyAlertEnabled)
+
+                if appState.highLatencyAlertEnabled {
+                    Stepper(
+                        value: $state.highLatencyThreshold,
+                        in: 50 ... 5000,
+                        step: 50,
+                    ) {
+                        HStack {
+                            Text(l10n["settings.alerts.highLatency.threshold"])
+                            Spacer()
+                            Text(l10n.t("settings.alerts.highLatency.value", "\(appState.highLatencyThreshold)"))
+                                .monospacedDigit()
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    Text(l10n["settings.alerts.highLatency.description"])
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                // Broker Offline
+                Toggle(l10n["settings.alerts.brokerOffline.enabled"], isOn: $state.brokerOfflineAlertEnabled)
+
+                if appState.brokerOfflineAlertEnabled {
+                    Stepper(
+                        value: $state.expectedBrokerCount,
+                        in: 1 ... 100,
+                    ) {
+                        HStack {
+                            Text(l10n["settings.alerts.brokerOffline.expected"])
+                            Spacer()
+                            Text("\(appState.expectedBrokerCount)")
+                                .monospacedDigit()
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    Text(l10n["settings.alerts.brokerOffline.description"])
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                // Desktop Notifications
                 Toggle(l10n["settings.alerts.desktop"], isOn: $state.desktopNotificationsEnabled)
 
                 if appState.desktopNotificationsEnabled, !appState.notificationPermissionGranted {

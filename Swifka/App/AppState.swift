@@ -131,9 +131,9 @@ final class AppState {
         didSet {
             UserDefaults.standard.set(isrAlertsEnabled, forKey: "settings.isrAlerts.enabled")
             if !isrAlertsEnabled {
-                activeISRAlertState = nil
-                isrAlertDismissed = false
-                previousISRSeverity = nil
+                activeAlerts.removeAll { $0.type == .isr }
+                dismissedAlertTypes.remove(AlertRuleType.isr.rawValue)
+                previousAlertTypes.remove(AlertRuleType.isr.rawValue)
             }
         }
     }
@@ -156,16 +156,51 @@ final class AppState {
     /// Tracks the notification permission state for display in Settings.
     var notificationPermissionGranted: Bool = false
 
-    // MARK: - ISR Alerts (session-scoped)
+    // MARK: - Alert Rules Settings
 
-    /// Active ISR alert state, nil when all partitions are healthy.
-    var activeISRAlertState: ISRAlertState?
+    var clusterLagAlertEnabled: Bool = false {
+        didSet {
+            UserDefaults.standard.set(clusterLagAlertEnabled, forKey: "settings.alerts.clusterLag.enabled")
+        }
+    }
 
-    /// Whether the user has manually dismissed the current alert.
-    var isrAlertDismissed: Bool = false
+    var clusterLagThreshold: Int = 10000 {
+        didSet {
+            UserDefaults.standard.set(clusterLagThreshold, forKey: "settings.alerts.clusterLag.threshold")
+        }
+    }
+
+    var highLatencyAlertEnabled: Bool = false {
+        didSet {
+            UserDefaults.standard.set(highLatencyAlertEnabled, forKey: "settings.alerts.highLatency.enabled")
+        }
+    }
+
+    var highLatencyThreshold: Int = 500 {
+        didSet {
+            UserDefaults.standard.set(highLatencyThreshold, forKey: "settings.alerts.highLatency.threshold")
+        }
+    }
+
+    var brokerOfflineAlertEnabled: Bool = false {
+        didSet {
+            UserDefaults.standard.set(brokerOfflineAlertEnabled, forKey: "settings.alerts.brokerOffline.enabled")
+        }
+    }
+
+    var expectedBrokerCount: Int = 3 {
+        didSet {
+            UserDefaults.standard.set(expectedBrokerCount, forKey: "settings.alerts.brokerOffline.expected")
+        }
+    }
+
+    // MARK: - Alerts (session-scoped)
+
+    var activeAlerts: [AlertRecord] = []
+    var dismissedAlertTypes: Set<String> = []
 
     @ObservationIgnored
-    private var previousISRSeverity: ISRAlertSeverity?
+    private var previousAlertTypes: Set<String> = []
 
     /// Prevents overlapping refreshAll() calls (e.g. timer fires while previous refresh still blocking).
     @ObservationIgnored
@@ -229,6 +264,23 @@ final class AppState {
         if UserDefaults.standard.object(forKey: "settings.desktopNotifications.enabled") != nil {
             desktopNotificationsEnabled = UserDefaults.standard.bool(forKey: "settings.desktopNotifications.enabled")
         }
+        // Alert rule settings
+        if UserDefaults.standard.object(forKey: "settings.alerts.clusterLag.enabled") != nil {
+            clusterLagAlertEnabled = UserDefaults.standard.bool(forKey: "settings.alerts.clusterLag.enabled")
+        }
+        let storedLagThreshold = UserDefaults.standard.integer(forKey: "settings.alerts.clusterLag.threshold")
+        if storedLagThreshold > 0 { clusterLagThreshold = storedLagThreshold }
+        if UserDefaults.standard.object(forKey: "settings.alerts.highLatency.enabled") != nil {
+            highLatencyAlertEnabled = UserDefaults.standard.bool(forKey: "settings.alerts.highLatency.enabled")
+        }
+        let storedLatencyThreshold = UserDefaults.standard.integer(forKey: "settings.alerts.highLatency.threshold")
+        if storedLatencyThreshold > 0 { highLatencyThreshold = storedLatencyThreshold }
+        if UserDefaults.standard.object(forKey: "settings.alerts.brokerOffline.enabled") != nil {
+            brokerOfflineAlertEnabled = UserDefaults.standard.bool(forKey: "settings.alerts.brokerOffline.enabled")
+        }
+        let storedBrokerCount = UserDefaults.standard.integer(forKey: "settings.alerts.brokerOffline.expected")
+        if storedBrokerCount > 0 { expectedBrokerCount = storedBrokerCount }
+
         checkNotificationPermission()
         if let raw = UserDefaults.standard.string(forKey: "nav.sidebarItem"),
            let item = SidebarItem(rawValue: raw)
@@ -298,9 +350,9 @@ final class AppState {
         expandedTopics = []
         trendsMode = .live
         lagMode = .live
-        activeISRAlertState = nil
-        isrAlertDismissed = false
-        previousISRSeverity = nil
+        activeAlerts = []
+        dismissedAlertTypes = []
+        previousAlertTypes = []
         consecutiveRefreshErrors = 0
         historyState.store.clear()
         lagHistoryState.store.clear()
@@ -381,7 +433,7 @@ final class AppState {
         await fetchConsumerGroupLags()
 
         recordMetricSnapshot()
-        checkISRHealth()
+        checkAlertRules()
 
         // Ensure spinner is visible long enough to avoid flickering
         let elapsed = ContinuousClock.now - start
@@ -525,83 +577,156 @@ final class AppState {
         }
     }
 
-    private func checkISRHealth() {
-        guard isrAlertsEnabled, connectionStatus.isConnected else {
-            activeISRAlertState = nil
-            previousISRSeverity = nil
+    // MARK: - Unified Alert Checks
+
+    private func checkAlertRules() {
+        guard connectionStatus.isConnected else {
+            activeAlerts = []
+            previousAlertTypes = []
             return
         }
 
-        var details: [ISRAlertDetail] = []
-        var totalPartitionCount = 0
+        var alerts: [AlertRecord] = []
 
+        // --- ISR Alert ---
+        if isrAlertsEnabled {
+            if let record = checkISRAlert() {
+                alerts.append(record)
+            }
+        }
+
+        // --- Cluster Lag Alert ---
+        if clusterLagAlertEnabled {
+            let totalLag = consumerGroupLags.values.reduce(0, +)
+            if totalLag > Int64(clusterLagThreshold) {
+                let severity: AlertSeverity = totalLag > Int64(clusterLagThreshold) * 2 ? .critical : .warning
+                alerts.append(AlertRecord(
+                    id: UUID(),
+                    type: .clusterLag,
+                    severity: severity,
+                    timestamp: Date(),
+                    title: l10n["alert.clusterLag.title"],
+                    summary: l10n.t("alert.clusterLag.summary",
+                                    formatLagNumber(totalLag),
+                                    formatLagNumber(Int64(clusterLagThreshold))),
+                ))
+            }
+        }
+
+        // --- High Latency Alert ---
+        if highLatencyAlertEnabled, let ping = pingMs, ping > highLatencyThreshold {
+            let severity: AlertSeverity = ping > highLatencyThreshold * 2 ? .critical : .warning
+            alerts.append(AlertRecord(
+                id: UUID(),
+                type: .highLatency,
+                severity: severity,
+                timestamp: Date(),
+                title: l10n["alert.highLatency.title"],
+                summary: l10n.t("alert.highLatency.summary", "\(ping)", "\(highLatencyThreshold)"),
+            ))
+        }
+
+        // --- Broker Offline Alert ---
+        if brokerOfflineAlertEnabled, brokers.count < expectedBrokerCount {
+            alerts.append(AlertRecord(
+                id: UUID(),
+                type: .brokerOffline,
+                severity: .critical,
+                timestamp: Date(),
+                title: l10n["alert.brokerOffline.title"],
+                summary: l10n.t("alert.brokerOffline.summary", "\(brokers.count)", "\(expectedBrokerCount)"),
+            ))
+        }
+
+        // Detect newly triggered alert types
+        let currentTypes = Set(alerts.map(\.type.rawValue))
+        let newlyTriggered = currentTypes.subtracting(previousAlertTypes)
+
+        // Reset dismiss for types that resolved and re-triggered
+        let resolvedTypes = previousAlertTypes.subtracting(currentTypes)
+        dismissedAlertTypes.subtract(resolvedTypes)
+
+        // Persist resolution for types that just resolved
+        for typeRaw in resolvedTypes {
+            persistAlertResolution(typeRaw)
+        }
+
+        // Send notifications and persist for newly triggered alerts
+        for alert in alerts where newlyTriggered.contains(alert.type.rawValue) {
+            sendAlertNotification(alert)
+            persistAlertRecord(alert)
+        }
+
+        activeAlerts = alerts
+        previousAlertTypes = currentTypes
+    }
+
+    /// ISR-specific check logic — returns an AlertRecord if under-replicated partitions found.
+    private func checkISRAlert() -> AlertRecord? {
         // Redpanda (Raft-based) may not shrink ISR when a broker goes down —
         // it keeps reporting the dead broker in the ISR list. Cross-reference
         // ISR broker IDs against alive brokers from the metadata response.
         let aliveBrokerIds = Set(brokers.map(\.id))
 
+        var underReplicatedCount = 0
+        var criticalCount = 0
+        var belowMinCount = 0
+        var totalPartitionCount = 0
+
         for topic in topics where !topic.isInternal {
             for partition in topic.partitions {
                 totalPartitionCount += 1
                 let replicaCount = partition.replicas.count
-
-                // Effective ISR = reported ISR filtered to only alive brokers
                 let effectiveISRCount = partition.isr.count(where: { aliveBrokerIds.contains($0) })
 
                 guard effectiveISRCount < replicaCount else { continue }
+                underReplicatedCount += 1
 
-                let severity: ISRAlertSeverity = if effectiveISRCount < minInsyncReplicas {
-                    .danger
+                if effectiveISRCount < minInsyncReplicas {
+                    belowMinCount += 1
                 } else if effectiveISRCount == 1 {
-                    .critical
-                } else {
-                    .warning
+                    criticalCount += 1
                 }
-
-                details.append(ISRAlertDetail(
-                    topic: topic.name,
-                    partition: partition.partitionId,
-                    isrCount: effectiveISRCount,
-                    replicaCount: replicaCount,
-                    severity: severity,
-                ))
             }
         }
 
-        if details.isEmpty {
-            if activeISRAlertState != nil {
-                activeISRAlertState = nil
-                isrAlertDismissed = false
-            }
-            previousISRSeverity = nil
-            return
+        guard underReplicatedCount > 0 else { return nil }
+
+        let severity: AlertSeverity
+        let title: String
+        let summary: String
+
+        if belowMinCount > 0 {
+            severity = .critical
+            title = l10n["alert.isr.severity.danger"]
+            summary = l10n.t("alert.isr.summary.danger", "\(belowMinCount)", "\(totalPartitionCount)")
+        } else if criticalCount > 0 {
+            severity = .critical
+            title = l10n["alert.isr.severity.critical"]
+            summary = l10n.t("alert.isr.summary.critical", "\(criticalCount)", "\(totalPartitionCount)")
+        } else {
+            severity = .warning
+            title = l10n["alert.isr.severity.warning"]
+            summary = l10n.t("alert.isr.summary.warning", "\(underReplicatedCount)", "\(totalPartitionCount)")
         }
 
-        let maxSeverity = details.map(\.severity).max() ?? .warning
-        let criticalCount = details.count(where: { $0.severity == .critical })
-        let belowMinCount = details.count(where: { $0.severity == .danger })
-
-        let newState = ISRAlertState(
-            severity: maxSeverity,
+        return AlertRecord(
+            id: UUID(),
+            type: .isr,
+            severity: severity,
             timestamp: Date(),
-            affectedPartitions: details,
-            totalPartitions: totalPartitionCount,
-            underReplicatedCount: details.count,
-            criticalCount: criticalCount,
-            belowMinISRCount: belowMinCount,
+            title: title,
+            summary: summary,
         )
+    }
 
-        // Reset dismiss flag and send notification when severity escalates or affected partitions change
-        let isNewOrEscalated = maxSeverity != previousISRSeverity
-            || activeISRAlertState?.affectedPartitions != newState.affectedPartitions
-
-        if isNewOrEscalated {
-            isrAlertDismissed = false
-            sendISRNotification(state: newState)
+    private func formatLagNumber(_ lag: Int64) -> String {
+        if lag >= 1_000_000 {
+            return String(format: "%.1fM", Double(lag) / 1_000_000)
+        } else if lag >= 1000 {
+            return String(format: "%.1fK", Double(lag) / 1000)
         }
-
-        activeISRAlertState = newState
-        previousISRSeverity = maxSeverity
+        return "\(lag)"
     }
 
     // MARK: - Desktop Notifications
@@ -622,35 +747,34 @@ final class AppState {
         }
     }
 
-    private func sendISRNotification(state: ISRAlertState) {
+    private func sendAlertNotification(_ alert: AlertRecord) {
         guard desktopNotificationsEnabled, notificationPermissionGranted else { return }
 
         let content = UNMutableNotificationContent()
-
-        let severityLabel: String
-        let summary: String
-        switch state.severity {
-        case .warning:
-            severityLabel = l10n["alert.isr.severity.warning"]
-            summary = l10n.t("alert.isr.summary.warning", "\(state.underReplicatedCount)", "\(state.totalPartitions)")
-        case .critical:
-            severityLabel = l10n["alert.isr.severity.critical"]
-            summary = l10n.t("alert.isr.summary.critical", "\(state.criticalCount)", "\(state.totalPartitions)")
-        case .danger:
-            severityLabel = l10n["alert.isr.severity.danger"]
-            summary = l10n.t("alert.isr.summary.danger", "\(state.belowMinISRCount)", "\(state.totalPartitions)")
-        }
-
-        content.title = "Swifka — \(severityLabel)"
-        content.body = summary
+        content.title = "Swifka — \(alert.title)"
+        content.body = alert.summary
         content.sound = .default
 
         let request = UNNotificationRequest(
-            identifier: "isr-alert",
+            identifier: "alert-\(alert.type.rawValue)",
             content: content,
             trigger: nil,
         )
         UNUserNotificationCenter.current().add(request)
+    }
+
+    private func persistAlertRecord(_ alert: AlertRecord) {
+        guard let db = metricDatabase, let clusterId = configStore.selectedCluster?.id else { return }
+        Task {
+            try? await db.insertAlert(alert, clusterId: clusterId)
+        }
+    }
+
+    private func persistAlertResolution(_ typeRaw: String) {
+        guard let db = metricDatabase, let clusterId = configStore.selectedCluster?.id else { return }
+        Task {
+            try? await db.resolveAlerts(type: typeRaw, clusterId: clusterId)
+        }
     }
 
     private func loadHistoricalMetrics(for clusterId: UUID) async {
@@ -670,7 +794,8 @@ final class AppState {
         guard let db = metricDatabase else { return }
         do {
             let deleted = try await db.deleteAllData()
-            print("Cleared \(deleted) metric snapshots")
+            let deletedAlerts = try await db.deleteAllAlerts()
+            print("Cleared \(deleted) metric snapshots, \(deletedAlerts) alert records")
         } catch {
             print("Failed to clear metric data: \(error)")
         }
@@ -680,8 +805,9 @@ final class AppState {
         guard let db = metricDatabase else { return }
         do {
             let deleted = try await db.pruneAllClusters(retentionPolicy: retentionPolicy)
-            if deleted > 0 {
-                print("Pruned \(deleted) old metric snapshots")
+            let deletedAlerts = try await db.pruneAlerts(retentionPolicy: retentionPolicy)
+            if deleted > 0 || deletedAlerts > 0 {
+                print("Pruned \(deleted) old metric snapshots, \(deletedAlerts) old alert records")
             }
         } catch {
             print("Failed to prune metrics: \(error)")

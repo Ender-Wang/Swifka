@@ -22,6 +22,17 @@ actor MetricDatabase {
     private let colTopicLags = SQLite.Expression<String>("topic_lags")
     private let colPartitionLagDetail = SQLite.Expression<String>("partition_lag_detail")
 
+    // Alert records table
+    private let alerts = Table("alert_records")
+    private let colAlertId = SQLite.Expression<String>("id")
+    private let colAlertClusterId = SQLite.Expression<String>("cluster_id")
+    private let colAlertTimestamp = SQLite.Expression<Double>("timestamp")
+    private let colAlertType = SQLite.Expression<String>("alert_type")
+    private let colAlertSeverity = SQLite.Expression<Int64>("severity")
+    private let colAlertTitle = SQLite.Expression<String>("title")
+    private let colAlertSummary = SQLite.Expression<String>("summary")
+    private let colAlertResolvedAt = SQLite.Expression<Double?>("resolved_at")
+
     // MARK: - Init
 
     init() throws {
@@ -91,6 +102,41 @@ actor MetricDatabase {
         if !existingColumns.contains("partition_lag_detail") {
             try conn.run(table.addColumn(
                 SQLite.Expression<String>("partition_lag_detail"), defaultValue: "{}",
+            ))
+        }
+
+        // Alert records table
+        let alertsTable = Table("alert_records")
+        let colAlertId = SQLite.Expression<String>("id")
+        let colAlertClusterId = SQLite.Expression<String>("cluster_id")
+        let colAlertTimestamp = SQLite.Expression<Double>("timestamp")
+        let colAlertType = SQLite.Expression<String>("alert_type")
+        let colAlertSeverity = SQLite.Expression<Int64>("severity")
+        let colAlertTitle = SQLite.Expression<String>("title")
+        let colAlertSummary = SQLite.Expression<String>("summary")
+
+        try conn.run(alertsTable.create(ifNotExists: true) { t in
+            t.column(colAlertId, primaryKey: true)
+            t.column(colAlertClusterId)
+            t.column(colAlertTimestamp)
+            t.column(colAlertType)
+            t.column(colAlertSeverity)
+            t.column(colAlertTitle)
+            t.column(colAlertSummary)
+        })
+
+        try conn.run(alertsTable.createIndex(
+            colAlertClusterId, colAlertTimestamp,
+            ifNotExists: true,
+        ))
+
+        // Migration: add resolved_at column if missing
+        let alertColumns = try conn.prepare("PRAGMA table_info(alert_records)").map { row in
+            row[1] as! String
+        }
+        if !alertColumns.contains("resolved_at") {
+            try conn.run(alertsTable.addColumn(
+                SQLite.Expression<Double?>("resolved_at"),
             ))
         }
 
@@ -417,5 +463,69 @@ actor MetricDatabase {
     /// Flush WAL journal into the main database file so a single-file copy is consistent.
     func checkpoint() throws {
         try db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+    }
+
+    // MARK: - Alert Records
+
+    func insertAlert(_ record: AlertRecord, clusterId: UUID) throws {
+        try db.run(alerts.insert(
+            colAlertId <- record.id.uuidString,
+            colAlertClusterId <- clusterId.uuidString,
+            colAlertTimestamp <- record.timestamp.timeIntervalSince1970,
+            colAlertType <- record.type.rawValue,
+            colAlertSeverity <- Int64(record.severity.rawValue),
+            colAlertTitle <- record.title,
+            colAlertSummary <- record.summary,
+            colAlertResolvedAt <- nil,
+        ))
+    }
+
+    /// Mark the most recent unresolved alert of the given type as resolved.
+    func resolveAlerts(type: String, clusterId: UUID) throws {
+        let query = alerts
+            .filter(colAlertClusterId == clusterId.uuidString)
+            .filter(colAlertType == type)
+            .filter(colAlertResolvedAt == nil)
+        try db.run(query.update(colAlertResolvedAt <- Date().timeIntervalSince1970))
+    }
+
+    func loadRecentAlerts(clusterId: UUID, limit: Int = 50) throws -> [AlertRecord] {
+        let query = alerts
+            .filter(colAlertClusterId == clusterId.uuidString)
+            .order(colAlertTimestamp.desc)
+            .limit(limit)
+
+        return try db.prepare(query).compactMap { row in
+            guard let type = AlertRuleType(rawValue: row[colAlertType]),
+                  let severity = AlertSeverity(rawValue: Int(row[colAlertSeverity]))
+            else { return nil }
+            let resolvedAt: Date? = if let ts = row[colAlertResolvedAt] {
+                Date(timeIntervalSince1970: ts)
+            } else {
+                nil
+            }
+            return AlertRecord(
+                id: UUID(uuidString: row[colAlertId]) ?? UUID(),
+                type: type,
+                severity: severity,
+                timestamp: Date(timeIntervalSince1970: row[colAlertTimestamp]),
+                title: row[colAlertTitle],
+                summary: row[colAlertSummary],
+                resolvedAt: resolvedAt,
+            )
+        }
+    }
+
+    @discardableResult
+    func pruneAlerts(retentionPolicy: DataRetentionPolicy) throws -> Int {
+        guard let cutoff = retentionPolicy.cutoffDate else { return 0 }
+        let query = alerts
+            .filter(colAlertTimestamp < cutoff.timeIntervalSince1970)
+        return try db.run(query.delete())
+    }
+
+    @discardableResult
+    func deleteAllAlerts() throws -> Int {
+        try db.run(alerts.delete())
     }
 }
