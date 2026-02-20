@@ -36,6 +36,7 @@ struct MessageBrowserView: View {
     // Schema Registry auto-decode cache
     @State private var registrySchemas: [Int: SchemaInfo] = [:]
     @State private var parsedRegistrySchemas: [Int: (schema: ProtoSchema, messageTypes: [String])] = [:]
+    @State private var parsedAvroSchemas: [Int: AvroType] = [:]
 
     // Pagination
     @State private var currentPage = 0
@@ -194,6 +195,7 @@ struct MessageBrowserView: View {
                 if !appState.connectionStatus.isConnected {
                     registrySchemas = [:]
                     parsedRegistrySchemas = [:]
+                    parsedAvroSchemas = [:]
                 }
                 if appState.connectionStatus.isConnected, selectedTopicName != nil, appState.refreshManager.isAutoRefresh {
                     fetchMessages()
@@ -1361,6 +1363,10 @@ struct MessageBrowserView: View {
                 let parsed = ProtoSchemaParser.parse(schema.schema)
                 let types = ConfluentWireFormat.orderedMessageTypes(from: schema.schema)
                 parsedRegistrySchemas[id] = (schema: parsed, messageTypes: types)
+            } else if schema.schemaType == .avro {
+                if let avroType = try? AvroSchemaParser.parse(schema.schema) {
+                    parsedAvroSchemas[id] = avroType
+                }
             }
         }
     }
@@ -1400,7 +1406,16 @@ struct MessageBrowserView: View {
             }
             return string
         case .avro:
-            return "(Avro — decoding coming in next update)"
+            guard let avroType = parsedAvroSchemas[schemaID] else { return nil }
+            let payload = ConfluentWireFormat.extractPayload(data)
+            do {
+                let decoded = try AvroDecoder.decode(payload: payload, schema: avroType)
+                return pretty
+                    ? AvroDecoder.formatPretty(decoded)
+                    : AvroDecoder.formatFlat(decoded)
+            } catch {
+                return "(Avro decode error: \(error.localizedDescription))"
+            }
         }
     }
 
