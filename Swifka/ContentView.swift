@@ -73,34 +73,37 @@ struct ContentView: View {
             }
 
             ToolbarItemGroup(placement: .primaryAction) {
-                // Alert history bell (always visible, before refresh controls)
-                let activeCount = alertHistory.count(where: { $0.resolvedAt == nil })
-                Button {
-                    showAlertHistory.toggle()
-                } label: {
-                    Label(l10n["toolbar.alerts"], systemImage: "bell")
-                        .foregroundStyle(activeCount > 0 ? .orange : .secondary)
-                        .symbolEffect(.bounce, value: activeCount)
-                }
-                .overlay(alignment: .topTrailing) {
-                    if activeCount > 0 {
-                        Text("\(activeCount)")
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 3)
-                            .frame(minWidth: 15, minHeight: 15)
-                            .background(.orange, in: Circle())
-                            .offset(x: 6, y: -6)
-                            .allowsHitTesting(false)
+                // Alert bell — Dashboard only (cluster health overview)
+                if appState.selectedSidebarItem == .dashboard
+                    || appState.selectedSidebarItem == .none
+                {
+                    let activeCount = alertHistory.count(where: { $0.resolvedAt == nil })
+                    Button {
+                        showAlertHistory.toggle()
+                    } label: {
+                        Label(l10n["toolbar.alerts"], systemImage: "bell")
+                            .foregroundStyle(activeCount > 0 ? .orange : .secondary)
+                            .symbolEffect(.bounce, value: activeCount)
+                    }
+                    .overlay(alignment: .topTrailing) {
+                        if activeCount > 0 {
+                            Text("\(activeCount)")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 3)
+                                .frame(minWidth: 15, minHeight: 15)
+                                .background(.orange, in: Circle())
+                                .offset(x: 6, y: -6)
+                                .allowsHitTesting(false)
+                        }
+                    }
+                    .help(l10n["toolbar.alerts"])
+                    .popover(isPresented: $showAlertHistory) {
+                        AlertHistoryPopover(appState: appState, history: alertHistory)
                     }
                 }
-                .id("alertBell")
-                .help(l10n["toolbar.alerts"])
-                .popover(isPresented: $showAlertHistory) {
-                    AlertHistoryPopover(appState: appState, history: alertHistory)
-                }
 
-                // Refresh controls (only on data pages)
+                // Refresh controls — connected data pages
                 if appState.connectionStatus.isConnected,
                    appState.selectedSidebarItem != .clusters,
                    appState.selectedSidebarItem != .settings,
@@ -146,7 +149,7 @@ struct ContentView: View {
                     .help(l10n["settings.refresh.mode"])
                 }
 
-                // Add cluster (only on Clusters page)
+                // Add cluster — Clusters page only
                 if appState.selectedSidebarItem == .clusters {
                     Button {
                         showingAddClusterSheet = true
@@ -157,24 +160,27 @@ struct ContentView: View {
                     .keyboardShortcut("n", modifiers: .command)
                 }
 
-                // Connection controls (rightmost)
+                // Power button — all pages except Clusters
                 if appState.selectedSidebarItem != .clusters {
-                    if appState.connectionStatus.isConnected {
+                    let isConnected = appState.connectionStatus.isConnected
+                    let hasCluster = appState.configStore.selectedCluster != nil
+                    if isConnected || hasCluster {
                         Button {
-                            Task { await appState.disconnect() }
+                            Task {
+                                if isConnected {
+                                    await appState.disconnect()
+                                } else {
+                                    await appState.connect()
+                                }
+                            }
                         } label: {
-                            Label(l10n["connection.disconnect"], systemImage: "power")
-                                .foregroundStyle(.green)
+                            Label(
+                                isConnected ? l10n["connection.disconnect"] : l10n["connection.connect"],
+                                systemImage: "power",
+                            )
+                            .foregroundStyle(isConnected ? .green : .red)
                         }
-                        .help(l10n["connection.disconnect"])
-                    } else if appState.configStore.selectedCluster != nil {
-                        Button {
-                            Task { await appState.connect() }
-                        } label: {
-                            Label(l10n["connection.connect"], systemImage: "power")
-                                .foregroundStyle(.red)
-                        }
-                        .help(l10n["connection.connect"])
+                        .help(isConnected ? l10n["connection.disconnect"] : l10n["connection.connect"])
                     }
                 }
             }
