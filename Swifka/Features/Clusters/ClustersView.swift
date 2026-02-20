@@ -719,10 +719,11 @@ private struct TestBanner: View {
                 HStack(spacing: 3) {
                     Image(systemName: "antenna.radiowaves.left.and.right")
                         .font(.caption)
-                    Text("\(pingMs)ms")
+                    Text("\(pingMs) ms")
                         .monospacedDigit()
                 }
                 .foregroundStyle(.secondary)
+                .fixedSize()
             } else if let message = info.message {
                 Text(message)
                     .foregroundStyle(.secondary)
@@ -730,6 +731,7 @@ private struct TestBanner: View {
             }
         }
         .font(.callout)
+        .fixedSize()
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
         .background(.ultraThinMaterial, in: Capsule())
