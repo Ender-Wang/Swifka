@@ -201,7 +201,7 @@ Or download the latest `.dmg` from [Releases](https://github.com/Ender-Wang/Swif
 - [x] Schema Registry integration (read-only, Confluent-compatible)
 - [x] Avro deserialization support
 - [x] Configurable alert rules (lag thresholds, broker latency, broker offline)
-- [ ] Structured logging (os.Logger + Console.app)
+- [x] Structured logging (os.Logger + Console.app)
 
 🎨 **Polish**
 
