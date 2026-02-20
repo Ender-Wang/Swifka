@@ -650,12 +650,12 @@ private struct AlertHistoryPopover: View {
 
     private var currentAlerts: [AlertRecord] {
         let startOfDay = Calendar.current.startOfDay(for: Date())
-        return history.filter { $0.timestamp >= startOfDay }
+        return history.filter { $0.timestamp >= startOfDay || $0.resolvedAt == nil }
     }
 
     private var pastAlerts: [AlertRecord] {
         let startOfDay = Calendar.current.startOfDay(for: Date())
-        return history.filter { $0.timestamp < startOfDay }
+        return history.filter { $0.timestamp < startOfDay && $0.resolvedAt != nil }
     }
 
     private var displayedAlerts: [AlertRecord] {
