@@ -179,25 +179,6 @@ struct ContentView: View {
                 }
             }
         }
-        .overlay(alignment: .top) {
-            let visibleAlerts = appState.activeAlerts.filter {
-                !appState.dismissedAlertTypes.contains($0.type.rawValue)
-            }
-            if !visibleAlerts.isEmpty {
-                VStack(spacing: 4) {
-                    ForEach(visibleAlerts) { alert in
-                        AlertRuleBanner(
-                            alert: alert,
-                            l10n: appState.l10n,
-                            onDismiss: { appState.dismissedAlertTypes.insert(alert.type.rawValue) },
-                        )
-                        .transition(.move(edge: .top).combined(with: .opacity))
-                    }
-                }
-            }
-        }
-        .animation(.easeInOut(duration: 0.3), value: appState.activeAlerts.count)
-        .animation(.easeInOut(duration: 0.3), value: appState.dismissedAlertTypes)
         .onChange(of: appState.activeAlerts.count) {
             Task { await loadAlertHistory() }
         }
@@ -575,57 +556,6 @@ private struct CompactMetricIcon: View {
         .opacity(connected ? 1 : 0.35)
         .animation(.default, value: count)
         .animation(.default, value: connected)
-    }
-}
-
-// MARK: - Alert Rule Banner
-
-private struct AlertRuleBanner: View {
-    let alert: AlertRecord
-    let l10n: L10n
-    let onDismiss: () -> Void
-
-    private var bannerColor: Color {
-        switch alert.severity {
-        case .warning: .orange
-        case .critical: .red
-        }
-    }
-
-    private var severityIcon: String {
-        switch alert.severity {
-        case .warning: "exclamationmark.triangle.fill"
-        case .critical: "exclamationmark.octagon.fill"
-        }
-    }
-
-    var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: severityIcon)
-                .foregroundStyle(bannerColor)
-
-            Text(alert.title)
-                .fontWeight(.medium)
-
-            Text(alert.summary)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-
-            Button {
-                onDismiss()
-            } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .foregroundStyle(.secondary)
-            }
-            .buttonStyle(.plain)
-            .help(l10n["common.dismiss"])
-        }
-        .font(.callout)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .background(.ultraThinMaterial, in: Capsule())
-        .shadow(color: .black.opacity(0.1), radius: 8, y: 4)
-        .padding(.top, 8)
     }
 }
 

@@ -132,7 +132,7 @@ final class AppState {
             UserDefaults.standard.set(isrAlertsEnabled, forKey: "settings.isrAlerts.enabled")
             if !isrAlertsEnabled {
                 activeAlerts.removeAll { $0.type == .isr }
-                dismissedAlertTypes.remove(AlertRuleType.isr.rawValue)
+
                 previousAlertTypes.remove(AlertRuleType.isr.rawValue)
             }
         }
@@ -197,7 +197,6 @@ final class AppState {
     // MARK: - Alerts (session-scoped)
 
     var activeAlerts: [AlertRecord] = []
-    var dismissedAlertTypes: Set<String> = []
 
     @ObservationIgnored
     private var previousAlertTypes: Set<String> = []
@@ -351,7 +350,6 @@ final class AppState {
         trendsMode = .live
         lagMode = .live
         activeAlerts = []
-        dismissedAlertTypes = []
         previousAlertTypes = []
         consecutiveRefreshErrors = 0
         historyState.store.clear()
@@ -642,11 +640,8 @@ final class AppState {
         let currentTypes = Set(alerts.map(\.type.rawValue))
         let newlyTriggered = currentTypes.subtracting(previousAlertTypes)
 
-        // Reset dismiss for types that resolved and re-triggered
-        let resolvedTypes = previousAlertTypes.subtracting(currentTypes)
-        dismissedAlertTypes.subtract(resolvedTypes)
-
         // Persist resolution for types that just resolved
+        let resolvedTypes = previousAlertTypes.subtracting(currentTypes)
         for typeRaw in resolvedTypes {
             persistAlertResolution(typeRaw)
         }
