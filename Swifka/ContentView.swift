@@ -730,10 +730,15 @@ private struct AlertHistoryPopover: View {
                     .lineLimit(1)
             }
             Spacer()
-            Text(record.timestamp, format: .dateTime.hour().minute().second())
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
-                .fixedSize()
+            VStack(alignment: .trailing, spacing: 1) {
+                Text(record.timestamp, format: .dateTime.hour().minute().second())
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                Text(record.timestamp, format: .dateTime.year().month(.abbreviated).day())
+                    .font(.caption2)
+                    .foregroundStyle(.quaternary)
+            }
+            .fixedSize()
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
@@ -781,7 +786,7 @@ private struct AlertHistoryPopover: View {
                 Text(l10n["alerts.detail.triggered"])
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
-                Text(record.timestamp, format: .dateTime.month(.abbreviated).day().hour().minute().second())
+                Text(record.timestamp, format: .dateTime.year().month(.abbreviated).day().hour().minute().second())
                     .font(.caption.monospacedDigit())
             }
 
@@ -791,7 +796,7 @@ private struct AlertHistoryPopover: View {
                     Text(l10n["alerts.detail.resolved"])
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
-                    Text(resolvedAt, format: .dateTime.month(.abbreviated).day().hour().minute().second())
+                    Text(resolvedAt, format: .dateTime.year().month(.abbreviated).day().hour().minute().second())
                         .font(.caption.monospacedDigit())
                         .foregroundStyle(.green)
                 }
