@@ -173,7 +173,7 @@ Or download the latest `.dmg` from [Releases](https://github.com/Ender-Wang/Swif
 - [x] Message deserialization
   - [x] Extensible deserializer protocol with per-topic format memory
   - [x] Protobuf decoding (import .proto files, schema-aware field names, nested messages)
-  - [x] ~~Avro deserialization~~ — deferred (future work)
+  - [x] Avro deserialization (via Schema Registry, lightweight binary decoder)
   - [x] ~~Application-level decryption~~ — deferred (future work)
   - [x] ~~Custom deserializers (plugin system)~~ — deferred (future work)
 - [x] JSON pretty-printing with syntax highlighting
