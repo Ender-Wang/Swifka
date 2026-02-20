@@ -165,7 +165,9 @@ struct MessageBrowserView: View {
                 }
             }
             .onChange(of: messageFormat) {
-                saveFormatForTopic(messageFormat) // Save format when changed
+                if !messageFormat.isSchemaRegistry {
+                    saveFormatForTopic(messageFormat) // Save manual format choices only
+                }
             }
             .onAppear {
                 loadFormatForTopic(selectedTopicName) // Load format on initial appear
@@ -475,8 +477,12 @@ struct MessageBrowserView: View {
             }
 
             Picker(l10n["messages.format"], selection: $messageFormat) {
-                ForEach(MessageFormat.allCases) { format in
+                ForEach(MessageFormat.manualCases) { format in
                     Text(format.rawValue).tag(format)
+                }
+                if messageFormat.isSchemaRegistry {
+                    Divider()
+                    Text(messageFormat.rawValue).tag(messageFormat)
                 }
             }
             .fixedSize()
@@ -1352,11 +1358,9 @@ struct MessageBrowserView: View {
             }
         }
 
-        // Only fetch schemas we haven't cached yet
-        schemaIDs.subtract(registrySchemas.keys)
-        guard !schemaIDs.isEmpty else { return }
-
-        for id in schemaIDs {
+        // Fetch schemas we haven't cached yet
+        let uncached = schemaIDs.subtracting(registrySchemas.keys)
+        for id in uncached {
             guard let schema = try? await client.fetchSchemaByID(id) else { continue }
             registrySchemas[id] = schema
             if schema.schemaType == .protobuf {
@@ -1368,6 +1372,25 @@ struct MessageBrowserView: View {
                     parsedAvroSchemas[id] = avroType
                 }
             }
+        }
+
+        // Auto-detect format from the dominant schema type in value fields
+        guard !schemaIDs.isEmpty else { return }
+        autoDetectRegistryFormat(for: messages)
+    }
+
+    /// Auto-set format picker to Schema Registry when registry-encoded messages are detected.
+    private func autoDetectRegistryFormat(for messages: [KafkaMessageRecord]) {
+        let hasRegistryMessages = messages.contains { message in
+            guard let value = message.value else { return false }
+            return ConfluentWireFormat.extractSchemaID(value) != nil
+        }
+
+        guard hasRegistryMessages else { return }
+
+        // Only auto-set if the user hasn't manually chosen a non-default format
+        if messageFormat == .utf8 {
+            messageFormat = .schemaRegistry
         }
     }
 

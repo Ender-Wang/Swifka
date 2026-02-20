@@ -262,7 +262,7 @@ nonisolated struct KafkaMessageRecord: Identifiable, Sendable {
         guard let data else { return "(null)" }
         if data.isEmpty { return "(empty)" }
         switch format {
-        case .utf8:
+        case .utf8, .schemaRegistry:
             return String(data: data, encoding: .utf8) ?? "(binary data)"
         case .hex:
             return data.map { String(format: "%02x", $0) }.joined(separator: " ")
@@ -339,16 +339,22 @@ nonisolated enum MessageFormat: String, CaseIterable, Identifiable, Sendable {
     case hex = "Hex"
     case base64 = "Base64"
     case protobuf = "Protobuf"
+    case schemaRegistry = "Schema Registry"
 
     var id: String {
         rawValue
+    }
+
+    /// Whether this format is auto-detected via Schema Registry (not user-selectable)
+    var isSchemaRegistry: Bool {
+        self == .schemaRegistry
     }
 
     /// Bridge to new deserializer system
     @MainActor
     var deserializer: any MessageDeserializer {
         switch self {
-        case .utf8:
+        case .utf8, .schemaRegistry:
             UTF8Deserializer()
         case .hex:
             HexDeserializer()
@@ -366,7 +372,13 @@ nonisolated enum MessageFormat: String, CaseIterable, Identifiable, Sendable {
         case .hex: "hex"
         case .base64: "base64"
         case .protobuf: "protobuf"
+        case .schemaRegistry: "schema-registry"
         }
+    }
+
+    /// Formats available in the manual picker (excludes auto-detected registry formats)
+    static var manualCases: [MessageFormat] {
+        [.utf8, .hex, .base64, .protobuf]
     }
 }
 
