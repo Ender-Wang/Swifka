@@ -17,9 +17,22 @@
 		F86DB56B2F34E4EB009E3F6A /* Swifka.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Swifka.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		F83FB8FB2F49E5E4007775F9 /* Exceptions for "Swifka" folder in "Swifka" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = F86DB56A2F34E4EB009E3F6A /* Swifka */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		F86DB56D2F34E4EB009E3F6A /* Swifka */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				F83FB8FB2F49E5E4007775F9 /* Exceptions for "Swifka" folder in "Swifka" target */,
+			);
 			path = Swifka;
 			sourceTree = "<group>";
 		};
@@ -300,9 +313,9 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Swifka/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Swifka;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -333,9 +346,9 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Swifka/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Swifka;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
