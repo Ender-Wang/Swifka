@@ -7,12 +7,14 @@ enum SettingsTab: String, CaseIterable {
     case general
     case alerts
     case data
+    case about
 
     var icon: String {
         switch self {
         case .general: "gearshape"
         case .alerts: "bell"
         case .data: "internaldrive"
+        case .about: "info.circle"
         }
     }
 
@@ -21,6 +23,7 @@ enum SettingsTab: String, CaseIterable {
         case .general: l10n["settings.tab.general"]
         case .alerts: l10n["settings.tab.alerts"]
         case .data: l10n["settings.tab.data"]
+        case .about: l10n["settings.tab.about"]
         }
     }
 }
@@ -86,6 +89,8 @@ struct SettingsView: View {
                     alertsSection
                 case .data:
                     dataSection
+                case .about:
+                    aboutSection
                 }
             }
             .formStyle(.grouped)
@@ -481,6 +486,47 @@ struct SettingsView: View {
         }
     }
 
+    // MARK: - About Tab
+
+    @ViewBuilder
+    private var aboutSection: some View {
+        let l10n = appState.l10n
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"
+        let copyright = Bundle.main.infoDictionary?["NSHumanReadableCopyright"] as? String ?? ""
+
+        Section(header: Label(l10n["settings.about.app"], systemImage: "info.circle")) {
+            VStack(spacing: 8) {
+                Image(nsImage: NSApp.applicationIconImage)
+                    .resizable()
+                    .frame(width: 64, height: 64)
+
+                Text("Swifka")
+                    .font(.title2.bold())
+                Text("v\(version) (build \(build))")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                if !copyright.isEmpty {
+                    Text(copyright)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Text(l10n["settings.about.description"])
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 4)
+        }
+
+        Section(header: Label(l10n["settings.about.links"], systemImage: "link")) {
+            LinkRow(title: l10n["settings.about.github"], url: "https://github.com/Ender-Wang/Swifka")
+            LinkRow(title: l10n["settings.about.report.bug"], url: "https://github.com/Ender-Wang/Swifka/issues/new?template=bug_report.md")
+            LinkRow(title: l10n["settings.about.request.feature"], url: "https://github.com/Ender-Wang/Swifka/issues/new?template=feature_request.md")
+        }
+    }
+
     // MARK: - Backup Import
 
     private func handleBackupImport(_ result: Result<URL, Error>) {
@@ -568,5 +614,38 @@ private struct SettingsTabButton: View {
             )
         }
         .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Link Row
+
+private struct LinkRow: View {
+    let title: String
+    let url: String
+    @State private var isHovered = false
+
+    var body: some View {
+        HStack {
+            Text(title)
+            Spacer()
+            Button {
+                if let url = URL(string: url) {
+                    NSWorkspace.shared.open(url)
+                }
+            } label: {
+                Image(systemName: "arrow.up.right")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 24, height: 24)
+                    .background(
+                        RoundedRectangle(cornerRadius: 5)
+                            .fill(isHovered ? Color.primary.opacity(0.08) : .clear),
+                    )
+                    .animation(.easeInOut(duration: 0.15), value: isHovered)
+            }
+            .buttonStyle(.plain)
+            .onHover { isHovered = $0 }
+            .help(url)
+        }
     }
 }

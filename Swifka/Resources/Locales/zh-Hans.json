@@ -250,6 +250,7 @@
   "settings.tab.general": "通用",
   "settings.tab.alerts": "警报",
   "settings.tab.data": "数据",
+  "settings.tab.about": "关于",
   "settings.general": "通用",
   "settings.refresh": "刷新",
   "settings.refresh.mode": "默认刷新模式",
@@ -328,6 +329,13 @@
   "settings.retention.unlimited": "不限",
   "settings.retention.clear": "清除所有指标数据",
   "settings.retention.clear.confirm": "确定要删除所有已存储的指标历史记录吗？此操作无法撤销。",
+
+  "settings.about.app": "应用信息",
+  "settings.about.description": "原生 macOS Kafka 监控工具，只读设计。",
+  "settings.about.links": "链接",
+  "settings.about.github": "GitHub 仓库",
+  "settings.about.report.bug": "报告问题",
+  "settings.about.request.feature": "功能建议",
 
   "common.copy": "拷贝",
   "common.copied": "已拷贝",

@@ -250,6 +250,7 @@
   "settings.tab.general": "General",
   "settings.tab.alerts": "Alerts",
   "settings.tab.data": "Data",
+  "settings.tab.about": "About",
   "settings.general": "General",
   "settings.refresh": "Refresh",
   "settings.refresh.mode": "Default Refresh Mode",
@@ -328,6 +329,13 @@
   "settings.retention.unlimited": "Unlimited",
   "settings.retention.clear": "Clear All Metric Data",
   "settings.retention.clear.confirm": "Are you sure you want to delete all stored metric history? This cannot be undone.",
+
+  "settings.about.app": "App Info",
+  "settings.about.description": "A native macOS Kafka monitor. Read-only by design.",
+  "settings.about.links": "Links",
+  "settings.about.github": "GitHub Repository",
+  "settings.about.report.bug": "Report a Bug",
+  "settings.about.request.feature": "Request a Feature",
 
   "common.copy": "Copy",
   "common.copied": "Copied",
