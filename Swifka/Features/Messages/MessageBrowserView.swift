@@ -283,6 +283,7 @@ struct MessageBrowserView: View {
                         .font(.system(size: 13))
                 }
                 .buttonStyle(.plain)
+                .help(l10n["common.clear.search"])
             }
         }
         .padding(.horizontal, 8)
@@ -1818,6 +1819,19 @@ struct DetailRow: View {
                 )
                 .contentTransition(.opacity)
                 .onTapGesture {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(value, forType: .string)
+
+                    withAnimation(.easeIn(duration: 0.1)) {
+                        isHighlighted = true
+                        showCopied = true
+                    }
+                    withAnimation(.easeOut(duration: 0.3).delay(0.8)) {
+                        showCopied = false
+                        isHighlighted = false
+                    }
+                }
+                .accessibilityAction(named: "Copy") {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(value, forType: .string)
 

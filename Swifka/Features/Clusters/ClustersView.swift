@@ -1026,6 +1026,7 @@ private struct ClusterRow: View {
                 Circle()
                     .fill(dotColor)
                     .frame(width: 8, height: 8)
+                    .accessibilityLabel(dotAccessibilityLabel)
 
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
@@ -1213,11 +1214,19 @@ private struct ClusterRow: View {
         )
         .animation(.easeInOut(duration: 0.15), value: isKeyboardSelected)
         .onTapGesture(count: 2) { onEdit() }
+        .accessibilityAction(named: Text(appState.l10n["cluster.edit"])) { onEdit() }
     }
 
     /// Show action buttons: always for connected cluster, on hover/selection for others
     private var showActions: Bool {
         isConnected || isKeyboardSelected || isTesting
+    }
+
+    private var dotAccessibilityLabel: String {
+        let l10n = appState.l10n
+        if isConnected { return l10n["a11y.cluster.status.connected"] }
+        if pingFailed { return l10n["a11y.cluster.status.unreachable"] }
+        return l10n["a11y.cluster.status.idle"]
     }
 
     private var dotColor: Color {

@@ -420,7 +420,7 @@ struct ClusterThroughputChart: View {
                         if let p = nearest(data, to: date, by: \.timestamp) {
                             ChartTooltip(date: p.timestamp) {
                                 HStack(spacing: 4) {
-                                    Circle().fill(.blue).frame(width: 8, height: 8)
+                                    Circle().fill(.blue).frame(width: 8, height: 8).accessibilityHidden(true)
                                     Text(String(format: "%.1f msg/s", p.messagesPerSecond))
                                         .font(.caption2).bold()
                                 }
@@ -436,7 +436,7 @@ struct ClusterThroughputChart: View {
                         if let p = nearest(data, to: date, by: \.timestamp) {
                             ChartTooltip(date: p.timestamp) {
                                 HStack(spacing: 4) {
-                                    Circle().fill(.blue).frame(width: 8, height: 8)
+                                    Circle().fill(.blue).frame(width: 8, height: 8).accessibilityHidden(true)
                                     Text(String(format: "%.1f msg/s", p.messagesPerSecond))
                                         .font(.caption2).bold()
                                 }
@@ -535,7 +535,7 @@ struct PingLatencyChart: View {
                         if let p = nearest(data, to: date, by: \.timestamp) {
                             ChartTooltip(date: p.timestamp) {
                                 HStack(spacing: 4) {
-                                    Circle().fill(.green).frame(width: 8, height: 8)
+                                    Circle().fill(.green).frame(width: 8, height: 8).accessibilityHidden(true)
                                     Text("\(p.ms) ms")
                                         .font(.caption2).bold()
                                 }
@@ -551,7 +551,7 @@ struct PingLatencyChart: View {
                         if let p = nearest(data, to: date, by: \.timestamp) {
                             ChartTooltip(date: p.timestamp) {
                                 HStack(spacing: 4) {
-                                    Circle().fill(.green).frame(width: 8, height: 8)
+                                    Circle().fill(.green).frame(width: 8, height: 8).accessibilityHidden(true)
                                     Text("\(p.ms) ms")
                                         .font(.caption2).bold()
                                 }
@@ -604,7 +604,7 @@ struct TopicThroughputChart: View {
                 ForEach(items) { item in
                     let colorIndex = selectedTopics.firstIndex(of: item.id) ?? 0
                     HStack(spacing: 4) {
-                        Circle().fill(seriesColors[colorIndex % seriesColors.count]).frame(width: 8, height: 8)
+                        Circle().fill(seriesColors[colorIndex % seriesColors.count]).frame(width: 8, height: 8).accessibilityHidden(true)
                         Text(String(format: "%@: %.1f msg/s", item.id, item.point.messagesPerSecond))
                             .font(.caption2)
                     }
@@ -797,7 +797,7 @@ struct ConsumerGroupLagChart: View {
                 ForEach(items) { item in
                     let colorIndex = selectedGroups.firstIndex(of: item.id) ?? 0
                     HStack(spacing: 4) {
-                        Circle().fill(seriesColors[colorIndex % seriesColors.count]).frame(width: 8, height: 8)
+                        Circle().fill(seriesColors[colorIndex % seriesColors.count]).frame(width: 8, height: 8).accessibilityHidden(true)
                         Text("\(item.id): \(item.point.totalLag)")
                             .font(.caption2)
                     }
@@ -1001,7 +1001,7 @@ struct TopicLagChart: View {
                 ForEach(items) { item in
                     let colorIndex = active.firstIndex(of: item.id) ?? 0
                     HStack(spacing: 4) {
-                        Circle().fill(seriesColors[colorIndex % seriesColors.count]).frame(width: 8, height: 8)
+                        Circle().fill(seriesColors[colorIndex % seriesColors.count]).frame(width: 8, height: 8).accessibilityHidden(true)
                         Text("\(item.id): \(item.point.totalLag)")
                             .font(.caption2)
                     }
@@ -1339,7 +1339,7 @@ private struct PartitionSubChart: View {
                 ForEach(items, id: \.key) { item in
                     let colorIndex = partitionKeys.firstIndex(of: item.key) ?? 0
                     HStack(spacing: 4) {
-                        Circle().fill(seriesColors[colorIndex % seriesColors.count]).frame(width: 8, height: 8)
+                        Circle().fill(seriesColors[colorIndex % seriesColors.count]).frame(width: 8, height: 8).accessibilityHidden(true)
                         if let owner = item.owner {
                             Text("\(item.label) (\(owner.clientId) · \(owner.memberId)): \(item.point.totalLag)")
                                 .font(.caption2)
@@ -1680,7 +1680,7 @@ private struct MemberSubChart: View {
                 ForEach(hoverItems, id: \.idx) { item in
                     let colorIndex = item.idx
                     HStack(spacing: 4) {
-                        Circle().fill(seriesColors[colorIndex % seriesColors.count]).frame(width: 8, height: 8)
+                        Circle().fill(seriesColors[colorIndex % seriesColors.count]).frame(width: 8, height: 8).accessibilityHidden(true)
                         if needsDisambiguation {
                             Text("\(item.member.clientId) · \(item.member.memberId): \(item.point.totalLag)")
                                 .font(.caption2)
@@ -1845,7 +1845,7 @@ struct ISRHealthChart: View {
                         if let p = nearest(data, to: date, by: \.timestamp) {
                             ChartTooltip(date: p.timestamp) {
                                 HStack(spacing: 4) {
-                                    Circle().fill(.green).frame(width: 8, height: 8)
+                                    Circle().fill(.green).frame(width: 8, height: 8).accessibilityHidden(true)
                                     Text(String(format: "%.1f%%", p.healthyRatio * 100))
                                         .font(.caption2).bold()
                                 }
@@ -1861,7 +1861,7 @@ struct ISRHealthChart: View {
                         if let p = nearest(data, to: date, by: \.timestamp) {
                             ChartTooltip(date: p.timestamp) {
                                 HStack(spacing: 4) {
-                                    Circle().fill(.green).frame(width: 8, height: 8)
+                                    Circle().fill(.green).frame(width: 8, height: 8).accessibilityHidden(true)
                                     Text(String(format: "%.1f%%", p.healthyRatio * 100))
                                         .font(.caption2).bold()
                                 }

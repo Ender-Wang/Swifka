@@ -334,6 +334,7 @@
   "common.refresh": "Refresh",
   "common.close": "Close",
   "common.find": "Find",
+  "common.clear.search": "Clear search",
   "common.dismiss": "Dismiss",
   "toolbar.alerts": "Alert History",
   "common.loading": "Loading…",
@@ -417,5 +418,10 @@
   "cancel": "Cancel",
   "save": "Save",
   "expand": "Expand",
-  "collapse": "Collapse"
+  "collapse": "Collapse",
+
+  "a11y.cluster.status.connected": "Connected",
+  "a11y.cluster.status.unreachable": "Unreachable",
+  "a11y.cluster.status.idle": "Idle",
+  "a11y.broker.status.online": "Online"
 }

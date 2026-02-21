@@ -92,6 +92,7 @@ struct BrokersView: View {
                     Circle()
                         .fill(.green)
                         .frame(width: 8, height: 8)
+                        .accessibilityLabel(l10n["a11y.broker.status.online"])
                     Text(l10n["brokers.broker.id"])
                         .font(.caption)
                         .foregroundStyle(.secondary)

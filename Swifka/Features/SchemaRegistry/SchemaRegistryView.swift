@@ -138,6 +138,7 @@ struct SchemaRegistryView: View {
                             .font(.system(size: 13))
                     }
                     .buttonStyle(.plain)
+                    .help(l10n["common.clear.search"])
                 }
             }
             .padding(.horizontal, 8)

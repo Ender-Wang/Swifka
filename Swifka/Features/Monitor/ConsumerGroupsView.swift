@@ -319,6 +319,12 @@ struct GroupDetailView: View {
                         withAnimation(.easeIn(duration: 0.1)) { nameCopied = true }
                         withAnimation(.easeOut(duration: 0.3).delay(0.8)) { nameCopied = false }
                     }
+                    .accessibilityAction(named: Text(l10n["common.copy"])) {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(group.name, forType: .string)
+                        withAnimation(.easeIn(duration: 0.1)) { nameCopied = true }
+                        withAnimation(.easeOut(duration: 0.3).delay(0.8)) { nameCopied = false }
+                    }
                 Spacer()
             }
             .padding(.horizontal)

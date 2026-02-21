@@ -334,6 +334,7 @@
   "common.refresh": "刷新",
   "common.close": "关闭",
   "common.find": "查找",
+  "common.clear.search": "清除搜索",
   "common.dismiss": "关闭",
   "toolbar.alerts": "告警历史",
   "common.loading": "加载中…",
@@ -417,5 +418,10 @@
   "cancel": "取消",
   "save": "保存",
   "expand": "展开",
-  "collapse": "收起"
+  "collapse": "收起",
+
+  "a11y.cluster.status.connected": "已连接",
+  "a11y.cluster.status.unreachable": "无法访问",
+  "a11y.cluster.status.idle": "空闲",
+  "a11y.broker.status.online": "在线"
 }
