@@ -198,7 +198,7 @@ struct SettingsView: View {
         }
 
         // Updates
-        Section(header: Label(l10n["settings.updates"], systemImage: "arrow.triangle.2.circlepath")) {
+        Section(header: Label(l10n["settings.updates"], systemImage: "arrow.down.app")) {
             Toggle(l10n["updates.auto.check"], isOn: $state.autoCheckUpdates)
 
             Text(l10n["updates.auto.check.description"])
