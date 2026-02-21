@@ -205,7 +205,7 @@ Or download the latest `.dmg` from [Releases](https://github.com/Ender-Wang/Swif
 
 🎨 **Polish**
 
-- [ ] Accessibility (VoiceOver, keyboard-only workflows)
+- [x] Accessibility (VoiceOver, ~~keyboard-only workflows~~ Cmd+F to search)
 
 📦 **Release**
 
