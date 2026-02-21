@@ -90,126 +90,64 @@ Or download the latest `.dmg` from [Releases](https://github.com/Ender-Wang/Swif
 
 # Roadmap
 
-## Milestone 1: MVP Core
+| Milestone | Focus | Status |
+|-----------|-------|--------|
+| 1 | MVP Core — connections, topics, messages, consumer groups, brokers | ✅ |
+| 2 | Dashboards & Visualization — charts, alerts, historical data, SQLite | ✅ |
+| 3 | Animations & Polish — chart animations, cluster manager, menu bar | ✅ |
+| 4 | Advanced Monitoring & Search — Protobuf/Avro decode, regex/JSON path search | ✅ |
+| 5 | Release Polish — Schema Registry, alert rules, accessibility, logging, in-app auto-update → **1.0.0** | 🚧 |
 
-✨ **Features**
+<details>
+<summary>Detailed milestone breakdown</summary>
 
-- [x] Cluster connection management (add/edit/delete, multi-cluster switching, test connection)
-- [x] Topic list with partition detail (replicas, leader, ISR, watermarks)
-- [x] Message browsing (key, value, timestamp, offset) with UTF-8 / Hex / Base64 display
-- [x] Consumer group list with lag display (watermark-based)
-- [x] Broker list and basic stats (topic count, partition count)
+**Milestone 1: MVP Core**
 
-⚙️ **Settings & Infrastructure**
+- Cluster connection management (add/edit/delete, multi-cluster, test, Keychain credentials)
+- Topic list with partition detail (replicas, leader, ISR, watermarks)
+- Message browsing (key, value, timestamp, offset) with UTF-8 / Hex / Base64
+- Consumer group list with lag display (watermark-based)
+- Broker list and basic stats
+- Manual + timed refresh (5s / 10s / 30s / 60s)
+- i18n — English + Simplified Chinese
 
-- [x] Config persistence (JSON) + Keychain for credentials
-- [x] Manual + timed refresh (5s / 10s / 30s / 60s)
-- [x] Read-only by default, extension points for future write features
+**Milestone 2: Dashboards & Visualization**
 
-🌍 **i18n**
+- Cluster health overview with throughput (msg/s)
+- Per-topic and per-partition lag breakdown
+- Swift Charts — lag trends, throughput trends, per-consumer member lag
+- SQLite storage with configurable retention and SQL-downsampled history (1h–7d)
+- Hover-to-inspect chart tooltips with color markers
+- Paginated message browsing (500 per page)
+- ISR health monitoring and alerts (under-replicated, critical, below min.insync.replicas)
+- Desktop notifications
 
-- [x] i18n framework — English + Simplified Chinese (JSON-based, easy to contribute)
+**Milestone 3: Animations & Polish**
 
-## Milestone 2: Dashboards & Visualization
+- Animated line drawing for chart transitions
+- Live ↔ History mode transitions
+- Dark mode optimization
+- Broker health dashboard (leader distribution chart + stats cards)
+- Excel (.xlsx) chart data export
+- Menu bar resident mode + keyboard shortcuts
+- Cluster manager: pin, clone, export/import, drag-to-reorder, sort modes, keyboard navigation
 
-📊 **Features**
+**Milestone 4: Advanced Monitoring & Search**
 
-- [x] Cluster health overview with production/consumption throughput
-- [x] Per-topic lag ranking and total lag display
-- [x] Per-partition lag breakdown in consumer group detail panel
-- [x] Swift Charts — lag trends, throughput trends
-- [x] Per-consumer member lag chart (aggregate partition lag per consumer instance)
+- Message deserialization: Protobuf (.proto import), Avro (Schema Registry), JSON pretty-print
+- Message search: keyword, regex, JSON path (`user.email:john@`), time range filter
+- Broker liveness monitoring, consumer activity status
 
-🔧 **Enhancements**
+**Milestone 5: Release Polish & Extended Monitoring**
 
-- [x] Local database storage (SQLite ~~/ SwiftData~~) with configurable retention
-- [x] Historical data browsing with date range filtering and scrollable charts
-- [x] Hover-to-inspect tooltips on trend charts with color markers and value ranking
-- [x] SQL aggregation + extended time ranges for History mode (1h / 6h / 24h / 7d)
-- [x] Paginated message browsing (500 per page)
+- Schema Registry integration (read-only, Confluent-compatible, auto-decode wire format)
+- Configurable alert rules (lag, latency, broker offline) with history and resolution tracking
+- Structured logging (os.Logger + Console.app)
+- VoiceOver accessibility
+- Logo, screenshots, GitHub Releases
+- In-app auto-update (check, download, verify, install, restart) — no Sparkle dependency
 
-⚠️ **Health & Alerts**
-
-- [x] ISR health monitoring and alerts
-  - [x] Alert: Under-replicated partitions (ISR < replication factor)
-  - [x] Alert: Critical ISR level (ISR = 1, single point of failure)
-  - [x] Alert: ISR below min.insync.replicas (partition at risk)
-  - [x] ISR history graph (track ISR changes over time)
-- [x] Desktop notifications (macOS native alerts)
-
-## Milestone 3: Animations & Polish
-
-📊 **Advanced Charts**
-
-- [x] ~~Trends page tab reorganization~~ → Split into Trends (cluster health) + Lag (consumer investigation) pages
-- [x] ~~Pinch-to-zoom on History charts for time range drill-down~~ — visible window picker (1m–7d) provides equivalent zoom
-- [x] ~~Chart statistics overlay (avg / min / max per series in visible window)~~ — superseded by global Mean/Min/Max aggregation mode
-- [x] ~~Timeline gap compression~~ — deferred; data smoothing is a better alternative
-- [x] ~~Data smoothing for large time windows~~ — covered by Mean/Min/Max SQL downsampling
-- [x] ~~Export chart data as CSV~~ → replaced with Excel (.xlsx) export with per-series sheets
-
-🎨 **UI & Animations**
-
-- [x] Animated line drawing for chart transitions
-- [x] ~~Message flow animations and real-time data change effects~~ — per-point interpolation conflicts with SwiftUI Charts' y-axis auto-ranging, causing visual glitches; not worth the complexity
-- [x] Trends page loading/mode-switch transitions (Live ↔ History)
-- [x] Dark mode optimization
-- [x] Broker health dashboard (leader distribution chart + stats cards)
-
-🔧 **Enhancements**
-
-- [x] Menu bar resident mode + keyboard shortcuts
-- [x] Cluster manager enhancements
-  - [x] Pin favorite clusters to top
-  - [x] Clone/duplicate cluster configs (with password copy)
-  - [x] Export/import clusters with selective backup (timestamped files)
-  - [x] Multiple sort modes (manual, name, last connected, created, modified)
-  - [x] Drag-to-reorder and drag-to-pin/unpin
-  - [x] Track last connected timestamp for each cluster
-  - [x] Keyboard navigation (↑↓ arrows, Enter to connect, shortcuts for test/edit/delete/clone)
-
-## Milestone 4: Advanced Monitoring & Search
-
-✨ **Features**
-
-- [x] Message deserialization
-  - [x] Extensible deserializer protocol with per-topic format memory
-  - [x] Protobuf decoding (import .proto files, schema-aware field names, nested messages)
-  - [x] Avro deserialization (via Schema Registry, lightweight binary decoder)
-  - [x] ~~Application-level decryption~~ — deferred (future work)
-  - [x] ~~Custom deserializers (plugin system)~~ — deferred (future work)
-- [x] JSON pretty-printing with syntax highlighting
-- [x] Message search/filter
-  - [x] Search by key, value, or both
-  - [x] Time range filter
-  - [x] Keyword and regex search
-  - [x] JSON path search (e.g., `user.email:john@`)
-
-📊 **Monitoring**
-
-- [x] Broker liveness monitoring, consumer activity status
-
-## Milestone 5: Release Polish & Extended Monitoring
-
-- [x] ~~Send test messages, create/delete topics, reset offsets~~ — write operations contradict Swifka's core identity as a safe, read-only monitor; in production environments, topic management belongs in IaC (Terraform), offset resets in audited CLI runbooks, and message production in application code
-- [x] ~~Permission tiers (Read / Write / Admin / Dangerous)~~ — unnecessary without write operations
-- [x] ~~Docker API integration for local dev environments~~ — users manage Docker externally
-- [x] ~~Failure simulation and recovery monitoring~~ — chaos engineering, not monitoring; out of scope
-
-🔍 **Extended Monitoring**
-
-- [x] Schema Registry integration (read-only, Confluent-compatible)
-- [x] Avro deserialization support
-- [x] Configurable alert rules (lag thresholds, broker latency, broker offline)
-- [x] Structured logging (os.Logger + Console.app)
-
-🎨 **Polish**
-
-- [x] Accessibility (VoiceOver, ~~keyboard-only workflows~~ Cmd+F to search)
-
-📦 **Release**
-
-- [ ] Logo, screenshots, full README, CONTRIBUTING.md, GitHub Releases
+</details>
 
 ---
 
@@ -222,6 +160,82 @@ brew install swiftformat
 ```
 
 Code style is enforced by [SwiftFormat](https://github.com/nicklockwood/SwiftFormat) via a build phase — rules are in `.swiftformat` at the project root.
+
+## Architecture
+
+### Data Flow
+
+```mermaid
+graph TD
+    V["SwiftUI Views"] -->|"observe"| A["AppState (@Observable)"]
+    A -->|"user actions"| V
+    R["RefreshManager"] -->|"periodic fetch"| A
+    A -->|"async calls"| K["KafkaService (actor)"]
+    K -->|"C FFI · librdkafka"| C["Kafka / Redpanda"]
+    A -->|"decode"| D["MessageDeserializer"]
+    D -.->|"schema lookup"| S["SchemaRegistryClient"]
+    S -->|"HTTP"| SR["Schema Registry"]
+    A <-->|"metrics"| DB[("SQLite")]
+    A <-->|"configs"| CS["JSON + Keychain"]
+```
+
+### Source Tree
+
+```
+Swifka/
+├── App/                            # Entry point + global state
+│   ├── SwifkaApp.swift             #   @main, window groups, menu commands
+│   └── AppState.swift              #   @Observable — single source of truth for all UI
+├── ContentView.swift               # NavigationSplitView shell (sidebar → detail router)
+│
+├── Core/                           # Business logic — no SwiftUI imports
+│   ├── Kafka/
+│   │   ├── KafkaService.swift      #   actor — librdkafka C FFI (metadata, consume, watermarks)
+│   │   ├── Models.swift            #   TopicInfo, BrokerInfo, ConsumerGroupInfo, etc.
+│   │   ├── MetricStore.swift       #   In-memory snapshots for live trend charts
+│   │   └── MetricModels.swift      #   MetricSnapshot, LagSnapshot value types
+│   ├── Deserialization/
+│   │   ├── MessageDeserializer.swift      # Format router (UTF-8, Hex, Base64, Proto, Avro, JSON)
+│   │   ├── ProtobufDeserializer.swift     # .proto file import + wire-format decode
+│   │   └── AvroDecoder.swift              # Avro binary decoder (all types)
+│   ├── SchemaRegistry/
+│   │   ├── SchemaRegistryClient.swift     # HTTP — subjects, versions, schema fetch
+│   │   └── ConfluentWireFormat.swift      # Magic byte 0x00 + 4-byte schema ID extraction
+│   ├── Storage/
+│   │   ├── ConfigStore.swift       #   Cluster configs persisted as JSON files
+│   │   ├── MetricDatabase.swift    #   SQLite — historical metrics, alerts, retention
+│   │   └── BackupManager.swift     #   Cluster export/import (.zip archives)
+│   └── Security/
+│       └── KeychainManager.swift   #   macOS Keychain for passwords and SASL credentials
+│
+├── Features/                       # One directory per sidebar page
+│   ├── Clusters/                   #   Cluster list — add, edit, pin, clone, connect
+│   ├── Connection/                 #   Dashboard overview + cluster picker
+│   ├── Topics/                     #   Topic list with expandable partition detail
+│   ├── Messages/                   #   Message browser — search, filter, decode
+│   ├── Monitor/                    #   Consumer groups table + broker health cards
+│   ├── Trends/                     #   Throughput, ISR, ping charts (Live + History)
+│   ├── Lag/                        #   Consumer lag investigation (group/topic/partition/member)
+│   ├── SchemaRegistry/             #   Schema browser — subjects, versions, schema viewer
+│   └── Settings/                   #   Preferences — refresh, density, language, alerts
+│
+├── Shared/
+│   ├── Components/                 # Reusable views — MenuBarView, ConnectionStatusBadge
+│   └── Utils/                      # L10n, RefreshManager, Log, ChartExporter, XLSXWriter
+│
+└── Resources/
+    └── Locales/                    # en.json, zh-Hans.json (custom JSON-based i18n)
+```
+
+### Key Patterns
+
+| Pattern | Detail |
+|---------|--------|
+| **Actor isolation** | `KafkaService` is a Swift `actor`. Blocking librdkafka C calls run on a dedicated `DispatchQueue` via `withCheckedThrowingContinuation`, keeping the actor executor free for cancellation |
+| **@Observable** | `AppState` uses the `@Observable` macro. Views read properties directly — no `@Published` or `objectWillChange` needed |
+| **MainActor by default** | Project sets `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`. All types are `@MainActor` unless explicitly opted out (`KafkaService`, model structs) |
+| **Read-only** | `KafkaService` only exposes read methods — no produce, delete, or admin operations exist in the codebase |
+| **JSON i18n** | `L10n` loads locale JSON at runtime. Access: `l10n["key"]` or `l10n.t("key", arg1, arg2)` for interpolation |
 
 ---
 
