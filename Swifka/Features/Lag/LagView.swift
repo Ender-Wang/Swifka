@@ -213,6 +213,7 @@ struct LagView: View {
                 systemImage: "clock.arrow.circlepath",
                 description: Text(l10n["lag.history.no.data.description"]),
             )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             let mode = TrendRenderingMode.history(
                 visibleSeconds: history.visibleWindowSeconds,

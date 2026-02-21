@@ -193,6 +193,7 @@ struct TrendsView: View {
                 systemImage: "clock.arrow.circlepath",
                 description: Text(l10n["trends.history.no.data.description"]),
             )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             let mode = TrendRenderingMode.history(
                 visibleSeconds: history.visibleWindowSeconds,
