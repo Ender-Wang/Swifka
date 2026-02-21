@@ -247,6 +247,9 @@
   "brokers.empty.description": "No brokers found in this cluster.",
 
   "settings.title": "Settings",
+  "settings.tab.general": "General",
+  "settings.tab.alerts": "Alerts",
+  "settings.tab.data": "Data",
   "settings.general": "General",
   "settings.refresh": "Refresh",
   "settings.refresh.mode": "Default Refresh Mode",

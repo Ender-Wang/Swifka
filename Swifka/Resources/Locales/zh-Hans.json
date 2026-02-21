@@ -247,6 +247,9 @@
   "brokers.empty.description": "该集群中没有找到 Broker。",
 
   "settings.title": "设置",
+  "settings.tab.general": "通用",
+  "settings.tab.alerts": "警报",
+  "settings.tab.data": "数据",
   "settings.general": "通用",
   "settings.refresh": "刷新",
   "settings.refresh.mode": "默认刷新模式",
