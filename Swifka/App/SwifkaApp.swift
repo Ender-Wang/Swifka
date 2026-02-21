@@ -21,6 +21,13 @@ struct SwifkaApp: App {
                 .onAppear {
                     UNUserNotificationCenter.current().delegate = notificationDelegate
                 }
+                .sheet(isPresented: Binding(
+                    get: { appState.showUpdateSheet },
+                    set: { appState.showUpdateSheet = $0 },
+                )) {
+                    UpdateView()
+                        .environment(appState)
+                }
         }
         .defaultSize(
             width: Constants.defaultWindowWidth,
@@ -88,6 +95,13 @@ struct SwifkaApp: App {
                     appState.focusSearchTrigger = UUID()
                 }
                 .keyboardShortcut("f", modifiers: .command)
+            }
+            CommandGroup(after: .appInfo) {
+                Button(appState.l10n["updates.check.menu"]) {
+                    Task {
+                        await appState.checkForUpdates(source: .manual)
+                    }
+                }
             }
             CommandGroup(replacing: .appSettings) {
                 Button(appState.l10n["sidebar.settings"]) {

@@ -200,6 +200,50 @@ final class AppState {
         }
     }
 
+    // MARK: - Updates
+
+    let updateChecker = UpdateChecker()
+    var updateStatus: UpdateStatus = .idle
+    var showUpdateSheet: Bool = false
+    /// Release date of the currently running version (fetched from GitHub).
+    var currentVersionReleaseDate: Date?
+
+    /// Download task reference for cancellation.
+    @ObservationIgnored
+    private var downloadTask: Task<Void, Never>?
+
+    var autoCheckUpdates: Bool = true {
+        didSet {
+            UserDefaults.standard.set(autoCheckUpdates, forKey: "settings.updates.autoCheck")
+        }
+    }
+
+    var lastUpdateCheckDate: Date? {
+        didSet {
+            UserDefaults.standard.set(lastUpdateCheckDate, forKey: "settings.updates.lastCheckDate")
+        }
+    }
+
+    var dismissedUpdateVersion: String? {
+        didSet {
+            UserDefaults.standard.set(dismissedUpdateVersion, forKey: "settings.updates.dismissedVersion")
+        }
+    }
+
+    var includeBetaUpdates: Bool = false {
+        didSet {
+            UserDefaults.standard.set(includeBetaUpdates, forKey: "settings.updates.includeBeta")
+        }
+    }
+
+    /// Tracks the last version for which a notification was sent, to avoid re-notifying.
+    @ObservationIgnored
+    private var lastNotifiedUpdateVersion: String? {
+        didSet {
+            UserDefaults.standard.set(lastNotifiedUpdateVersion, forKey: "settings.updates.lastNotifiedVersion")
+        }
+    }
+
     // MARK: - Alerts (session-scoped)
 
     var activeAlerts: [AlertRecord] = []
@@ -286,6 +330,19 @@ final class AppState {
         let storedBrokerCount = UserDefaults.standard.integer(forKey: "settings.alerts.brokerOffline.expected")
         if storedBrokerCount > 0 { expectedBrokerCount = storedBrokerCount }
 
+        // Update settings
+        if UserDefaults.standard.object(forKey: "settings.updates.autoCheck") != nil {
+            autoCheckUpdates = UserDefaults.standard.bool(forKey: "settings.updates.autoCheck")
+        }
+        if let date = UserDefaults.standard.object(forKey: "settings.updates.lastCheckDate") as? Date {
+            lastUpdateCheckDate = date
+        }
+        dismissedUpdateVersion = UserDefaults.standard.string(forKey: "settings.updates.dismissedVersion")
+        lastNotifiedUpdateVersion = UserDefaults.standard.string(forKey: "settings.updates.lastNotifiedVersion")
+        if UserDefaults.standard.object(forKey: "settings.updates.includeBeta") != nil {
+            includeBetaUpdates = UserDefaults.standard.bool(forKey: "settings.updates.includeBeta")
+        }
+
         checkNotificationPermission()
         if let raw = UserDefaults.standard.string(forKey: "nav.sidebarItem"),
            let item = SidebarItem(rawValue: raw)
@@ -300,6 +357,13 @@ final class AppState {
         // Prune old metrics on launch
         Task { [weak self] in
             await self?.pruneMetrics()
+        }
+
+        // Auto-check for updates on launch (once per 24 hours)
+        if autoCheckUpdates {
+            Task { [weak self] in
+                await self?.checkForUpdatesOnLaunch()
+            }
         }
     }
 
@@ -773,6 +837,25 @@ final class AppState {
         UNUserNotificationCenter.current().add(request)
     }
 
+    private func sendUpdateNotification(_ release: GitHubRelease) {
+        guard desktopNotificationsEnabled, notificationPermissionGranted else { return }
+        // Only notify once per version
+        guard release.version != lastNotifiedUpdateVersion else { return }
+
+        let content = UNMutableNotificationContent()
+        content.title = l10n["updates.notification.title"]
+        content.body = l10n.t("updates.notification.body", release.version)
+        content.sound = .default
+
+        let request = UNNotificationRequest(
+            identifier: "update-available-v\(release.version)",
+            content: content,
+            trigger: nil,
+        )
+        UNUserNotificationCenter.current().add(request)
+        lastNotifiedUpdateVersion = release.version
+    }
+
     private func persistAlertRecord(_ alert: AlertRecord) {
         guard let db = metricDatabase, let clusterId = configStore.selectedCluster?.id else { return }
         Task {
@@ -822,6 +905,138 @@ final class AppState {
         } catch {
             Log.storage.error("[AppState] pruneMetrics: failed — \(error.localizedDescription, privacy: .public)")
         }
+    }
+
+    // MARK: - Updates
+
+    /// Check for updates on launch, throttled to once per 24 hours.
+    private func checkForUpdatesOnLaunch() async {
+        if let lastCheck = lastUpdateCheckDate,
+           Date().timeIntervalSince(lastCheck) < 86400
+        {
+            Log.updates.debug("[AppState] update check skipped (throttled)")
+            return
+        }
+        await checkForUpdates(source: .launch)
+    }
+
+    enum UpdateCheckSource {
+        /// App launch — throttled, sends notification, updates lastCheckDate.
+        case launch
+        /// Settings page appeared — just updates UI status, no side effects.
+        case settings
+        /// User clicked "Check for Updates" — shows sheet, updates lastCheckDate.
+        case manual
+    }
+
+    func checkForUpdates(source: UpdateCheckSource = .launch) async {
+        updateStatus = .checking
+        do {
+            if let release = try await updateChecker.checkForUpdate(includeBeta: includeBetaUpdates) {
+                // Skip dismissed version unless explicitly requested by user
+                if source != .manual, release.version == dismissedUpdateVersion {
+                    Log.updates.debug("[AppState] update v\(release.version, privacy: .public) dismissed by user")
+                    updateStatus = .upToDate
+                } else {
+                    // Fetch current version's release date (non-blocking, best-effort)
+                    let currentVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0"
+                    currentVersionReleaseDate = await updateChecker.fetchReleaseDate(forVersion: currentVersion)
+
+                    updateStatus = .available(release)
+                    switch source {
+                    case .launch:
+                        sendUpdateNotification(release)
+                    case .manual:
+                        showUpdateSheet = true
+                    case .settings:
+                        break // UI status updated above, no extra action
+                    }
+                }
+            } else {
+                updateStatus = .upToDate
+            }
+            // Only update throttle date for launch and manual checks
+            if source != .settings {
+                lastUpdateCheckDate = Date()
+            }
+        } catch {
+            if let updateError = error as? UpdateError {
+                updateStatus = .error(updateError)
+            } else {
+                updateStatus = .error(.networkError(error.localizedDescription))
+            }
+            Log.updates.error("[AppState] update check failed: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    /// Download the update DMG asset with progress tracking.
+    func downloadUpdate(_ release: GitHubRelease) async {
+        guard let asset = release.dmgAsset else {
+            updateStatus = .error(.noAssetFound)
+            return
+        }
+
+        downloadTask = Task {
+            do {
+                let dmgURL = try await UpdateDownloader.download(asset: asset) { [weak self] progress in
+                    Task { @MainActor [weak self] in
+                        self?.updateStatus = .downloading(progress)
+                    }
+                }
+
+                // Verify checksum if available
+                if let checksumAsset = release.checksumAsset {
+                    Log.updates.info("[AppState] verifying checksum...")
+                    let expected = try await updateChecker.fetchChecksum(from: checksumAsset)
+                    let valid = try ChecksumVerifier.verify(dmgURL, expected: expected)
+                    if !valid {
+                        updateStatus = .error(.checksumMismatch)
+                        return
+                    }
+                    Log.updates.info("[AppState] checksum verified")
+                }
+
+                updateStatus = .readyToInstall(release, dmgURL)
+            } catch {
+                if let updateError = error as? UpdateError {
+                    if case .cancelled = updateError {
+                        updateStatus = .idle
+                        return
+                    }
+                    updateStatus = .error(updateError)
+                } else {
+                    updateStatus = .error(.networkError(error.localizedDescription))
+                }
+            }
+        }
+    }
+
+    /// Install the downloaded update.
+    func installUpdate() async {
+        guard case let .readyToInstall(_, dmgURL) = updateStatus else { return }
+        updateStatus = .installing
+        do {
+            try await UpdateInstaller.install(downloadedDMG: dmgURL)
+        } catch {
+            if let updateError = error as? UpdateError {
+                updateStatus = .error(updateError)
+            } else {
+                updateStatus = .error(.installationFailed(error.localizedDescription))
+            }
+        }
+    }
+
+    /// Cancel an in-progress download.
+    func cancelDownload() {
+        downloadTask?.cancel()
+        downloadTask = nil
+        updateStatus = .idle
+    }
+
+    /// Skip a specific version.
+    func skipVersion(_ version: String) {
+        dismissedUpdateVersion = version
+        updateStatus = .idle
     }
 
     // MARK: - Status

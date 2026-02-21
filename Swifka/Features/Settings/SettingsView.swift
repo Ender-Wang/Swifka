@@ -93,6 +93,10 @@ struct SettingsView: View {
         .navigationTitle(l10n["settings.title"])
         .task(id: appState.selectedSidebarItem) {
             dataCleared = false
+            // Always check for updates when opening Settings
+            if appState.selectedSidebarItem == .settings {
+                await appState.checkForUpdates(source: .settings)
+            }
         }
         .fileExporter(
             isPresented: $showingBackupExport,
@@ -189,6 +193,78 @@ struct SettingsView: View {
             Picker(l10n["settings.charts.time.window"], selection: $state.chartTimeWindow) {
                 ForEach(ChartTimeWindow.allCases) { window in
                     Text(window.rawValue).tag(window)
+                }
+            }
+        }
+
+        // Updates
+        Section(header: Label(l10n["settings.updates"], systemImage: "arrow.triangle.2.circlepath")) {
+            Toggle(l10n["updates.auto.check"], isOn: $state.autoCheckUpdates)
+
+            Text(l10n["updates.auto.check.description"])
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Toggle(l10n["updates.include.beta"], isOn: $state.includeBetaUpdates)
+
+            HStack {
+                VStack(alignment: .leading) {
+                    Text(l10n["updates.check"])
+                    if let lastCheck = appState.lastUpdateCheckDate {
+                        Text(l10n.t("updates.last.checked", lastCheck.formatted(date: .abbreviated, time: .shortened)))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                Spacer()
+                updateStatusLabel(l10n: l10n)
+            }
+
+            let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
+            let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"
+            HStack {
+                Text(l10n["updates.current.version"])
+                Spacer()
+                Text("v\(version) (\(build))")
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func updateStatusLabel(l10n: L10n) -> some View {
+        switch appState.updateStatus {
+        case .checking:
+            ProgressView()
+                .controlSize(.small)
+        case let .available(release):
+            Button {
+                appState.showUpdateSheet = true
+            } label: {
+                HStack(spacing: 4) {
+                    Text(l10n["updates.available.short"])
+                    Text("·")
+                        .foregroundStyle(.secondary)
+                    Text("v\(release.version)")
+                    if let buildMatch = release.name.firstMatch(of: /\(build (\d+)\)/) {
+                        Text("(build \(buildMatch.1))")
+                    }
+                }
+            }
+            .foregroundStyle(.accent)
+        case .upToDate:
+            Text(l10n["updates.up.to.date"])
+                .font(.caption)
+                .foregroundStyle(.green)
+        case let .error(error):
+            Text(error.errorDescription ?? l10n["common.error"])
+                .font(.caption)
+                .foregroundStyle(.red)
+                .lineLimit(1)
+        default:
+            Button(l10n["updates.check"]) {
+                Task {
+                    await appState.checkForUpdates(source: .manual)
                 }
             }
         }
