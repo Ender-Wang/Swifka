@@ -7,10 +7,6 @@ A native macOS Kafka monitor. Read-only by design.
 <br clear="all" />
 
 <p align="center">
-  <b>⚠️ Swifka is currently under active development. We are aiming for a 1.0 stable release.</b>
-</p>
-
-<p align="center">
   <a href="https://github.com/Ender-Wang/Swifka/releases"><img src="https://img.shields.io/github/v/release/Ender-Wang/Swifka?label=Latest%20Release&color=green" alt="Latest Release" /></a>
   <a href="https://github.com/Ender-Wang/Swifka/releases"><img src="https://img.shields.io/github/downloads/Ender-Wang/Swifka/total?color=green" alt="Total Downloads" /></a>
   <br />
@@ -36,8 +32,22 @@ A native macOS Kafka monitor. Read-only by design.
 Swifka fills the gap: a native macOS client built for **monitoring only** — safe to point at production, with zero risk of accidental writes. The teams that adopt Swifka are the ones that want a tool they can hand to any engineer, including junior developers and on-call rotations, without worrying about accidental production damage.
 
 <p align="center">
-  <img src=".github/assets/screenshots.png" alt="Swifka — Trends, Consumer Lag, Messages, Settings" />
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset=".github/assets/screenshots-dark.png" />
+    <source media="(prefers-color-scheme: light)" srcset=".github/assets/screenshots-light.png" />
+    <img alt="Swifka Screenshots" src=".github/assets/screenshots-light.png" />
+  </picture>
 </p>
+
+# Install
+
+```bash
+brew install --cask ender-wang/tap/swifka
+```
+
+Or download the latest `.dmg` from [Releases](https://github.com/Ender-Wang/Swifka/releases).
+
+---
 
 # Features
 
@@ -76,15 +86,8 @@ Swifka fills the gap: a native macOS client built for **monitoring only** — sa
 - Manual + timed refresh (5s / 10s / 30s / 60s) with circuit breaker
 - Dark mode, compact/regular/large row density
 - English + Simplified Chinese (JSON-based, easy to contribute)
+- In-app auto-update (GitHub Releases — check, download, verify, install, restart)
 - Read-only by design — zero risk of accidental writes to production
-
-# Install
-
-```bash
-brew install --cask ender-wang/tap/swifka
-```
-
-Or download the latest `.dmg` from [Releases](https://github.com/Ender-Wang/Swifka/releases).
 
 ---
 
@@ -96,58 +99,7 @@ Or download the latest `.dmg` from [Releases](https://github.com/Ender-Wang/Swif
 | 2 | Dashboards & Visualization — charts, alerts, historical data, SQLite | ✅ |
 | 3 | Animations & Polish — chart animations, cluster manager, menu bar | ✅ |
 | 4 | Advanced Monitoring & Search — Protobuf/Avro decode, regex/JSON path search | ✅ |
-| 5 | Release Polish — Schema Registry, alert rules, accessibility, logging, in-app auto-update → **1.0.0** | 🚧 |
-
-<details>
-<summary>Detailed milestone breakdown</summary>
-
-**Milestone 1: MVP Core**
-
-- Cluster connection management (add/edit/delete, multi-cluster, test, Keychain credentials)
-- Topic list with partition detail (replicas, leader, ISR, watermarks)
-- Message browsing (key, value, timestamp, offset) with UTF-8 / Hex / Base64
-- Consumer group list with lag display (watermark-based)
-- Broker list and basic stats
-- Manual + timed refresh (5s / 10s / 30s / 60s)
-- i18n — English + Simplified Chinese
-
-**Milestone 2: Dashboards & Visualization**
-
-- Cluster health overview with throughput (msg/s)
-- Per-topic and per-partition lag breakdown
-- Swift Charts — lag trends, throughput trends, per-consumer member lag
-- SQLite storage with configurable retention and SQL-downsampled history (1h–7d)
-- Hover-to-inspect chart tooltips with color markers
-- Paginated message browsing (500 per page)
-- ISR health monitoring and alerts (under-replicated, critical, below min.insync.replicas)
-- Desktop notifications
-
-**Milestone 3: Animations & Polish**
-
-- Animated line drawing for chart transitions
-- Live ↔ History mode transitions
-- Dark mode optimization
-- Broker health dashboard (leader distribution chart + stats cards)
-- Excel (.xlsx) chart data export
-- Menu bar resident mode + keyboard shortcuts
-- Cluster manager: pin, clone, export/import, drag-to-reorder, sort modes, keyboard navigation
-
-**Milestone 4: Advanced Monitoring & Search**
-
-- Message deserialization: Protobuf (.proto import), Avro (Schema Registry), JSON pretty-print
-- Message search: keyword, regex, JSON path (`user.email:john@`), time range filter
-- Broker liveness monitoring, consumer activity status
-
-**Milestone 5: Release Polish & Extended Monitoring**
-
-- Schema Registry integration (read-only, Confluent-compatible, auto-decode wire format)
-- Configurable alert rules (lag, latency, broker offline) with history and resolution tracking
-- Structured logging (os.Logger + Console.app)
-- VoiceOver accessibility
-- Logo, screenshots, GitHub Releases
-- In-app auto-update (check, download, verify, install, restart) — no Sparkle dependency
-
-</details>
+| 5 | Release Polish — Schema Registry, alert rules, accessibility, logging, in-app auto-update → **1.0.0** | ✅ |
 
 ---
 
@@ -175,6 +127,8 @@ graph TD
     A -->|"decode"| D["MessageDeserializer"]
     D -.->|"schema lookup"| S["SchemaRegistryClient"]
     S -->|"HTTP"| SR["Schema Registry"]
+    A -->|"check · download · install"| U["UpdateChecker / Installer"]
+    U -->|"GitHub API"| GH["GitHub Releases"]
     A <-->|"metrics"| DB[("SQLite")]
     A <-->|"configs"| CS["JSON + Keychain"]
 ```
@@ -201,6 +155,12 @@ Swifka/
 │   ├── SchemaRegistry/
 │   │   ├── SchemaRegistryClient.swift     # HTTP — subjects, versions, schema fetch
 │   │   └── ConfluentWireFormat.swift      # Magic byte 0x00 + 4-byte schema ID extraction
+│   ├── Updates/
+│   │   ├── UpdateChecker.swift      #   actor — GitHub Releases API, version comparison
+│   │   ├── UpdateDownloader.swift   #   URLSession delegate with progress tracking
+│   │   ├── UpdateInstaller.swift    #   9-phase DMG install pipeline + restart
+│   │   ├── UpdateModels.swift       #   GitHubRelease, UpdateStatus, UpdateProgress, UpdateError
+│   │   └── ChecksumVerifier.swift   #   SHA256 verification via CryptoKit
 │   ├── Storage/
 │   │   ├── ConfigStore.swift       #   Cluster configs persisted as JSON files
 │   │   ├── MetricDatabase.swift    #   SQLite — historical metrics, alerts, retention
@@ -217,7 +177,7 @@ Swifka/
 │   ├── Trends/                     #   Throughput, ISR, ping charts (Live + History)
 │   ├── Lag/                        #   Consumer lag investigation (group/topic/partition/member)
 │   ├── SchemaRegistry/             #   Schema browser — subjects, versions, schema viewer
-│   └── Settings/                   #   Preferences — refresh, density, language, alerts
+│   └── Settings/                   #   Preferences — refresh, density, language, alerts, auto-update, about
 │
 ├── Shared/
 │   ├── Components/                 # Reusable views — MenuBarView, ConnectionStatusBadge
@@ -236,6 +196,7 @@ Swifka/
 | **MainActor by default** | Project sets `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`. All types are `@MainActor` unless explicitly opted out (`KafkaService`, model structs) |
 | **Read-only** | `KafkaService` only exposes read methods — no produce, delete, or admin operations exist in the codebase |
 | **JSON i18n** | `L10n` loads locale JSON at runtime. Access: `l10n["key"]` or `l10n.t("key", arg1, arg2)` for interpolation |
+| **DMG auto-update** | `UpdateChecker` (actor) queries GitHub Releases API. `UpdateInstaller` runs a 9-phase pipeline: mount DMG → verify bundle ID → copy + strip quarantine → replace with backup → restart via detached script |
 
 ---
 
@@ -245,8 +206,8 @@ Swifka uses a custom JSON-based i18n system. Currently supported:
 
 | Language | File | Status |
 |----------|------|--------|
-| English | `Resources/Locales/en.json` | Complete |
-| Simplified Chinese | `Resources/Locales/zh-Hans.json` | Complete |
+| English | `Resources/Locales/en.json` | ✅ |
+| Simplified Chinese | `Resources/Locales/zh-Hans.json` | ✅ |
 
 ## Contributing a Translation
 
@@ -256,18 +217,6 @@ Swifka uses a custom JSON-based i18n system. Currently supported:
 4. Submit a PR
 
 No code changes needed — the app picks up new locale files automatically.
-
----
-
-# Star History
-
-<a href="https://star-history.com/#Ender-Wang/Swifka&Date">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=Ender-Wang/Swifka&type=Date&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=Ender-Wang/Swifka&type=Date" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=Ender-Wang/Swifka&type=Date" />
- </picture>
-</a>
 
 ---
 
@@ -286,3 +235,15 @@ Swifka is built on top of these open-source projects:
 | [SQLite.swift](https://github.com/stephencelis/SQLite.swift) | MIT | Type-safe SQLite wrapper for metrics storage |
 | [SwiftProtobuf](https://github.com/apple/swift-protobuf) | Apache-2.0 | Protocol Buffers runtime for message decoding |
 | [SwiftFormat](https://github.com/nicklockwood/SwiftFormat) | MIT | Code formatting tool used in the build pipeline |
+
+---
+
+# Star History
+
+<a href="https://star-history.com/#Ender-Wang/Swifka&Date">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=Ender-Wang/Swifka&type=Date&theme=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=Ender-Wang/Swifka&type=Date" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=Ender-Wang/Swifka&type=Date" />
+ </picture>
+</a>
