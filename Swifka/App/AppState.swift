@@ -58,6 +58,11 @@ final class AppState {
 
     var expandedTopics: Set<String> = []
 
+    // MARK: - Keyboard Navigation
+
+    /// Bumped to a new UUID each time Cmd+F is pressed. Views observe this to focus their search field.
+    var focusSearchTrigger = UUID()
+
     // MARK: - Trends (session-scoped)
 
     var trendsMode: TrendsMode = .live

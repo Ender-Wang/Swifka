@@ -83,6 +83,12 @@ struct SwifkaApp: App {
                 }
                 .keyboardShortcut("k", modifiers: [.command, .shift])
             }
+            CommandGroup(after: .pasteboard) {
+                Button(appState.l10n["common.find"]) {
+                    appState.focusSearchTrigger = UUID()
+                }
+                .keyboardShortcut("f", modifiers: .command)
+            }
             CommandGroup(replacing: .appSettings) {
                 Button(appState.l10n["sidebar.settings"]) {
                     navigateTo(.settings)

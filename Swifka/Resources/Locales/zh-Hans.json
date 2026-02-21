@@ -333,6 +333,7 @@
   "common.delete": "删除",
   "common.refresh": "刷新",
   "common.close": "关闭",
+  "common.find": "查找",
   "common.dismiss": "关闭",
   "toolbar.alerts": "告警历史",
   "common.loading": "加载中…",

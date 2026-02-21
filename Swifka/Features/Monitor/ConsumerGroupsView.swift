@@ -5,6 +5,7 @@ struct ConsumerGroupsView: View {
     @State private var selectedGroup: ConsumerGroupInfo?
     @State private var searchText = ""
     @State private var stateFilter: StateFilter = .all
+    @FocusState private var isSearchFocused: Bool
 
     private enum StateFilter: String, CaseIterable {
         case all
@@ -135,9 +136,18 @@ struct ConsumerGroupsView: View {
                 selectedGroup = nil
                 return .handled
             }
+            if isSearchFocused {
+                isSearchFocused = false
+                return .handled
+            }
             return .ignored
         }
         .navigationTitle(l10n["groups.title"])
+        .onChange(of: appState.focusSearchTrigger) {
+            if appState.selectedSidebarItem == .consumerGroups {
+                isSearchFocused = true
+            }
+        }
     }
 
     // MARK: - Summary Bar
@@ -237,6 +247,7 @@ struct ConsumerGroupsView: View {
             TextField(prompt, text: $searchText)
                 .textFieldStyle(.plain)
                 .font(.caption)
+                .focused($isSearchFocused)
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 4)

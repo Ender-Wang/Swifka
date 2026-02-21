@@ -13,6 +13,7 @@ struct SchemaRegistryView: View {
     @State private var error: String?
     @State private var searchQuery = ""
     @State private var schemaCopied = false
+    @FocusState private var isSearchFocused: Bool
 
     private var filteredSubjects: [String] {
         if searchQuery.isEmpty { return subjects }
@@ -46,7 +47,19 @@ struct SchemaRegistryView: View {
                     schemaDetail
                 }
             }
+            .onKeyPress(.escape) {
+                if isSearchFocused {
+                    isSearchFocused = false
+                    return .handled
+                }
+                return .ignored
+            }
             .onAppear { loadSubjects() }
+            .onChange(of: appState.focusSearchTrigger) {
+                if appState.selectedSidebarItem == .schemaRegistry {
+                    isSearchFocused = true
+                }
+            }
             .onChange(of: appState.connectionStatus.isConnected) {
                 if appState.connectionStatus.isConnected {
                     loadSubjects()
@@ -115,6 +128,7 @@ struct SchemaRegistryView: View {
                     .font(.system(size: 13))
                 TextField(l10n["schema.search"], text: $searchQuery)
                     .textFieldStyle(.plain)
+                    .focused($isSearchFocused)
                 if !searchQuery.isEmpty {
                     Button {
                         searchQuery = ""

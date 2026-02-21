@@ -333,6 +333,7 @@
   "common.delete": "Delete",
   "common.refresh": "Refresh",
   "common.close": "Close",
+  "common.find": "Find",
   "common.dismiss": "Dismiss",
   "toolbar.alerts": "Alert History",
   "common.loading": "Loading…",

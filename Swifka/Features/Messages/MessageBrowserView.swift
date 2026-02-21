@@ -43,6 +43,7 @@ struct MessageBrowserView: View {
     private let messagesPerPage = 500
 
     // Search
+    @FocusState private var isSearchFocused: Bool
     @State private var searchQuery = ""
     @State private var searchScope: SearchScope = .both
     @State private var isRegex = false
@@ -98,6 +99,11 @@ struct MessageBrowserView: View {
                 }
             }
         }
+        .onChange(of: appState.focusSearchTrigger) {
+            if appState.selectedSidebarItem == .messages {
+                isSearchFocused = true
+            }
+        }
         .onChange(of: searchQuery) { _, _ in currentPage = 0 }
         .onChange(of: searchScope) { _, _ in currentPage = 0 }
         .onChange(of: isRegex) { _, _ in currentPage = 0 }
@@ -133,11 +139,17 @@ struct MessageBrowserView: View {
                 }
             }
             .animation(.smooth(duration: 0.25), value: detailMessage?.id)
-            .onKeyPress(.escape) {
-                if detailMessage != nil {
-                    selectedMessageId = nil
-                    detailMessage = nil
-                    return .handled
+            .onKeyPress { press in
+                if press.key == .escape {
+                    if detailMessage != nil {
+                        selectedMessageId = nil
+                        detailMessage = nil
+                        return .handled
+                    }
+                    if isSearchFocused {
+                        isSearchFocused = false
+                        return .handled
+                    }
                 }
                 return .ignored
             }
@@ -260,6 +272,7 @@ struct MessageBrowserView: View {
 
             TextField(l10n["messages.search.placeholder"], text: $searchQuery)
                 .textFieldStyle(.plain)
+                .focused($isSearchFocused)
 
             if !searchQuery.isEmpty {
                 Button {

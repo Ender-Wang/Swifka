@@ -4,6 +4,7 @@ struct TopicListView: View {
     @Environment(AppState.self) private var appState
     @State private var searchText = ""
     @AppStorage("topics.hideInternal") private var hideInternal = true
+    @FocusState private var isSearchFocused: Bool
 
     var body: some View {
         let l10n = appState.l10n
@@ -86,6 +87,18 @@ struct TopicListView: View {
         .navigationTitle(l10n["topics.title"])
         .onAppear { expandFirstTopicIfNeeded() }
         .onChange(of: appState.topics) { expandFirstTopicIfNeeded() }
+        .onChange(of: appState.focusSearchTrigger) {
+            if appState.selectedSidebarItem == .topics {
+                isSearchFocused = true
+            }
+        }
+        .onKeyPress(.escape) {
+            if isSearchFocused {
+                isSearchFocused = false
+                return .handled
+            }
+            return .ignored
+        }
     }
 
     private func summaryBar(l10n: L10n) -> some View {
@@ -136,6 +149,7 @@ struct TopicListView: View {
             TextField(prompt, text: $searchText)
                 .textFieldStyle(.plain)
                 .font(.caption)
+                .focused($isSearchFocused)
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
