@@ -92,8 +92,11 @@ jobs:
           mkdir -p dmg_contents
           cp -R build/Build/Products/Release/Swifka.app dmg_contents/
           ln -s /Applications dmg_contents/Applications
-          hdiutil create -volname "Swifka" -srcfolder dmg_contents -ov -format UDZO "Swifka-${{ needs.check-version.outputs.tag }}.dmg"
-          echo "dmg_name=Swifka-${{ needs.check-version.outputs.tag }}.dmg" >> $GITHUB_OUTPUT
+          DMG_NAME="Swifka-${{ needs.check-version.outputs.tag }}.dmg"
+          hdiutil create -volname "Swifka" -srcfolder dmg_contents -ov -format UDZO "$DMG_NAME"
+          shasum -a 256 "$DMG_NAME" > "$DMG_NAME.sha256"
+          echo "dmg_name=$DMG_NAME" >> $GITHUB_OUTPUT
+          echo "sha_name=$DMG_NAME.sha256" >> $GITHUB_OUTPUT
 
       - name: Release
         uses: softprops/action-gh-release@v1
@@ -102,7 +105,9 @@ jobs:
           name: ${{ needs.check-version.outputs.tag }} (build ${{ needs.check-version.outputs.build }})
           body: ${{ needs.check-version.outputs.commit_message }}
           prerelease: ${{ needs.check-version.outputs.prerelease == 'true' }}
-          files: ${{ steps.dmg.outputs.dmg_name }}
+          files: |
+            ${{ steps.dmg.outputs.dmg_name }}
+            ${{ steps.dmg.outputs.sha_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -111,12 +116,12 @@ jobs:
     if: needs.check-version.outputs.prerelease == 'false'
     runs-on: ubuntu-latest
     steps:
-      - name: Download DMG and compute SHA256
+      - name: Download SHA256 from release
         id: sha
         run: |
           DMG_NAME="Swifka-${{ needs.check-version.outputs.tag }}.dmg"
-          gh release download "${{ needs.check-version.outputs.tag }}" --pattern "$DMG_NAME" --repo "${{ github.repository }}"
-          SHA=$(sha256sum "$DMG_NAME" | awk '{print $1}')
+          gh release download "${{ needs.check-version.outputs.tag }}" --pattern "$DMG_NAME.sha256" --repo "${{ github.repository }}"
+          SHA=$(awk '{print $1}' "$DMG_NAME.sha256")
           echo "sha256=$SHA" >> $GITHUB_OUTPUT
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
