@@ -863,9 +863,15 @@ enum ProtoSchemaParser {
         var depth = 1
         var i = content.index(after: start)
         while i < content.endIndex {
-            if content[i] == "{" { depth += 1 }
-            if content[i] == "}" { depth -= 1 }
-            if depth == 0 { return i }
+            if content[i] == "{" {
+                depth += 1
+            }
+            if content[i] == "}" {
+                depth -= 1
+            }
+            if depth == 0 {
+                return i
+            }
             i = content.index(after: i)
         }
         return nil
@@ -894,7 +900,9 @@ enum ProtoSchemaParser {
             let name = String(body[nameRange])
 
             // Skip nested message/enum keywords picked up by regex
-            if typeName == "message" || typeName == "enum" { continue }
+            if typeName == "message" || typeName == "enum" {
+                continue
+            }
 
             fields[number] = ProtoFieldDef(
                 number: number,

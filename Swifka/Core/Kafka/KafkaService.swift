@@ -9,6 +9,15 @@ private nonisolated struct SendableHandle: @unchecked Sendable {
     let pointer: OpaquePointer
 }
 
+/// Kerberos ticket acquisition tuned to reuse the process credential cache and limit KDC traffic.
+private nonisolated enum KerberosConfig {
+    /// Use cached TGT when valid; renew or keytab kinit only on miss.
+    static let kinitCmd =
+        "klist -s 2>/dev/null || (kinit -R 2>/dev/null || kinit -t \"%{sasl.kerberos.keytab}\" -k %{sasl.kerberos.principal} -r 7d)"
+    /// Background refresh at most once per hour (librdkafka default is 60s).
+    static let minTimeBeforeReloginMs = "3600000"
+}
+
 actor KafkaService {
     private var handle: OpaquePointer?
     private let stringSize = 512
@@ -731,6 +740,9 @@ actor KafkaService {
             ) {
                 try setConfig(conf, key: "sasl.kerberos.keytab", value: keytab)
             }
+
+            try setConfig(conf, key: "sasl.kerberos.kinit.cmd", value: KerberosConfig.kinitCmd)
+            try setConfig(conf, key: "sasl.kerberos.min.time.before.relogin", value: KerberosConfig.minTimeBeforeReloginMs)
         case .plain, .scramSHA256, .scramSHA512:
             if let username = config.saslUsername {
                 try setConfig(conf, key: "sasl.username", value: username)

@@ -261,7 +261,9 @@ nonisolated struct AvroBinaryDecoder {
         var result: [Any] = []
         while true {
             var blockCount = try readLong()
-            if blockCount == 0 { break }
+            if blockCount == 0 {
+                break
+            }
             if blockCount < 0 {
                 blockCount = -blockCount
                 _ = try readLong() // skip block byte size
@@ -278,7 +280,9 @@ nonisolated struct AvroBinaryDecoder {
         var result: [(String, Any)] = []
         while true {
             var blockCount = try readLong()
-            if blockCount == 0 { break }
+            if blockCount == 0 {
+                break
+            }
             if blockCount < 0 {
                 blockCount = -blockCount
                 _ = try readLong() // skip block byte size
@@ -401,7 +405,9 @@ nonisolated enum AvroDecoder {
     }
 
     private static func formatDict(_ pairs: [(String, Any)], flat: Bool, indent: Int) -> String {
-        if pairs.isEmpty { return "{}" }
+        if pairs.isEmpty {
+            return "{}"
+        }
 
         if flat {
             let parts = pairs.map { "\($0.0): \(formatValue($0.1, flat: true))" }
@@ -421,7 +427,9 @@ nonisolated enum AvroDecoder {
     }
 
     private static func formatArray(_ items: [Any], flat: Bool, indent: Int) -> String {
-        if items.isEmpty { return "[]" }
+        if items.isEmpty {
+            return "[]"
+        }
 
         if flat {
             let parts = items.map { formatValue($0, flat: true) }

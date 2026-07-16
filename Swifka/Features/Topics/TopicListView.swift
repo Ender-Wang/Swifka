@@ -164,16 +164,26 @@ struct TopicListView: View {
     }
 
     private func formatCount(_ count: Int64) -> String {
-        if count >= 1_000_000_000 { return String(format: "%.1fB", Double(count) / 1_000_000_000) }
-        if count >= 1_000_000 { return String(format: "%.1fM", Double(count) / 1_000_000) }
-        if count >= 1000 { return String(format: "%.1fK", Double(count) / 1000) }
+        if count >= 1_000_000_000 {
+            return String(format: "%.1fB", Double(count) / 1_000_000_000)
+        }
+        if count >= 1_000_000 {
+            return String(format: "%.1fM", Double(count) / 1_000_000)
+        }
+        if count >= 1000 {
+            return String(format: "%.1fK", Double(count) / 1000)
+        }
         return "\(count)"
     }
 
     private var filteredTopics: [TopicInfo] {
         appState.topics.filter { topic in
-            if hideInternal, topic.isInternal { return false }
-            if searchText.isEmpty { return true }
+            if hideInternal, topic.isInternal {
+                return false
+            }
+            if searchText.isEmpty {
+                return true
+            }
             return topic.name.localizedCaseInsensitiveContains(searchText)
         }
     }

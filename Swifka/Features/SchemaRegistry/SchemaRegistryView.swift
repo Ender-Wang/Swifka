@@ -16,7 +16,9 @@ struct SchemaRegistryView: View {
     @FocusState private var isSearchFocused: Bool
 
     private var filteredSubjects: [String] {
-        if searchQuery.isEmpty { return subjects }
+        if searchQuery.isEmpty {
+            return subjects
+        }
         return subjects.filter { $0.localizedCaseInsensitiveContains(searchQuery) }
     }
 
