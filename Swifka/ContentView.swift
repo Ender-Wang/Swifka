@@ -189,12 +189,14 @@ struct ContentView: View {
             Task { await loadAlertHistory() }
         }
         .onChange(of: showAlertHistory) {
-            if showAlertHistory { Task { await loadAlertHistory() } }
+            if showAlertHistory {
+                Task { await loadAlertHistory() }
+            }
         }
         .sheet(isPresented: $showingAddClusterSheet) {
             ClusterFormView(mode: .add) { cluster, password in
                 appState.configStore.addCluster(cluster)
-                if let password, cluster.authType == .sasl {
+                if let password, cluster.usesSaslPassword {
                     try? KeychainManager.save(password: password, for: cluster.id)
                 }
             }

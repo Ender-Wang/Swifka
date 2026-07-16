@@ -36,7 +36,7 @@ If applicable, add screenshots to help explain your problem.
 **Cluster configuration (if relevant)**
 
 - Number of brokers: [e.g. 3]
-- Authentication: [e.g. None, SASL/PLAIN, SASL/SCRAM]
+- Authentication: [e.g. None, SASL/PLAIN, SASL/SCRAM, SASL/GSSAPI (Kerberos)]
 - Schema Registry: [Yes/No]
 
 **Console.app logs**
