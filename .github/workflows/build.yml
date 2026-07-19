@@ -145,7 +145,7 @@ jobs:
             desc "Native macOS Kafka monitoring client"
             homepage "https://github.com/Ender-Wang/Swifka"
 
-            depends_on macos: ">= :sequoia"
+            depends_on macos: :sequoia
 
             app "Swifka.app"
 
