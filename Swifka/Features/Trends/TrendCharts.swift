@@ -39,7 +39,9 @@ private struct ChartRevealModifier: ViewModifier {
             guard elapsed >= animDelay else { return }
             let t = min((elapsed - animDelay) / 0.6, 1.0)
             progress = t // linear
-            if t >= 1 { timer.invalidate() }
+            if t >= 1 {
+                timer.invalidate()
+            }
         }
     }
 }
@@ -657,8 +659,11 @@ struct TopicThroughputChart: View {
                         Toggle(topic, isOn: Binding(
                             get: { selectedTopics.contains(topic) },
                             set: { on in
-                                if on { selectedTopics.append(topic) }
-                                else { selectedTopics.removeAll { $0 == topic } }
+                                if on {
+                                    selectedTopics.append(topic)
+                                } else {
+                                    selectedTopics.removeAll { $0 == topic }
+                                }
                             },
                         ))
                         .toggleStyle(ChipToggleStyle())
@@ -857,8 +862,11 @@ struct ConsumerGroupLagChart: View {
                             Toggle(group, isOn: Binding(
                                 get: { selectedGroups.contains(group) },
                                 set: { on in
-                                    if on { selectedGroups.append(group) }
-                                    else { selectedGroups.removeAll { $0 == group } }
+                                    if on {
+                                        selectedGroups.append(group)
+                                    } else {
+                                        selectedGroups.removeAll { $0 == group }
+                                    }
                                 },
                             ))
                             .toggleStyle(ChipToggleStyle())
@@ -1062,8 +1070,11 @@ struct TopicLagChart: View {
                             Toggle(topic, isOn: Binding(
                                 get: { selectedTopics.contains(topic) },
                                 set: { on in
-                                    if on { selectedTopics.append(topic) }
-                                    else { selectedTopics.removeAll { $0 == topic } }
+                                    if on {
+                                        selectedTopics.append(topic)
+                                    } else {
+                                        selectedTopics.removeAll { $0 == topic }
+                                    }
                                 },
                             ))
                             .toggleStyle(ChipToggleStyle())
@@ -1244,8 +1255,11 @@ struct PartitionLagChart: View {
                             Toggle(topic, isOn: Binding(
                                 get: { selectedTopics.contains(topic) },
                                 set: { on in
-                                    if on { selectedTopics.append(topic) }
-                                    else { selectedTopics.removeAll { $0 == topic } }
+                                    if on {
+                                        selectedTopics.append(topic)
+                                    } else {
+                                        selectedTopics.removeAll { $0 == topic }
+                                    }
                                 },
                             ))
                             .toggleStyle(ChipToggleStyle())
@@ -1489,8 +1503,11 @@ struct ConsumerMemberLagChart: View {
                             Toggle(group, isOn: Binding(
                                 get: { selectedGroups.contains(group) },
                                 set: { on in
-                                    if on { selectedGroups.append(group) }
-                                    else { selectedGroups.removeAll { $0 == group } }
+                                    if on {
+                                        selectedGroups.append(group)
+                                    } else {
+                                        selectedGroups.removeAll { $0 == group }
+                                    }
                                 },
                             ))
                             .toggleStyle(ChipToggleStyle())

@@ -56,7 +56,7 @@ Or download the latest `.dmg` from [Releases](https://github.com/Ender-Wang/Swif
 - Connect to any Kafka-compatible cluster (Kafka, Redpanda, etc.)
 - Multi-cluster management with pin, clone, drag-to-reorder, and keyboard navigation
 - Cluster backup & restore (timestamped `.zip` export/import)
-- Keychain-secured credentials
+- Keychain-secured credentials (SASL/PLAIN, SCRAM, GSSAPI/Kerberos with keytab + krb5.conf)
 
 **Topics & Messages**
 
@@ -109,7 +109,11 @@ Or download the latest `.dmg` from [Releases](https://github.com/Ender-Wang/Swif
 
 ```bash
 brew install swiftformat
+xcodebuild -project Swifka.xcodeproj -scheme Swifka -configuration Release \
+  -derivedDataPath build CODE_SIGN_IDENTITY="-" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO build
 ```
+
+Or use `./scripts/build-release.sh` (same flags as CI).
 
 Code style is enforced by [SwiftFormat](https://github.com/nicklockwood/SwiftFormat) via a build phase — rules are in `.swiftformat` at the project root.
 

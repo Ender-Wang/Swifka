@@ -318,17 +318,23 @@ final class AppState {
             clusterLagAlertEnabled = UserDefaults.standard.bool(forKey: "settings.alerts.clusterLag.enabled")
         }
         let storedLagThreshold = UserDefaults.standard.integer(forKey: "settings.alerts.clusterLag.threshold")
-        if storedLagThreshold > 0 { clusterLagThreshold = storedLagThreshold }
+        if storedLagThreshold > 0 {
+            clusterLagThreshold = storedLagThreshold
+        }
         if UserDefaults.standard.object(forKey: "settings.alerts.highLatency.enabled") != nil {
             highLatencyAlertEnabled = UserDefaults.standard.bool(forKey: "settings.alerts.highLatency.enabled")
         }
         let storedLatencyThreshold = UserDefaults.standard.integer(forKey: "settings.alerts.highLatency.threshold")
-        if storedLatencyThreshold > 0 { highLatencyThreshold = storedLatencyThreshold }
+        if storedLatencyThreshold > 0 {
+            highLatencyThreshold = storedLatencyThreshold
+        }
         if UserDefaults.standard.object(forKey: "settings.alerts.brokerOffline.enabled") != nil {
             brokerOfflineAlertEnabled = UserDefaults.standard.bool(forKey: "settings.alerts.brokerOffline.enabled")
         }
         let storedBrokerCount = UserDefaults.standard.integer(forKey: "settings.alerts.brokerOffline.expected")
-        if storedBrokerCount > 0 { expectedBrokerCount = storedBrokerCount }
+        if storedBrokerCount > 0 {
+            expectedBrokerCount = storedBrokerCount
+        }
 
         // Update settings
         if UserDefaults.standard.object(forKey: "settings.updates.autoCheck") != nil {
@@ -375,7 +381,7 @@ final class AppState {
         lastError = nil
 
         do {
-            let password = cluster.authType == .sasl
+            let password = cluster.usesSaslPassword
                 ? KeychainManager.loadPassword(for: cluster.id)
                 : nil
             try await kafkaService.connect(config: cluster, password: password)
@@ -529,7 +535,7 @@ final class AppState {
         guard let cluster = configStore.selectedCluster else {
             throw SwifkaError.notConnected
         }
-        let password = cluster.authType == .sasl
+        let password = cluster.usesSaslPassword
             ? KeychainManager.loadPassword(for: cluster.id)
             : nil
         return try await kafkaService.browseMessages(

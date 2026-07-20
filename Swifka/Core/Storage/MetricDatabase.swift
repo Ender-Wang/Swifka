@@ -363,7 +363,9 @@ actor MetricDatabase {
     /// Aggregate an array of `[String: Int64]` dicts per key using the given mode.
     private func aggregateDict(_ dicts: [[String: Int64]], mode: AggregationMode) -> [String: Int64] {
         guard !dicts.isEmpty else { return [:] }
-        if dicts.count == 1 { return dicts[0] }
+        if dicts.count == 1 {
+            return dicts[0]
+        }
 
         // Collect all keys
         var allKeys = Set<String>()

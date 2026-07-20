@@ -301,42 +301,41 @@ struct MessageBrowserView: View {
         .fixedSize()
     }
 
+    @ViewBuilder
     private func searchOptions(l10n: L10n) -> some View {
-        Group {
-            Toggle(isOn: Binding(
-                get: { isRegex },
-                set: { newValue in
-                    isRegex = newValue
-                    if newValue {
-                        isJsonPath = false // Mutually exclusive
-                    }
-                },
-            )) {
-                Text(l10n["messages.search.regex"])
-            }
-            .toggleStyle(.checkbox)
-            .disabled(isJsonPath)
-
-            Toggle(isOn: $isCaseSensitive) {
-                Text(l10n["messages.search.case.sensitive"])
-            }
-            .toggleStyle(.checkbox)
-
-            Toggle(isOn: Binding(
-                get: { isJsonPath },
-                set: { newValue in
-                    isJsonPath = newValue
-                    if newValue {
-                        isRegex = false // Mutually exclusive
-                        searchScope = .value // Auto-set to Value
-                    }
-                },
-            )) {
-                Text(l10n["messages.search.jsonpath"])
-            }
-            .toggleStyle(.checkbox)
-            .disabled(isRegex)
+        Toggle(isOn: Binding(
+            get: { isRegex },
+            set: { newValue in
+                isRegex = newValue
+                if newValue {
+                    isJsonPath = false // Mutually exclusive
+                }
+            },
+        )) {
+            Text(l10n["messages.search.regex"])
         }
+        .toggleStyle(.checkbox)
+        .disabled(isJsonPath)
+
+        Toggle(isOn: $isCaseSensitive) {
+            Text(l10n["messages.search.case.sensitive"])
+        }
+        .toggleStyle(.checkbox)
+
+        Toggle(isOn: Binding(
+            get: { isJsonPath },
+            set: { newValue in
+                isJsonPath = newValue
+                if newValue {
+                    isRegex = false // Mutually exclusive
+                    searchScope = .value // Auto-set to Value
+                }
+            },
+        )) {
+            Text(l10n["messages.search.jsonpath"])
+        }
+        .toggleStyle(.checkbox)
+        .disabled(isRegex)
     }
 
     @ViewBuilder
@@ -823,7 +822,9 @@ struct MessageBrowserView: View {
             }
             .onSubmit { clampOffsetFields() }
             .onChange(of: fromFieldFocused) { _, focused in
-                if !focused { clampOffsetFields() }
+                if !focused {
+                    clampOffsetFields()
+                }
             }
         }
         .fixedSize()
@@ -861,7 +862,9 @@ struct MessageBrowserView: View {
             }
             .onSubmit { clampOffsetFields() }
             .onChange(of: toFieldFocused) { _, focused in
-                if !focused { clampOffsetFields() }
+                if !focused {
+                    clampOffsetFields()
+                }
             }
         }
         .fixedSize()

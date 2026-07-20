@@ -10,7 +10,9 @@ final class RefreshManager {
     private var timer: Timer?
 
     var isAutoRefresh: Bool {
-        if case .interval = mode { return true }
+        if case .interval = mode {
+            return true
+        }
         return false
     }
 

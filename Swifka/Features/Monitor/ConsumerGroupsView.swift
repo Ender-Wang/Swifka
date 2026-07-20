@@ -279,14 +279,22 @@ struct ConsumerGroupsView: View {
     }
 
     private func formatLag(_ lag: Int64) -> String {
-        if lag >= 1_000_000 { return String(format: "%.1fM", Double(lag) / 1_000_000) }
-        if lag >= 1000 { return String(format: "%.1fK", Double(lag) / 1000) }
+        if lag >= 1_000_000 {
+            return String(format: "%.1fM", Double(lag) / 1_000_000)
+        }
+        if lag >= 1000 {
+            return String(format: "%.1fK", Double(lag) / 1000)
+        }
         return "\(lag)"
     }
 
     private func lagColor(_ lag: Int64) -> Color {
-        if lag == 0 { return .secondary }
-        if lag > 10000 { return .red }
+        if lag == 0 {
+            return .secondary
+        }
+        if lag > 10000 {
+            return .red
+        }
         return .orange
     }
 }
@@ -482,14 +490,22 @@ struct GroupDetailView: View {
     }
 
     private func formatLag(_ lag: Int64) -> String {
-        if lag >= 1_000_000 { return String(format: "%.1fM", Double(lag) / 1_000_000) }
-        if lag >= 1000 { return String(format: "%.1fK", Double(lag) / 1000) }
+        if lag >= 1_000_000 {
+            return String(format: "%.1fM", Double(lag) / 1_000_000)
+        }
+        if lag >= 1000 {
+            return String(format: "%.1fK", Double(lag) / 1000)
+        }
         return "\(lag)"
     }
 
     private func lagColor(_ lag: Int64) -> Color {
-        if lag == 0 { return .secondary }
-        if lag > 10000 { return .red }
+        if lag == 0 {
+            return .secondary
+        }
+        if lag > 10000 {
+            return .red
+        }
         return .orange
     }
 }

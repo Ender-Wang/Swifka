@@ -16,14 +16,14 @@ final class ConnectionViewModel {
 
     func addCluster(_ cluster: ClusterConfig, password: String?, to appState: AppState) {
         appState.configStore.addCluster(cluster)
-        if let password, cluster.authType == .sasl {
+        if let password, cluster.usesSaslPassword {
             try? KeychainManager.save(password: password, for: cluster.id)
         }
     }
 
     func updateCluster(_ cluster: ClusterConfig, password: String?, in appState: AppState) {
         appState.configStore.updateCluster(cluster)
-        if let password, cluster.authType == .sasl {
+        if let password, cluster.usesSaslPassword {
             try? KeychainManager.save(password: password, for: cluster.id)
         }
     }
@@ -38,6 +38,10 @@ final class ConnectionViewModel {
             authType: cluster.authType,
             saslMechanism: cluster.saslMechanism,
             saslUsername: cluster.saslUsername,
+            saslKerberosPrincipal: cluster.saslKerberosPrincipal,
+            saslKerberosServiceName: cluster.saslKerberosServiceName,
+            saslKerberosKeytabPath: cluster.saslKerberosKeytabPath,
+            saslKerberosKrb5ConfPath: cluster.saslKerberosKrb5ConfPath,
             useTLS: cluster.useTLS,
             isPinned: false,
             lastConnectedAt: nil,
@@ -46,8 +50,7 @@ final class ConnectionViewModel {
 
         appState.configStore.addCluster(cloned)
 
-        // Clone password if SASL
-        if cluster.authType == .sasl,
+        if cluster.usesSaslPassword,
            let password = KeychainManager.loadPassword(for: cluster.id)
         {
             try? KeychainManager.save(password: password, for: cloned.id)

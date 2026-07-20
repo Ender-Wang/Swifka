@@ -1,6 +1,10 @@
 import Foundation
 import Security
 
+/// macOS Keychain storage for cluster SASL passwords (PLAIN/SCRAM).
+///
+/// Usernames, Kerberos principals, and keytab/krb5 paths live in `ClusterConfig` JSON — they are
+/// identity or file references, not secrets. GSSAPI credentials remain in the keytab file on disk.
 enum KeychainManager {
     static func save(password: String, for clusterId: UUID) throws {
         let data = Data(password.utf8)

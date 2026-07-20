@@ -161,8 +161,12 @@ nonisolated enum XLSXWriter {
         while s.hasSuffix("'") {
             s.removeLast()
         }
-        if s.count > 31 { s = String(s.prefix(31)) }
-        if s.isEmpty { s = "Sheet" }
+        if s.count > 31 {
+            s = String(s.prefix(31))
+        }
+        if s.isEmpty {
+            s = "Sheet"
+        }
         return s
     }
 

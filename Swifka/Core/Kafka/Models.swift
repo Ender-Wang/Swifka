@@ -3,6 +3,11 @@ import SwiftUI
 
 // MARK: - Cluster Configuration
 
+/// Persisted cluster settings (JSON). Swifka v1.0.0 rule: **secrets never in config files**.
+///
+/// - **Keychain** (`KeychainManager`): SASL passwords for PLAIN/SCRAM only.
+/// - **Config (plaintext)**: usernames, Kerberos client identity, and filesystem paths to keytab/krb5.conf.
+///   These are not credentials — authentication still requires a readable keytab file on disk.
 nonisolated struct ClusterConfig: Codable, Identifiable, Hashable, Sendable {
     var id: UUID
     var name: String
@@ -10,7 +15,16 @@ nonisolated struct ClusterConfig: Codable, Identifiable, Hashable, Sendable {
     var port: Int
     var authType: AuthType
     var saslMechanism: SASLMechanism?
+    /// SASL username (PLAIN/SCRAM). Non-secret identity; stored in config like host/port.
     var saslUsername: String?
+    /// Kerberos client principal, e.g. `user@REALM`. Non-secret identity (analogous to `saslUsername`).
+    var saslKerberosPrincipal: String?
+    /// Kafka broker Kerberos service name (without `/hostname@REALM`), default `kafka`. Non-secret.
+    var saslKerberosServiceName: String?
+    /// Filesystem path to the keytab file. Not keytab contents — the file on disk is the credential.
+    var saslKerberosKeytabPath: String?
+    /// Filesystem path to krb5.conf (exported as `KRB5_CONFIG`). Non-secret realm/KDC configuration.
+    var saslKerberosKrb5ConfPath: String?
     var useTLS: Bool
     var createdAt: Date
     var updatedAt: Date
@@ -36,6 +50,10 @@ nonisolated struct ClusterConfig: Codable, Identifiable, Hashable, Sendable {
         authType: AuthType = .none,
         saslMechanism: SASLMechanism? = nil,
         saslUsername: String? = nil,
+        saslKerberosPrincipal: String? = nil,
+        saslKerberosServiceName: String? = nil,
+        saslKerberosKeytabPath: String? = nil,
+        saslKerberosKrb5ConfPath: String? = nil,
         useTLS: Bool = false,
         schemaRegistryURL: String? = nil,
         createdAt: Date = Date(),
@@ -51,6 +69,10 @@ nonisolated struct ClusterConfig: Codable, Identifiable, Hashable, Sendable {
         self.authType = authType
         self.saslMechanism = saslMechanism
         self.saslUsername = saslUsername
+        self.saslKerberosPrincipal = saslKerberosPrincipal
+        self.saslKerberosServiceName = saslKerberosServiceName
+        self.saslKerberosKeytabPath = saslKerberosKeytabPath
+        self.saslKerberosKrb5ConfPath = saslKerberosKrb5ConfPath
         self.useTLS = useTLS
         self.schemaRegistryURL = schemaRegistryURL
         self.createdAt = createdAt
@@ -88,6 +110,10 @@ nonisolated struct ClusterConfig: Codable, Identifiable, Hashable, Sendable {
         authType = try container.decode(AuthType.self, forKey: .authType)
         saslMechanism = try container.decodeIfPresent(SASLMechanism.self, forKey: .saslMechanism)
         saslUsername = try container.decodeIfPresent(String.self, forKey: .saslUsername)
+        saslKerberosPrincipal = try container.decodeIfPresent(String.self, forKey: .saslKerberosPrincipal)
+        saslKerberosServiceName = try container.decodeIfPresent(String.self, forKey: .saslKerberosServiceName)
+        saslKerberosKeytabPath = try container.decodeIfPresent(String.self, forKey: .saslKerberosKeytabPath)
+        saslKerberosKrb5ConfPath = try container.decodeIfPresent(String.self, forKey: .saslKerberosKrb5ConfPath)
         useTLS = try container.decode(Bool.self, forKey: .useTLS)
         schemaRegistryURL = try container.decodeIfPresent(String.self, forKey: .schemaRegistryURL)
         createdAt = try container.decode(Date.self, forKey: .createdAt)
@@ -107,6 +133,10 @@ nonisolated struct ClusterConfig: Codable, Identifiable, Hashable, Sendable {
         try container.encode(authType, forKey: .authType)
         try container.encodeIfPresent(saslMechanism, forKey: .saslMechanism)
         try container.encodeIfPresent(saslUsername, forKey: .saslUsername)
+        try container.encodeIfPresent(saslKerberosPrincipal, forKey: .saslKerberosPrincipal)
+        try container.encodeIfPresent(saslKerberosServiceName, forKey: .saslKerberosServiceName)
+        try container.encodeIfPresent(saslKerberosKeytabPath, forKey: .saslKerberosKeytabPath)
+        try container.encodeIfPresent(saslKerberosKrb5ConfPath, forKey: .saslKerberosKrb5ConfPath)
         try container.encode(useTLS, forKey: .useTLS)
         try container.encodeIfPresent(schemaRegistryURL, forKey: .schemaRegistryURL)
         try container.encode(createdAt, forKey: .createdAt)
@@ -117,8 +147,22 @@ nonisolated struct ClusterConfig: Codable, Identifiable, Hashable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, host, port, bootstrapServers, authType, saslMechanism, saslUsername, useTLS
+        case id, name, host, port, bootstrapServers, authType, saslMechanism, saslUsername
+        case saslKerberosPrincipal, saslKerberosServiceName, saslKerberosKeytabPath, saslKerberosKrb5ConfPath, useTLS
         case schemaRegistryURL, createdAt, updatedAt, isPinned, lastConnectedAt, sortOrder
+    }
+
+    /// Whether this cluster stores a SASL password in Keychain (PLAIN/SCRAM). GSSAPI uses keytab on disk instead.
+    var usesSaslPassword: Bool {
+        authType == .sasl && saslMechanism?.usesPassword == true
+    }
+
+    /// Whether GSSAPI keytab is configured and readable.
+    var hasKerberosKeytab: Bool {
+        guard let path = saslKerberosKeytabPath?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !path.isEmpty
+        else { return false }
+        return FileManager.default.isReadableFile(atPath: path)
     }
 }
 
@@ -131,6 +175,14 @@ nonisolated enum SASLMechanism: String, Codable, CaseIterable, Sendable {
     case plain = "PLAIN"
     case scramSHA256 = "SCRAM-SHA-256"
     case scramSHA512 = "SCRAM-SHA-512"
+    case gssapi = "GSSAPI"
+
+    var usesPassword: Bool {
+        switch self {
+        case .gssapi: false
+        case .plain, .scramSHA256, .scramSHA512: true
+        }
+    }
 }
 
 // MARK: - Connection Status
@@ -142,7 +194,9 @@ nonisolated enum ConnectionStatus: Equatable, Sendable {
     case error(String)
 
     var isConnected: Bool {
-        if case .connected = self { return true }
+        if case .connected = self {
+            return true
+        }
         return false
     }
 }
@@ -260,7 +314,9 @@ nonisolated struct KafkaMessageRecord: Identifiable, Sendable {
 
     private func formatData(_ data: Data?, format: MessageFormat, protoContext: ProtobufContext? = nil) -> String {
         guard let data else { return "(null)" }
-        if data.isEmpty { return "(empty)" }
+        if data.isEmpty {
+            return "(empty)"
+        }
         switch format {
         case .utf8, .schemaRegistry:
             return String(data: data, encoding: .utf8) ?? "(binary data)"

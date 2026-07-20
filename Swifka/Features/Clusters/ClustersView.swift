@@ -359,8 +359,10 @@ struct ClustersView: View {
                 for cluster in appState.configStore.clusters {
                     let isConnected = appState.configStore.selectedClusterId == cluster.id
                         && appState.connectionStatus.isConnected
-                    if isConnected { continue }
-                    let password = cluster.authType == .sasl
+                    if isConnected {
+                        continue
+                    }
+                    let password = cluster.usesSaslPassword
                         ? KeychainManager.loadPassword(for: cluster.id)
                         : nil
                     group.addTask {
@@ -468,7 +470,7 @@ struct ClustersView: View {
 
     private func testCluster(_ cluster: ClusterConfig) {
         testingClusterId = cluster.id
-        let password = cluster.authType == .sasl
+        let password = cluster.usesSaslPassword
             ? KeychainManager.loadPassword(for: cluster.id)
             : nil
         Task {
@@ -679,12 +681,19 @@ struct ClustersView: View {
         // Mark imported clusters as "New"
         recentlyImportedClusterIDs = Set(idMap.values)
 
-        // Check for missing passwords (skip replaced clusters — their Keychain password is preserved)
+        // Check for missing credentials (skip replaced clusters — their Keychain password is preserved)
         missingPasswordClusters = clustersToImport.compactMap { cluster in
-            if replacedClusterIDs.contains(cluster.id) { return nil }
-            if cluster.authType == .sasl,
+            if replacedClusterIDs.contains(cluster.id) {
+                return nil
+            }
+            if cluster.usesSaslPassword,
                let effectiveID = idMap[cluster.id],
                KeychainManager.loadPassword(for: effectiveID) == nil
+            {
+                return cluster.name
+            }
+            if cluster.saslMechanism == .gssapi,
+               !cluster.hasKerberosKeytab
             {
                 return cluster.name
             }
@@ -1224,21 +1233,33 @@ private struct ClusterRow: View {
 
     private var dotAccessibilityLabel: String {
         let l10n = appState.l10n
-        if isConnected { return l10n["a11y.cluster.status.connected"] }
-        if pingFailed { return l10n["a11y.cluster.status.unreachable"] }
+        if isConnected {
+            return l10n["a11y.cluster.status.connected"]
+        }
+        if pingFailed {
+            return l10n["a11y.cluster.status.unreachable"]
+        }
         return l10n["a11y.cluster.status.idle"]
     }
 
     private var dotColor: Color {
-        if isConnected { return .green }
-        if pingFailed { return .red }
+        if isConnected {
+            return .green
+        }
+        if pingFailed {
+            return .red
+        }
         return .gray.opacity(0.3)
     }
 
     private var pingColor: Color {
         guard let pingMs else { return .secondary }
-        if pingMs < 50 { return .green }
-        if pingMs < 200 { return .yellow }
+        if pingMs < 50 {
+            return .green
+        }
+        if pingMs < 200 {
+            return .yellow
+        }
         return .red
     }
 

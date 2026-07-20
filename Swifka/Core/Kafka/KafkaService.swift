@@ -9,6 +9,15 @@ private nonisolated struct SendableHandle: @unchecked Sendable {
     let pointer: OpaquePointer
 }
 
+/// Kerberos ticket acquisition tuned to reuse the process credential cache and limit KDC traffic.
+private nonisolated enum KerberosConfig {
+    /// Use cached TGT when valid; renew or keytab kinit only on miss.
+    static let kinitCmd =
+        "klist -s 2>/dev/null || (kinit -R 2>/dev/null || kinit -t \"%{sasl.kerberos.keytab}\" -k %{sasl.kerberos.principal} -r 7d)"
+    /// Background refresh at most once per hour (librdkafka default is 60s).
+    static let minTimeBeforeReloginMs = "3600000"
+}
+
 actor KafkaService {
     private var handle: OpaquePointer?
     private let stringSize = 512
@@ -39,6 +48,9 @@ actor KafkaService {
     // MARK: - Connection
 
     func connect(config: ClusterConfig, password: String? = nil) async throws {
+        let kerberos = KerberosEnvironment(config: config)
+        defer { kerberos.restore() }
+
         disconnect()
 
         let conf = rd_kafka_conf_new()!
@@ -50,14 +62,7 @@ actor KafkaService {
         try setConfig(conf, key: "reconnect.backoff.max.ms", value: "5000")
 
         if config.authType == .sasl, let mechanism = config.saslMechanism {
-            try setConfig(conf, key: "security.protocol", value: config.useTLS ? "sasl_ssl" : "sasl_plaintext")
-            try setConfig(conf, key: "sasl.mechanism", value: mechanism.rawValue)
-            if let username = config.saslUsername {
-                try setConfig(conf, key: "sasl.username", value: username)
-            }
-            if let password {
-                try setConfig(conf, key: "sasl.password", value: password)
-            }
+            try applySaslConfig(conf, config: config, mechanism: mechanism, password: password)
         } else if config.useTLS {
             try setConfig(conf, key: "security.protocol", value: "ssl")
         }
@@ -80,7 +85,9 @@ actor KafkaService {
             try await Self.offload {
                 var metadataPtr: UnsafePointer<rd_kafka_metadata_t>?
                 let result = rd_kafka_metadata(h.pointer, 0, nil, &metadataPtr, timeout)
-                if let metadataPtr { rd_kafka_metadata_destroy(metadataPtr) }
+                if let metadataPtr {
+                    rd_kafka_metadata_destroy(metadataPtr)
+                }
                 guard result == RD_KAFKA_RESP_ERR_NO_ERROR else {
                     let errStr = String(cString: rd_kafka_err2str(result))
                     throw SwifkaError.connectionFailed(errStr)
@@ -108,20 +115,16 @@ actor KafkaService {
     }
 
     func testConnection(config: ClusterConfig, password: String? = nil) throws -> Bool {
+        let kerberos = KerberosEnvironment(config: config)
+        defer { kerberos.restore() }
+
         let testConf = rd_kafka_conf_new()!
 
         try setConfig(testConf, key: "bootstrap.servers", value: config.bootstrapServers)
         try setConfig(testConf, key: "client.id", value: "swifka-test")
 
         if config.authType == .sasl, let mechanism = config.saslMechanism {
-            try setConfig(testConf, key: "security.protocol", value: config.useTLS ? "sasl_ssl" : "sasl_plaintext")
-            try setConfig(testConf, key: "sasl.mechanism", value: mechanism.rawValue)
-            if let username = config.saslUsername {
-                try setConfig(testConf, key: "sasl.username", value: username)
-            }
-            if let password {
-                try setConfig(testConf, key: "sasl.password", value: password)
-            }
+            try applySaslConfig(testConf, config: config, mechanism: mechanism, password: password)
         } else if config.useTLS {
             try setConfig(testConf, key: "security.protocol", value: "ssl")
         }
@@ -137,7 +140,11 @@ actor KafkaService {
 
         var metadataPtr: UnsafePointer<rd_kafka_metadata_t>?
         let result = rd_kafka_metadata(testHandle, 1, nil, &metadataPtr, Constants.kafkaTimeout)
-        defer { if let metadataPtr { rd_kafka_metadata_destroy(metadataPtr) } }
+        defer {
+            if let metadataPtr {
+                rd_kafka_metadata_destroy(metadataPtr)
+            }
+        }
 
         guard result == RD_KAFKA_RESP_ERR_NO_ERROR else {
             let errStr = String(cString: rd_kafka_err2str(result))
@@ -160,7 +167,9 @@ actor KafkaService {
             var metadataPtr: UnsafePointer<rd_kafka_metadata_t>?
             let result = rd_kafka_metadata(h.pointer, 0, nil, &metadataPtr, timeout)
             let elapsed = DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds
-            if let metadataPtr { rd_kafka_metadata_destroy(metadataPtr) }
+            if let metadataPtr {
+                rd_kafka_metadata_destroy(metadataPtr)
+            }
 
             guard result == RD_KAFKA_RESP_ERR_NO_ERROR else {
                 let errStr = String(cString: rd_kafka_err2str(result))
@@ -512,6 +521,9 @@ actor KafkaService {
         offsetTo: Int64? = nil,
         password: String? = nil,
     ) throws -> [KafkaMessageRecord] {
+        let kerberos = KerberosEnvironment(config: config)
+        defer { kerberos.restore() }
+
         // Create a separate consumer with a random group ID to avoid affecting business consumers
         let consumerConf = rd_kafka_conf_new()!
         let groupId = "swifka-browse-\(UUID().uuidString.prefix(8))"
@@ -524,14 +536,7 @@ actor KafkaService {
         try setConfig(consumerConf, key: "client.id", value: "swifka-browser")
 
         if config.authType == .sasl, let mechanism = config.saslMechanism {
-            try setConfig(consumerConf, key: "security.protocol", value: config.useTLS ? "sasl_ssl" : "sasl_plaintext")
-            try setConfig(consumerConf, key: "sasl.mechanism", value: mechanism.rawValue)
-            if let username = config.saslUsername {
-                try setConfig(consumerConf, key: "sasl.username", value: username)
-            }
-            if let password {
-                try setConfig(consumerConf, key: "sasl.password", value: password)
-            }
+            try applySaslConfig(consumerConf, config: config, mechanism: mechanism, password: password)
         } else if config.useTLS {
             try setConfig(consumerConf, key: "security.protocol", value: "ssl")
         }
@@ -560,7 +565,11 @@ actor KafkaService {
             // Get partition count from metadata and assign all
             var metadataPtr: UnsafePointer<rd_kafka_metadata_t>?
             let topicHandle = rd_kafka_topic_new(consumer, topic, nil)
-            defer { if let topicHandle { rd_kafka_topic_destroy(topicHandle) } }
+            defer {
+                if let topicHandle {
+                    rd_kafka_topic_destroy(topicHandle)
+                }
+            }
 
             let metaResult = rd_kafka_metadata(consumer, 0, topicHandle, &metadataPtr, Constants.kafkaTimeout)
             if metaResult == RD_KAFKA_RESP_ERR_NO_ERROR, let metadata = metadataPtr?.pointee {
@@ -578,8 +587,16 @@ actor KafkaService {
         }
 
         // Normalize: swap if from > to
-        let normFrom: Int64? = if let f = offsetFrom, let t = offsetTo, f > t { t } else { offsetFrom }
-        let normTo: Int64? = if let f = offsetFrom, let t = offsetTo, f > t { f } else { offsetTo }
+        let normFrom: Int64? = if let f = offsetFrom, let t = offsetTo, f > t {
+            t
+        } else {
+            offsetFrom
+        }
+        let normTo: Int64? = if let f = offsetFrom, let t = offsetTo, f > t {
+            f
+        } else {
+            offsetTo
+        }
 
         // Set partition offsets based on direction and range, clamped to watermarks
         for i in 0 ..< Int(topicPartitionList.pointee.cnt) {
@@ -631,7 +648,9 @@ actor KafkaService {
 
         while messages.count < maxMessages, emptyPolls < maxEmptyPolls {
             // Allow early exit when the calling Task is cancelled
-            if Task.isCancelled { break }
+            if Task.isCancelled {
+                break
+            }
 
             guard let msg = rd_kafka_consumer_poll(consumer, Constants.defaultFetchTimeout) else {
                 emptyPolls += 1
@@ -694,6 +713,51 @@ actor KafkaService {
 
     // MARK: - Private Helpers
 
+    private func applySaslConfig(
+        _ conf: OpaquePointer,
+        config: ClusterConfig,
+        mechanism: SASLMechanism,
+        password: String?,
+    ) throws {
+        try setConfig(conf, key: "security.protocol", value: config.useTLS ? "sasl_ssl" : "sasl_plaintext")
+        try setConfig(conf, key: "sasl.mechanism", value: mechanism.rawValue)
+
+        switch mechanism {
+        case .gssapi:
+            let serviceName = Self.nonEmpty(
+                config.saslKerberosServiceName?.trimmingCharacters(in: .whitespacesAndNewlines),
+            ) ?? "kafka"
+            try setConfig(conf, key: "sasl.kerberos.service.name", value: serviceName)
+
+            if let principal = Self.nonEmpty(
+                config.saslKerberosPrincipal?.trimmingCharacters(in: .whitespacesAndNewlines),
+            ) {
+                try setConfig(conf, key: "sasl.kerberos.principal", value: principal)
+            }
+
+            if let keytab = Self.nonEmpty(
+                config.saslKerberosKeytabPath?.trimmingCharacters(in: .whitespacesAndNewlines),
+            ) {
+                try setConfig(conf, key: "sasl.kerberos.keytab", value: keytab)
+            }
+
+            try setConfig(conf, key: "sasl.kerberos.kinit.cmd", value: KerberosConfig.kinitCmd)
+            try setConfig(conf, key: "sasl.kerberos.min.time.before.relogin", value: KerberosConfig.minTimeBeforeReloginMs)
+        case .plain, .scramSHA256, .scramSHA512:
+            if let username = config.saslUsername {
+                try setConfig(conf, key: "sasl.username", value: username)
+            }
+            if let password {
+                try setConfig(conf, key: "sasl.password", value: password)
+            }
+        }
+    }
+
+    private static func nonEmpty(_ value: String?) -> String? {
+        guard let value, !value.isEmpty else { return nil }
+        return value
+    }
+
     private func setConfig(_ conf: OpaquePointer, key: String, value: String) throws {
         let errorChars = UnsafeMutablePointer<CChar>.allocate(capacity: stringSize)
         defer { errorChars.deallocate() }
@@ -709,5 +773,33 @@ actor KafkaService {
         if let handle {
             rd_kafka_destroy(handle)
         }
+    }
+}
+
+/// Applies per-cluster KRB5_CONFIG for GSSAPI (kinit inherits this from the process).
+private final class KerberosEnvironment: @unchecked Sendable {
+    private let previousKrb5Config: String?
+
+    init(config: ClusterConfig) {
+        previousKrb5Config = getenv("KRB5_CONFIG").map { String(cString: $0) }
+        guard config.saslMechanism == .gssapi,
+              let path = config.saslKerberosKrb5ConfPath?
+              .trimmingCharacters(in: .whitespacesAndNewlines),
+              !path.isEmpty
+        else { return }
+        setenv("KRB5_CONFIG", path, 1)
+        Log.kafka.debug("[KafkaService] Kerberos: KRB5_CONFIG=\(path, privacy: .public)")
+    }
+
+    func restore() {
+        if let previousKrb5Config {
+            setenv("KRB5_CONFIG", previousKrb5Config, 1)
+        } else {
+            unsetenv("KRB5_CONFIG")
+        }
+    }
+
+    deinit {
+        restore()
     }
 }
