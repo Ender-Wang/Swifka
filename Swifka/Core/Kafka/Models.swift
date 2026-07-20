@@ -3,6 +3,11 @@ import SwiftUI
 
 // MARK: - Cluster Configuration
 
+/// Persisted cluster settings (JSON). Swifka v1.0.0 rule: **secrets never in config files**.
+///
+/// - **Keychain** (`KeychainManager`): SASL passwords for PLAIN/SCRAM only.
+/// - **Config (plaintext)**: usernames, Kerberos client identity, and filesystem paths to keytab/krb5.conf.
+///   These are not credentials — authentication still requires a readable keytab file on disk.
 nonisolated struct ClusterConfig: Codable, Identifiable, Hashable, Sendable {
     var id: UUID
     var name: String
@@ -10,14 +15,15 @@ nonisolated struct ClusterConfig: Codable, Identifiable, Hashable, Sendable {
     var port: Int
     var authType: AuthType
     var saslMechanism: SASLMechanism?
+    /// SASL username (PLAIN/SCRAM). Non-secret identity; stored in config like host/port.
     var saslUsername: String?
-    /// Kerberos client principal, e.g. `kafkaclient/host@REALM`
+    /// Kerberos client principal, e.g. `user@REALM`. Non-secret identity (analogous to `saslUsername`).
     var saslKerberosPrincipal: String?
-    /// Kafka broker service name (without `/hostname@REALM`), default `kafka`
+    /// Kafka broker Kerberos service name (without `/hostname@REALM`), default `kafka`. Non-secret.
     var saslKerberosServiceName: String?
-    /// Path to Kerberos keytab file for GSSAPI authentication
+    /// Filesystem path to the keytab file. Not keytab contents — the file on disk is the credential.
     var saslKerberosKeytabPath: String?
-    /// Path to krb5.conf (exported as KRB5_CONFIG for kinit/GSSAPI)
+    /// Filesystem path to krb5.conf (exported as `KRB5_CONFIG`). Non-secret realm/KDC configuration.
     var saslKerberosKrb5ConfPath: String?
     var useTLS: Bool
     var createdAt: Date
@@ -146,7 +152,7 @@ nonisolated struct ClusterConfig: Codable, Identifiable, Hashable, Sendable {
         case schemaRegistryURL, createdAt, updatedAt, isPinned, lastConnectedAt, sortOrder
     }
 
-    /// Whether this cluster stores a SASL password in Keychain (PLAIN/SCRAM).
+    /// Whether this cluster stores a SASL password in Keychain (PLAIN/SCRAM). GSSAPI uses keytab on disk instead.
     var usesSaslPassword: Bool {
         authType == .sasl && saslMechanism?.usesPassword == true
     }
